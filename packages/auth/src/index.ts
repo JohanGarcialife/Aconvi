@@ -37,6 +37,15 @@ export function initAuth<
         redirectURI: `${options.productionUrl}/api/auth/callback/discord`,
       },
     },
+    user: {
+      additionalFields: {
+        role: {
+          type: "string",
+          required: true,
+          defaultValue: "Vecino",
+        },
+      },
+    },
     trustedOrigins: ["expo://"],
     onAPIError: {
       onError(error, ctx) {
