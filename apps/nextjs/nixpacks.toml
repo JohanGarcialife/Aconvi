@@ -3,7 +3,7 @@ nixPkgs = ["nodejs_22"]
 
 [phases.install]
 cmds = [
-  "npm install -g pnpm@latest && pnpm install --filter @acme/nextjs..."
+  "corepack enable && corepack prepare pnpm@10.19.0 --activate && pnpm install --filter @acme/nextjs..."
 ]
 
 [phases.build]
