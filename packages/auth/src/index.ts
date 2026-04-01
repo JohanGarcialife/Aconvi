@@ -2,7 +2,7 @@ import type { BetterAuthOptions, BetterAuthPlugin } from "better-auth";
 import { expo } from "@better-auth/expo";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { oAuthProxy } from "better-auth/plugins";
+import { oAuthProxy, magicLink, organization } from "better-auth/plugins";
 
 import { db } from "@acme/db/client";
 
@@ -23,11 +23,21 @@ export function initAuth<
     }),
     baseURL: options.baseUrl,
     secret: options.secret,
+    session: {
+      expiresIn: 60 * 60 * 24 * 365, // 1 year (Estilo WhatsApp)
+      updateAge: 60 * 60 * 24, // Update session every 1 day
+    },
     plugins: [
       oAuthProxy({
         productionURL: options.productionUrl,
       }),
       expo(),
+      magicLink({
+        sendMagicLink: async ({ email, token, url }) => {
+          console.log(`[AUTH] Magic link for ${email}: ${url}`);
+        },
+      }),
+      organization(),
       ...(options.extraPlugins ?? []),
     ],
     socialProviders: {
