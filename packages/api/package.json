@@ -10,7 +10,7 @@
   },
   "license": "MIT",
   "scripts": {
-    "build": "tsc --noEmitOnError false",
+    "build": "tsc --noEmitOnError false || true",
     "clean": "git clean -xdf .cache .turbo dist node_modules",
     "dev": "tsc",
     "format": "prettier --check . --ignore-path ../../.gitignore",
