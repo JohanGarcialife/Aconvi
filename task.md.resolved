@@ -1,0 +1,45 @@
+# Project: Aconvi (Gestión de Comunidades)
+
+## Fase 1: Setup Core, Multitenancy y Auth Passwordless (Días 1-7)
+- [x] Inicializar el monorepo usando Turborepo + pnpm (recomendación: Create T3 Turbo).
+- [x] Configurar Next.js 15 para la plataforma Web.
+- [x] Configurar Expo (React Native) para la plataforma Móvil.
+- [x] Configurar UI base usando Shadcn/ui.
+- [x] Configurar la base de datos PostgreSQL con Drizzle ORM.
+- [x] Configurar CI/CD para despliegue en VPS Ubuntu con Coolify.
+- [x] Desplegar un "Hello World" en Coolify para Web y API/DB.
+- [x] Refactorizar esquema DB para aplicar reglas de MULTITENANCY (Aislamiento total de comunidades).
+- [x] Refactorizar integración `better-auth` para soportar Passwordless (Magic Links / OTP).
+- [x] Modificar esquemas de sesión para soportar Sesiones de Larga Duración persistentes.
+- [x] Definir roles del sistema: Vecino, AF, Agente AF, SuperAdmin Aconvi, Agente Aconvi, Proveedor.
+
+## Fase 2: Core Administrativo, Importador y Notificaciones Custom (Días 8-20)
+- [x] Aplicar **Identidad Visual Aconvi** (Tailwind, global.css, colores primarios Teal, radio de bordes).
+- [x] Implementar Sidebar Layout principal para el Administrador de Fincas (AF).
+- [x] Ajustar flujo Auth Frontend para soportar Login con **Número de Teléfono** usando `better-auth`.
+- [x] Implementar protección de rutas basada en el contexto del Tenant (Comunidad) y Rol.
+- [x] Módulo: Gestión de Incidencias en Web (Lista, Estados, Asignación a Proveedor).
+- [x] Módulo: Tablón Digital y Comunicados oficiales (Backoffice AF).
+- [x] Módulo: Gestión de Fincas y Vecinos (Panel AF).
+- [x] Módulo: "Importador Masivo" por Excel (carga con 1 clic de Fincas, Vecinos, Coeficientes y Proveedores).
+- [x] Infraestructura de Notificaciones: Configurar WebSockets propios alojados en Coolify (Node/Socket.io u otros).
+- [x] Configurar Push API Nativa para Web y App móvil interactuando con nuestros WebSockets.
+
+## Fase 3: App Móvil (Expo), Offline e Incidencias (Días 21-35)
+- [x] Desarrollo UI App Expo para perfiles Vecinos, Agentes, Proveedores.
+- [x] Configuración Deep Linking (emails/notificaciones -> directo a la App autenticada).
+- [x] Módulo: Gestión de Incidencias (Backoffice).
+- [x] Módulo: Gestión de Incidencias en App (Reporte de vecinos con Foto + Descripción).
+- [x] Módulo Proveedores en App Móvil con **Modo Offline Obligatorio** (fotos sin internet y guardado local en caché/SQLite).
+- [x] Hook de sincronización en background para la carga automática al recuperar conexión.
+- [x] Módulo: Reservas de Zonas Comunes (Calendario y Reglas).
+
+## Fase 4: Votaciones Legales y Pulido General (Días 36-45)
+- [ ] Módulo de Votaciones Online Legales (Cálculo por Coeficientes, Timestamping).
+- [ ] Integración de 2FA obligatorio al momento de realizar el voto legal.
+- [ ] Generación de Acta PDF válida para Libro de Actas tras cierres automáticos de votaciones.
+- [ ] Módulo Documental: Subida masiva, carpetas por rol y buscador inteligente.
+- [ ] Módulo: Agenda Inteligente del Administrador (vencimientos, recurrentes).
+- [ ] Panel de Control de Auditoría (Aconvi SuperAdmin).
+- [ ] Pruebas cruzadas de Multitenancy y GDPR (aislamiento estricto de accesos).
+- [ ] Pruebas finales y despliegue del release canditate a producción.

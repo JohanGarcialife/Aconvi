@@ -2,7 +2,7 @@ import type { BetterAuthOptions, BetterAuthPlugin } from "better-auth";
 import { expo } from "@better-auth/expo";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { oAuthProxy, magicLink, organization } from "better-auth/plugins";
+import { oAuthProxy, magicLink, organization, phoneNumber } from "better-auth/plugins";
 
 import { db } from "@acme/db/client";
 
@@ -35,6 +35,12 @@ export function initAuth<
       magicLink({
         sendMagicLink: async ({ email, token, url }) => {
           console.log(`[AUTH] Magic link for ${email}: ${url}`);
+        },
+      }),
+      phoneNumber({
+        sendOTP: async ({ phoneNumber, code }, request) => {
+          console.log(`[AUTH] OTP requested for ${phoneNumber}: ${code}`);
+          // Send SMS logic goes here (e.g., Twilio)
         },
       }),
       organization(),

@@ -9,30 +9,22 @@ import {
 } from "./_components/posts";
 
 export default function HomePage() {
-  prefetch(trpc.post.all.queryOptions());
-
   return (
     <HydrateClient>
-      <main className="container h-screen py-16">
-        <div className="flex flex-col items-center justify-center gap-4">
-          <h1 className="text-5xl font-extrabold tracking-tight sm:text-[5rem]">
-            Create <span className="text-primary">T3</span> Turbo
-          </h1>
-          <AuthShowcase />
-
-          <CreatePostForm />
-          <div className="w-full max-w-2xl overflow-y-scroll">
-            <Suspense
-              fallback={
-                <div className="flex w-full flex-col gap-4">
-                  <PostCardSkeleton />
-                  <PostCardSkeleton />
-                  <PostCardSkeleton />
-                </div>
-              }
-            >
-              <PostList />
-            </Suspense>
+      <main className="flex min-h-screen bg-slate-50 dark:bg-slate-950">
+        <div className="m-auto w-full max-w-lg">
+          <div className="flex flex-col items-center justify-center p-8 bg-card border shadow-sm rounded-2xl">
+            <div className="mb-8 text-center">
+              <h1 className="text-4xl font-extrabold tracking-tight text-primary mb-2">
+                Aconvi
+              </h1>
+              <p className="text-muted-foreground text-sm">
+                Software Integral para Administradores de Fincas
+              </p>
+            </div>
+            
+            <AuthShowcase />
+            
           </div>
         </div>
       </main>

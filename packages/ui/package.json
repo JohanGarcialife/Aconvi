@@ -10,8 +10,16 @@
     "./input": "./src/input.tsx",
     "./label": "./src/label.tsx",
     "./separator": "./src/separator.tsx",
+    "./sidebar": "./src/sidebar.tsx",
+    "./sheet": "./src/sheet.tsx",
+    "./skeleton": "./src/skeleton.tsx",
+    "./table": "./src/table.tsx",
     "./theme": "./src/theme.tsx",
-    "./toast": "./src/toast.tsx"
+    "./toast": "./src/toast.tsx",
+    "./tooltip": "./src/tooltip.tsx",
+    "./dialog": "./src/dialog.tsx",
+    "./textarea": "./src/textarea.tsx",
+    "./badge": "./src/badge.tsx"
   },
   "license": "MIT",
   "scripts": {
@@ -24,6 +32,8 @@
   "dependencies": {
     "@radix-ui/react-icons": "^1.3.2",
     "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.7.0",
     "radix-ui": "^1.4.3",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.1"

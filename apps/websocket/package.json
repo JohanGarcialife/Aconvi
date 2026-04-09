@@ -1,0 +1,28 @@
+{
+  "name": "@acme/websocket",
+  "version": "1.0.0",
+  "description": "Aconvi Custom WebSocket Server",
+  "type": "module",
+  "main": "index.ts",
+  "scripts": {
+    "dev": "ts-node index.ts",
+    "start": "ts-node index.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.19.0",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "catalog:",
+    "ts-node": "^10.9.2",
+    "typescript": "catalog:"
+  }
+}

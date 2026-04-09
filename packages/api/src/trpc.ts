@@ -126,3 +126,55 @@ export const protectedProcedure = t.procedure
       },
     });
   });
+
+/**
+ * Tenant (Comunidad) protected procedure
+ *
+ * This procedure enforces that the caller provides a `tenantId` and ensures
+ * the authenticated user is an active member of that tenant.
+ */
+export const tenantProcedure = protectedProcedure
+  .input(z.object({ tenantId: z.string().min(1) }))
+  .use(async ({ ctx, input, next }) => {
+    const memberRecord = await ctx.db.query.member.findFirst({
+      where: (table, { eq, and }) =>
+        and(
+          eq(table.userId, ctx.session.user.id),
+          eq(table.organizationId, input.tenantId)
+        ),
+    });
+
+    if (!memberRecord) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "No tienes acceso a esta comunidad.",
+      });
+    }
+
+    return next({
+      ctx: {
+        ...ctx,
+        tenant: {
+          id: input.tenantId,
+          role: memberRecord.role,
+        },
+      },
+    });
+  });
+
+/**
+ * Role-based procedure factory
+ *
+ * Generates a protected procedure that further restricts access to users
+ * who have one of the `allowedRoles` within the specified `tenantId`.
+ */
+export const createRoleProcedure = (allowedRoles: string[]) =>
+  tenantProcedure.use(({ ctx, next }) => {
+    if (!allowedRoles.includes(ctx.tenant.role)) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Permisos insuficientes para realizar esta acción.",
+      });
+    }
+    return next();
+  });

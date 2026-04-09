@@ -51,6 +51,7 @@
     "@acme/tsconfig": "workspace:*",
     "@types/react": "catalog:react19",
     "eslint": "catalog:",
+    "metro-cache": "^0.84.2",
     "prettier": "catalog:",
     "tailwindcss": "catalog:",
     "typescript": "catalog:"
