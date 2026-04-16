@@ -1,0 +1,17 @@
+name: Deploy to Production (Coolify)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Trigger Coolify Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Coolify webhook
+        run: |
+          response=$(curl --fail --silent --show-error -X GET \
+            "http://212.227.207.43:8000/api/v1/deploy?uuid=ti6qdeom11qycsf3ky5fka7w&secret=${{ secrets.COOLIFY_WEBHOOK_SECRET }}&force=false")
+          echo "Coolify response: $response"
