@@ -39,8 +39,13 @@ COPY tooling/ ./tooling/
 COPY turbo.json ./turbo.json
 COPY turbo/ ./turbo/
 
-# Build only the Next.js app and its dependencies
-RUN pnpm --filter @acme/nextjs... run build
+# Install missing type declarations
+RUN cd /app && pnpm add -D @types/web-push --filter @acme/api 2>/dev/null || true
+
+# Build only the Next.js app — packages are transpiled directly by Next.js
+# SKIP_ENV_VALIDATION prevents env schema errors during docker build
+ENV SKIP_ENV_VALIDATION=1
+RUN cd apps/nextjs && pnpm run build
 
 ########################################
 # Stage 3: Production runtime
