@@ -39,9 +39,6 @@ COPY tooling/ ./tooling/
 COPY turbo.json ./turbo.json
 COPY turbo/ ./turbo/
 
-# Install missing type declarations
-RUN cd /app && pnpm add -D @types/web-push --filter @acme/api 2>/dev/null || true
-
 # Build only the Next.js app — packages are transpiled directly by Next.js
 # SKIP_ENV_VALIDATION prevents env schema errors during docker build
 ENV SKIP_ENV_VALIDATION=1
