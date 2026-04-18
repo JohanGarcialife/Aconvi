@@ -11,9 +11,9 @@ import {
 export default function HomePage() {
   return (
     <HydrateClient>
-      <main className="flex min-h-screen bg-slate-50 dark:bg-slate-950">
+      <main className="flex min-h-screen bg-slate-50">
         <div className="m-auto w-full max-w-lg">
-          <div className="flex flex-col items-center justify-center p-8 bg-card border shadow-sm rounded-2xl">
+          <div className="flex flex-col items-center justify-center p-8 bg-white border shadow-md rounded-2xl">
             <div className="mb-8 text-center">
               <h1 className="text-4xl font-extrabold tracking-tight text-primary mb-2">
                 Aconvi
