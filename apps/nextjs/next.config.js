@@ -19,6 +19,12 @@ const config = {
 
   /** We already do linting and typechecking as separate tasks in CI */
   typescript: { ignoreBuildErrors: true },
+
+  /** Stability: Limit concurrent build threads to reduce RAM usage on limited VPS */
+  experimental: {
+    cpus: 1,
+    workerThreads: false,
+  },
 };
 
 export default config;

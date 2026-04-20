@@ -41,7 +41,9 @@ COPY turbo/ ./turbo/
 
 # Build only the Next.js app — packages are transpiled directly by Next.js
 # SKIP_ENV_VALIDATION prevents env schema errors during docker build
+# NODE_OPTIONS limits memory usage to prevent OOM on limited RAM VPS
 ENV SKIP_ENV_VALIDATION=1
+ENV NODE_OPTIONS="--max-old-space-size=2048"
 RUN cd apps/nextjs && pnpm run build
 
 ########################################
