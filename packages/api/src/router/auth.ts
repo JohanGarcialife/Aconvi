@@ -1,8 +1,8 @@
 import type { TRPCRouterRecord } from "@trpc/server";
+import { z } from "zod/v4";
 
 import { desc, eq } from "@acme/db";
 import { verification } from "@acme/db/schema";
-import { z } from "@acme/validators";
 
 import { protectedProcedure, publicProcedure } from "../trpc";
 
