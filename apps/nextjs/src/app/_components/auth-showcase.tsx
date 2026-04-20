@@ -1,16 +1,12 @@
-"use client";
-
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Button } from "@acme/ui/button";
-import { Input } from "@acme/ui/input";
-import { authClient } from "~/auth/client";
+import { trpc } from "~/trpc/react";
 
 export function AuthShowcase() {
   const router = useRouter();
+  const utils = trpc.useUtils();
   const { data: session, isPending } = authClient.useSession();
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otp, setOtp] = useState("");
+  const [testCode, setTestCode] = useState<string | null>(null);
   const [step, setStep] = useState<"phone" | "otp">("phone");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -50,12 +46,26 @@ export function AuthShowcase() {
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setTestCode(null);
     setLoading(true);
     try {
       const { data, error } = await authClient.phoneNumber.sendOtp({
         phoneNumber,
       });
       if (error) throw error;
+      
+      // If it's the test number, wait a bit for the DB to save and then fetch it
+      if (phoneNumber === "+34 600 000 000") {
+        setTimeout(async () => {
+          try {
+            const code = await utils.auth.getLatestOTP.fetch({ phoneNumber });
+            if (code) setTestCode(code);
+          } catch (e) {
+            console.error("Failed to fetch test code", e);
+          }
+        }, 1500);
+      }
+
       setStep("otp");
     } catch (err: any) {
       setError(err.message || "Error al enviar el código");
@@ -128,6 +138,12 @@ export function AuthShowcase() {
               maxLength={6}
             />
           </div>
+          {testCode && (
+            <div className="rounded-md bg-primary/10 p-3 text-sm text-primary">
+              <p className="font-medium">Modo Pruebas:</p>
+              <p>Tu código es: <span className="text-lg font-bold tracking-widest">{testCode}</span></p>
+            </div>
+          )}
           <Button type="submit" disabled={loading} className="w-full">
             {loading ? "Verificando..." : "Verificar y entrar"}
           </Button>
