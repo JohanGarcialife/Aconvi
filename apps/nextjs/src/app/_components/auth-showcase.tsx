@@ -1,3 +1,11 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@acme/ui/button";
+import { Input } from "@acme/ui/input";
+
+import { authClient } from "~/auth/client";
 import { trpc } from "~/trpc/react";
 
 export function AuthShowcase() {
