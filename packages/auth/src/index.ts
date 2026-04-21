@@ -50,6 +50,10 @@ export function initAuth<
           console.log(`[AUTH] OTP requested for ${phoneNumber}: ${code}`);
           // Send SMS logic goes here (e.g., Twilio)
         },
+        signUpOnVerification: {
+          getTempEmail: (phoneNumber) => `${phoneNumber.replace("+", "")}@aconvi.app`,
+          getTempName: () => "Vecino",
+        },
       }),
       organization(),
       ...(options.extraPlugins ?? []),
