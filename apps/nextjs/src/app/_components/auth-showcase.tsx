@@ -6,11 +6,13 @@ import { Button } from "@acme/ui/button";
 import { Input } from "@acme/ui/input";
 
 import { authClient } from "~/auth/client";
-import { trpc } from "~/trpc/react";
+import { useTRPC } from "~/trpc/react";
+import { useQueryClient } from "@tanstack/react-query";
 
 export function AuthShowcase() {
   const router = useRouter();
-  const utils = trpc.useUtils();
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
   const { data: session, isPending } = authClient.useSession();
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otp, setOtp] = useState("");
@@ -66,7 +68,9 @@ export function AuthShowcase() {
       if (phoneNumber === "+34 600 000 000") {
         setTimeout(async () => {
           try {
-            const code = await utils.auth.getLatestOTP.fetch({ phoneNumber });
+            const code = await queryClient.fetchQuery(
+              trpc.auth.getLatestOTP.queryOptions({ phoneNumber })
+            );
             if (code) setTestCode(code);
           } catch (e) {
             console.error("Failed to fetch test code", e);
