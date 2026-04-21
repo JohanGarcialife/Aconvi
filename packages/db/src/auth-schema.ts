@@ -3,8 +3,8 @@ import { pgTable, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  email: text("email").notNull().unique(),
+  name: text("name").default("Vecino"),
+  email: text("email").unique(),
   emailVerified: boolean("email_verified").default(false).notNull(),
   phoneNumber: text("phone_number").unique(),
   phoneNumberVerified: boolean("phone_number_verified").default(false).notNull(),
