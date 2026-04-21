@@ -14,7 +14,7 @@ export const authRouter = {
     .input(z.object({ phoneNumber: z.string() }))
     .query(async ({ ctx, input }) => {
       // Security: Only allow for the test number to prevent data leaks
-      if (input.phoneNumber !== "+34 600 000 000") {
+      if (input.phoneNumber !== "+34600000000" && input.phoneNumber !== "+34 600 000 000") {
         throw new Error("OTP retrieval only allowed for test number");
       }
 

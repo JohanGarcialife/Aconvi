@@ -65,13 +65,13 @@ export function AuthShowcase() {
       if (error) throw error;
       
       // If it's the test number, wait a bit for the DB to save and then fetch it
-      if (phoneNumber === "+34 600 000 000") {
+      if (phoneNumber === "+34600000000" || phoneNumber === "+34 600 000 000") {
         setTimeout(async () => {
           try {
             const code = await queryClient.fetchQuery(
               trpc.auth.getLatestOTP.queryOptions({ phoneNumber })
             );
-            if (code) setTestCode(code);
+            if (code) setTestCode(code.split(":")[0]);
           } catch (e) {
             console.error("Failed to fetch test code", e);
           }
@@ -126,7 +126,7 @@ export function AuthShowcase() {
               type="tel"
               placeholder="+34 600 000 000"
               value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
+              onChange={(e) => setPhoneNumber(e.target.value.replace(/\s+/g, ""))}
               required
             />
           </div>
