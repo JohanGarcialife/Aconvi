@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Mail, Send, Lock, MousePointerClick, ShieldCheck } from "lucide-react";
+import { Mail, Send, Lock, MousePointerClick, ShieldCheck, Shield } from "lucide-react";
 
 import { authClient } from "~/auth/client";
 import { useTRPC } from "~/trpc/react";
@@ -35,7 +35,6 @@ export function ProfessionalLogin() {
 
       setSuccess(true);
 
-      // Plan B interceptor: poll for the test link
       let attempts = 0;
       const interval = setInterval(async () => {
         try {
@@ -63,37 +62,43 @@ export function ProfessionalLogin() {
   };
 
   return (
-    <div className="flex w-full flex-col overflow-hidden rounded-3xl border border-slate-200/60 bg-white shadow-2xl shadow-slate-200/50 lg:h-[640px] lg:flex-row">
-      {/* ─── LEFT SIDE ─────────────────────────────────────────── */}
-      <div className="flex w-full flex-col justify-between p-10 md:p-14 lg:w-1/2">
-        {/* Logo */}
-        <div>
+    <div
+      className="flex w-full overflow-hidden rounded-2xl bg-white shadow-2xl"
+      style={{ minHeight: "600px" }}
+    >
+      {/* ─── LEFT PANEL ─────────────────────────────────── */}
+      <div className="flex w-full flex-col lg:w-1/2">
+        <div className="flex flex-1 flex-col p-10 md:p-14">
+          {/* Logo */}
           <Image
             src="/logo.png"
             alt="Aconvi"
-            width={160}
-            height={48}
+            width={150}
+            height={44}
             priority
-            className="mb-12 object-contain"
+            className="mb-12 object-contain object-left"
           />
 
-          <span
-            className="mb-5 block text-xs font-bold uppercase tracking-widest"
-            style={{ color: "#2CD4D9" }}
-          >
-            Entorno Profesional
-          </span>
+          {/* Heading */}
+          <div className="mb-8">
+            <span
+              className="mb-4 block text-xs font-bold uppercase tracking-widest"
+              style={{ color: "#2CD4D9" }}
+            >
+              Entorno Profesional
+            </span>
 
-          <h1
-            className="mb-4 text-4xl font-extrabold leading-tight tracking-tight md:text-5xl"
-            style={{ color: "#0F1B2B" }}
-          >
-            Accede a tu<br />espacio de trabajo
-          </h1>
+            <h1
+              className="mb-3 text-4xl font-extrabold leading-tight tracking-tight md:text-5xl"
+              style={{ color: "#0F1B2B" }}
+            >
+              Accede a tu<br />espacio de trabajo
+            </h1>
 
-          <p className="mb-10 text-lg text-slate-500">
-            Sin contraseñas. Seguro. En segundos.
-          </p>
+            <p className="text-lg" style={{ color: "#64748b" }}>
+              Sin contraseñas. Seguro. En segundos.
+            </p>
+          </div>
 
           {/* Error */}
           {error && (
@@ -102,34 +107,22 @@ export function ProfessionalLogin() {
             </div>
           )}
 
-          {/* Success — Plan B interceptor link */}
+          {/* Success — Plan B */}
           {success && (
             <div
               className="mb-5 animate-in fade-in zoom-in rounded-xl border p-5 duration-300"
-              style={{
-                borderColor: "#2CD4D9",
-                backgroundColor: "rgba(44,212,217,0.06)",
-              }}
+              style={{ borderColor: "#2CD4D9", backgroundColor: "rgba(44,212,217,0.06)" }}
             >
               <div className="mb-2 flex items-center gap-3">
-                <ShieldCheck
-                  className="h-5 w-5 shrink-0"
-                  style={{ color: "#2CD4D9" }}
-                />
-                <p
-                  className="font-semibold"
-                  style={{ color: "#0F1B2B" }}
-                >
-                  {testLink
-                    ? "Enlace generado · Modo Pruebas"
-                    : "¡Enlace en camino!"}
+                <ShieldCheck className="h-5 w-5 shrink-0" style={{ color: "#2CD4D9" }} />
+                <p className="font-semibold" style={{ color: "#0F1B2B" }}>
+                  {testLink ? "Enlace generado · Modo Pruebas" : "¡Enlace en camino!"}
                 </p>
               </div>
               {testLink ? (
                 <div className="pl-8">
                   <p className="mb-3 text-sm text-slate-500">
-                    Sin SMTP configurado aún. Haz clic para validar el
-                    acceso directo:
+                    Sin SMTP configurado aún. Haz clic para validar el acceso:
                   </p>
                   <a
                     href={testLink}
@@ -141,8 +134,7 @@ export function ProfessionalLogin() {
                 </div>
               ) : (
                 <p className="pl-8 text-sm text-slate-500">
-                  Revisa tu bandeja de entrada. El enlace es válido 10
-                  minutos.
+                  Revisa tu bandeja de entrada. El enlace es válido 10 minutos.
                 </p>
               )}
             </div>
@@ -150,17 +142,18 @@ export function ProfessionalLogin() {
 
           {/* Form */}
           {!success && (
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-4">
               <div>
                 <label
                   htmlFor="email"
-                  className="mb-2 block text-sm font-bold text-slate-700"
+                  className="mb-2 block text-sm font-semibold"
+                  style={{ color: "#0F1B2B" }}
                 >
                   Email corporativo
                 </label>
                 <div className="relative">
                   <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-                    <Mail className="h-5 w-5 text-slate-400" />
+                    <Mail className="h-5 w-5" style={{ color: "#2CD4D9" }} />
                   </div>
                   <input
                     id="email"
@@ -169,19 +162,23 @@ export function ProfessionalLogin() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/60 py-4 pl-12 pr-4 text-base text-slate-800 placeholder-slate-400 outline-none transition focus:border-[#2CD4D9] focus:ring-2 focus:ring-[#2CD4D9]/20"
+                    onKeyDown={(e) => e.key === "Enter" && handleSubmit(e)}
+                    className="w-full rounded-xl border py-4 pl-12 pr-4 text-base outline-none transition"
+                    style={{
+                      borderColor: "#e2e8f0",
+                      color: "#0F1B2B",
+                    }}
+                    onFocus={(e) => (e.target.style.borderColor = "#2CD4D9")}
+                    onBlur={(e) => (e.target.style.borderColor = "#e2e8f0")}
                   />
                 </div>
               </div>
 
               <button
-                type="submit"
-                disabled={loading}
-                className="flex w-full items-center justify-center gap-3 rounded-xl py-4 text-base font-semibold text-white shadow-lg transition-all hover:opacity-90 disabled:opacity-60"
-                style={{
-                  backgroundColor: "#2CD4D9",
-                  boxShadow: "0 8px 24px rgba(44,212,217,0.25)",
-                }}
+                onClick={handleSubmit}
+                disabled={loading || !email}
+                className="flex w-full items-center justify-center gap-3 rounded-xl py-4 text-base font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                style={{ backgroundColor: "#2CD4D9" }}
               >
                 {loading ? (
                   "Procesando..."
@@ -192,74 +189,103 @@ export function ProfessionalLogin() {
                   </>
                 )}
               </button>
-            </form>
+
+              <p className="flex items-center justify-center gap-2 text-sm" style={{ color: "#94a3b8" }}>
+                <Lock className="h-4 w-4" />
+                Te enviaremos un enlace válido por 10 minutos.
+              </p>
+            </div>
           )}
 
-          <p className="mt-5 flex items-center justify-center gap-2 text-sm text-slate-400">
-            <Lock className="h-4 w-4" />
-            Te enviaremos un enlace válido por 10 minutos.
-          </p>
+          {/* Divider + Acceso Cifrado */}
+          <div className="mt-auto pt-8">
+            <div className="mb-4 border-t" style={{ borderColor: "#f1f5f9" }} />
+            <div className="flex items-center gap-3">
+              <div
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+                style={{ backgroundColor: "rgba(44,212,217,0.1)" }}
+              >
+                <Shield className="h-4 w-4" style={{ color: "#2CD4D9" }} />
+              </div>
+              <p className="text-sm" style={{ color: "#64748b" }}>
+                <strong style={{ color: "#0F1B2B" }}>Acceso cifrado.</strong> Solo tú puedes entrar.
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Footer */}
-        <div className="mt-10 flex flex-col gap-4 border-t border-slate-100 pt-6 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-2 text-sm text-slate-600">
-            <div
-              className="rounded-full p-1.5"
-              style={{ backgroundColor: "rgba(44,212,217,0.12)" }}
-            >
-              <ShieldCheck
-                className="h-4 w-4"
-                style={{ color: "#2CD4D9" }}
-              />
-            </div>
-            <span>
-              <strong>Acceso cifrado.</strong> Solo tú puedes entrar.
-            </span>
-          </div>
-          <div className="flex gap-4 text-xs text-slate-400">
-            <a href="#" className="transition hover:text-slate-600">
-              Aviso legal
-            </a>
-            <a href="#" className="transition hover:text-slate-600">
-              Privacidad
-            </a>
-            <a href="#" className="transition hover:text-slate-600">
-              Cookies
-            </a>
+        <div
+          className="flex items-center justify-between px-10 py-4 md:px-14"
+          style={{ borderTop: "1px solid #f1f5f9" }}
+        >
+          <p className="text-xs" style={{ color: "#94a3b8" }}>
+            © Aconvi. Todos los derechos reservados.
+          </p>
+          <div className="flex gap-4 text-xs" style={{ color: "#94a3b8" }}>
+            <a href="#" className="transition hover:text-slate-600">Aviso legal</a>
+            <a href="#" className="transition hover:text-slate-600">Privacidad</a>
+            <a href="#" className="transition hover:text-slate-600">Política de cookies</a>
           </div>
         </div>
       </div>
 
-      {/* ─── RIGHT SIDE ────────────────────────────────────────── */}
+      {/* ─── RIGHT PANEL ─────────────────────────────────── */}
       <div
-        className="relative hidden overflow-hidden p-14 lg:flex lg:w-1/2 lg:flex-col lg:justify-center"
+        className="relative hidden overflow-hidden lg:block lg:w-1/2"
         style={{ backgroundColor: "#F5F7FA" }}
       >
-        {/* Decorative orbs */}
+        {/* Decorative circles — positioned top-right like the reference */}
         <div
-          className="absolute right-10 top-10 h-72 w-72 rounded-full border"
-          style={{ borderColor: "rgba(44,212,217,0.12)" }}
-        />
-        <div
-          className="absolute right-4 top-4 h-80 w-80 rounded-full border"
-          style={{ borderColor: "rgba(44,212,217,0.08)" }}
-        />
-        <div
-          className="absolute right-24 top-24 h-36 w-36 rounded-full shadow-2xl"
+          className="absolute"
           style={{
-            background:
-              "radial-gradient(circle at 30% 30%, #2CD4D9, #1ab8bc)",
-            boxShadow: "0 20px 60px rgba(44,212,217,0.45)",
+            right: "-80px",
+            top: "-80px",
+            width: "340px",
+            height: "340px",
+            borderRadius: "50%",
+            border: "1px solid rgba(44,212,217,0.15)",
           }}
         />
         <div
-          className="absolute right-56 top-16 h-4 w-4 rounded-full"
-          style={{ backgroundColor: "#2CD4D9" }}
+          className="absolute"
+          style={{
+            right: "-40px",
+            top: "-40px",
+            width: "260px",
+            height: "260px",
+            borderRadius: "50%",
+            border: "1px solid rgba(44,212,217,0.12)",
+          }}
+        />
+        {/* Main sphere */}
+        <div
+          className="absolute"
+          style={{
+            right: "20px",
+            top: "20px",
+            width: "140px",
+            height: "140px",
+            borderRadius: "50%",
+            background: "radial-gradient(circle at 35% 35%, #4de8d5, #2CD4D9, #1aabb2)",
+            boxShadow: "0 16px 48px rgba(44,212,217,0.35)",
+          }}
+        />
+        {/* Small dot */}
+        <div
+          className="absolute"
+          style={{
+            right: "190px",
+            top: "50px",
+            width: "10px",
+            height: "10px",
+            borderRadius: "50%",
+            backgroundColor: "#2CD4D9",
+          }}
         />
 
         {/* Content */}
-        <div className="relative z-10 max-w-sm">
+        <div className="relative flex h-full flex-col justify-center px-14 py-20">
           <h2
             className="mb-12 text-3xl font-extrabold leading-tight tracking-tight"
             style={{ color: "#0F1B2B" }}
@@ -269,70 +295,76 @@ export function ProfessionalLogin() {
 
           <div className="flex flex-col gap-8">
             {/* Step 1 */}
-            <div className="relative flex gap-5">
-              <div className="absolute bottom-[-2.5rem] left-6 top-14 w-px border-l-2 border-dashed border-slate-200" />
-              <div className="relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm">
+            <div className="relative flex items-start gap-5">
+              <div
+                className="absolute left-6 top-14 z-0"
+                style={{
+                  height: "calc(100% + 0.5rem)",
+                  width: "1px",
+                  borderLeft: "2px dashed #d1d5db",
+                }}
+              />
+              <div
+                className="relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white shadow-sm"
+                style={{ border: "1px solid #e2e8f0" }}
+              >
                 <Mail className="h-5 w-5" style={{ color: "#2CD4D9" }} />
               </div>
-              <div>
-                <h3
-                  className="mb-1 text-lg font-bold"
-                  style={{ color: "#0F1B2B" }}
-                >
+              <div className="pt-1">
+                <h3 className="mb-1 font-bold" style={{ color: "#0F1B2B" }}>
                   1. Recibe el enlace
                 </h3>
-                <p className="text-slate-500">
+                <p className="text-sm" style={{ color: "#64748b" }}>
                   Te lo enviamos a tu correo corporativo.
                 </p>
               </div>
             </div>
 
             {/* Step 2 */}
-            <div className="relative flex gap-5">
-              <div className="absolute bottom-[-2.5rem] left-6 top-14 w-px border-l-2 border-dashed border-slate-200" />
-              <div className="relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm">
-                <MousePointerClick
-                  className="h-5 w-5"
-                  style={{ color: "#2CD4D9" }}
-                />
+            <div className="relative flex items-start gap-5">
+              <div
+                className="absolute left-6 top-14 z-0"
+                style={{
+                  height: "calc(100% + 0.5rem)",
+                  width: "1px",
+                  borderLeft: "2px dashed #d1d5db",
+                }}
+              />
+              <div
+                className="relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white shadow-sm"
+                style={{ border: "1px solid #e2e8f0" }}
+              >
+                <MousePointerClick className="h-5 w-5" style={{ color: "#2CD4D9" }} />
               </div>
-              <div>
-                <h3
-                  className="mb-1 text-lg font-bold"
-                  style={{ color: "#0F1B2B" }}
-                >
+              <div className="pt-1">
+                <h3 className="mb-1 font-bold" style={{ color: "#0F1B2B" }}>
                   2. Confirma con un clic
                 </h3>
-                <p className="text-slate-500">
+                <p className="text-sm" style={{ color: "#64748b" }}>
                   Abre el enlace en este dispositivo.
                 </p>
               </div>
             </div>
 
             {/* Step 3 */}
-            <div className="flex gap-5">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm">
+            <div className="flex items-start gap-5">
+              <div
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white shadow-sm"
+                style={{ border: "1px solid #e2e8f0" }}
+              >
                 <Lock className="h-5 w-5" style={{ color: "#2CD4D9" }} />
               </div>
-              <div>
-                <h3
-                  className="mb-1 text-lg font-bold"
-                  style={{ color: "#0F1B2B" }}
-                >
+              <div className="pt-1">
+                <h3 className="mb-1 font-bold" style={{ color: "#0F1B2B" }}>
                   3. Accede al instante
                 </h3>
-                <p className="text-slate-500">
+                <p className="text-sm" style={{ color: "#64748b" }}>
                   Entras directamente a tu entorno profesional de trabajo.
                 </p>
               </div>
             </div>
           </div>
         </div>
-
-        {/* Bottom copyright */}
-        <p className="absolute bottom-6 left-14 text-xs text-slate-400">
-          © Aconvi. Todos los derechos reservados.
-        </p>
       </div>
     </div>
   );
