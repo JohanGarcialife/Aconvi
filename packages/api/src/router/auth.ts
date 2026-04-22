@@ -25,6 +25,13 @@ export const authRouter = {
 
       return latest?.value;
     }),
+  getLatestMagicLink: publicProcedure
+    .input(z.object({ email: z.string() }))
+    .query(({ input }) => {
+      // @ts-ignore
+      const map = globalThis.__magicLinks as Map<string, string> | undefined;
+      return map?.get(input.email);
+    }),
   getSecretMessage: protectedProcedure.query(() => {
     return "you can see this secret message!";
   }),

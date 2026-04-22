@@ -43,6 +43,10 @@ export function initAuth<
       magicLink({
         sendMagicLink: async ({ email, token, url }) => {
           console.log(`[AUTH] Magic link for ${email}: ${url}`);
+          // @ts-ignore
+          if (!globalThis.__magicLinks) globalThis.__magicLinks = new Map();
+          // @ts-ignore
+          globalThis.__magicLinks.set(email, url);
         },
       }),
       phoneNumber({

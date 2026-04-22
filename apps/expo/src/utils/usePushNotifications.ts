@@ -21,7 +21,7 @@ export function usePushNotifications() {
   const responseListener = useRef<Notifications.EventSubscription | null>(null);
 
   // tRPC mutation to register token in backend
-  const registerToken = api.notification.registerToken.useMutation();
+  const registerToken = api?.notification.registerToken.useMutation();
 
   useEffect(() => {
     // Register for push notifications
