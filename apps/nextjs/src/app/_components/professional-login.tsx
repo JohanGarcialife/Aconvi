@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Mail, Send, Lock, MousePointerClick, ShieldCheck, Shield } from "lucide-react";
 
 import { authClient } from "~/auth/client";
 import { useTRPC } from "~/trpc/react";
@@ -20,6 +19,7 @@ export function ProfessionalLogin() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email || loading) return;
     setError("");
     setSuccess(false);
     setTestLink(null);
@@ -30,9 +30,7 @@ export function ProfessionalLogin() {
         email,
         callbackURL: "/incidents",
       });
-
       if (error) throw error;
-
       setSuccess(true);
 
       let attempts = 0;
@@ -41,329 +39,414 @@ export function ProfessionalLogin() {
           const url = (await queryClient.fetchQuery(
             trpc.auth.getLatestMagicLink.queryOptions({ email }),
           )) as string | null | undefined;
-
           if (url && typeof url === "string") {
             setTestLink(url);
             clearInterval(interval);
           }
-        } catch {
-          // silent
-        }
-        attempts++;
-        if (attempts > 8) clearInterval(interval);
+        } catch { /* silent */ }
+        if (++attempts > 8) clearInterval(interval);
       }, 1000);
     } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "Error al solicitar acceso.";
-      setError(message);
+      setError(err instanceof Error ? err.message : "Error al solicitar acceso.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div
-      className="flex w-full overflow-hidden rounded-2xl bg-white shadow-2xl"
-      style={{ minHeight: "600px" }}
-    >
-      {/* ─── LEFT PANEL ─────────────────────────────────── */}
-      <div className="flex w-full flex-col lg:w-1/2">
-        <div className="flex flex-1 flex-col p-10 md:p-14">
-          {/* Logo */}
+    <div style={{
+      display: "flex",
+      width: "100%",
+      maxWidth: "1060px",
+      minHeight: "600px",
+      background: "#ffffff",
+      borderRadius: "16px",
+      boxShadow: "0 4px 40px rgba(0,0,0,0.08)",
+      overflow: "hidden",
+    }}>
+
+      {/* ═══════════════════════════ LEFT PANEL ═══════════════════════════ */}
+      <div style={{
+        display: "flex",
+        flexDirection: "column",
+        width: "54%",
+        background: "#ffffff",
+        padding: "56px 64px 0 64px",
+      }}>
+
+        {/* Logo */}
+        <div style={{ marginBottom: "40px" }}>
           <Image
             src="/logo.png"
             alt="Aconvi"
-            width={150}
-            height={44}
+            width={160}
+            height={46}
             priority
-            className="mb-12 object-contain object-left"
+            style={{ objectFit: "contain", objectPosition: "left" }}
           />
+        </div>
 
-          {/* Heading */}
-          <div className="mb-8">
-            <span
-              className="mb-4 block text-xs font-bold uppercase tracking-widest"
-              style={{ color: "#2CD4D9" }}
-            >
-              Entorno Profesional
-            </span>
+        {/* Tag */}
+        <div style={{
+          fontSize: "11px",
+          fontWeight: 700,
+          letterSpacing: "0.14em",
+          textTransform: "uppercase",
+          color: "#00BDA5",
+          marginBottom: "16px",
+        }}>
+          Entorno Profesional
+        </div>
 
-            <h1
-              className="mb-3 text-4xl font-extrabold leading-tight tracking-tight md:text-5xl"
-              style={{ color: "#0F1B2B" }}
-            >
-              Accede a tu<br />espacio de trabajo
-            </h1>
+        {/* Heading */}
+        <h1 style={{
+          fontSize: "42px",
+          fontWeight: 800,
+          lineHeight: 1.15,
+          color: "#0F1B2B",
+          margin: "0 0 12px 0",
+          letterSpacing: "-0.5px",
+        }}>
+          Accede a tu<br />espacio de trabajo
+        </h1>
 
-            <p className="text-lg" style={{ color: "#64748b" }}>
-              Sin contraseñas. Seguro. En segundos.
-            </p>
+        {/* Subheading */}
+        <p style={{
+          fontSize: "16px",
+          color: "#6b7280",
+          margin: "0 0 32px 0",
+        }}>
+          Sin contraseñas. Seguro. En segundos.
+        </p>
+
+        {/* Error */}
+        {error && (
+          <div style={{
+            background: "#fef2f2",
+            border: "1px solid #fca5a5",
+            borderRadius: "10px",
+            padding: "12px 16px",
+            color: "#dc2626",
+            fontSize: "14px",
+            marginBottom: "16px",
+          }}>
+            {error}
           </div>
+        )}
 
-          {/* Error */}
-          {error && (
-            <div className="mb-5 rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-600">
-              {error}
+        {/* Test mode success box */}
+        {success && (
+          <div style={{
+            background: "rgba(0,189,165,0.06)",
+            border: "1px solid #00BDA5",
+            borderRadius: "12px",
+            padding: "18px",
+            marginBottom: "16px",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00BDA5" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              <span style={{ fontWeight: 600, color: "#0F1B2B" }}>
+                {testLink ? "Enlace generado · Modo Pruebas" : "¡Enlace en camino!"}
+              </span>
             </div>
-          )}
+            {testLink ? (
+              <div style={{ paddingLeft: "30px" }}>
+                <p style={{ color: "#6b7280", fontSize: "13px", marginBottom: "12px" }}>
+                  Sin SMTP configurado aún. Haz clic para acceder:
+                </p>
+                <a href={testLink} style={{
+                  display: "inline-block",
+                  padding: "8px 16px",
+                  background: "#0F1B2B",
+                  color: "#fff",
+                  borderRadius: "8px",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  textDecoration: "none",
+                }}>
+                  Entrar a mi entorno →
+                </a>
+              </div>
+            ) : (
+              <p style={{ paddingLeft: "30px", color: "#6b7280", fontSize: "13px" }}>
+                Revisa tu bandeja. El enlace caduca en 10 minutos.
+              </p>
+            )}
+          </div>
+        )}
 
-          {/* Success — Plan B */}
-          {success && (
-            <div
-              className="mb-5 animate-in fade-in zoom-in rounded-xl border p-5 duration-300"
-              style={{ borderColor: "#2CD4D9", backgroundColor: "rgba(44,212,217,0.06)" }}
+        {/* Form */}
+        {!success && (
+          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+            {/* Label */}
+            <label style={{ fontSize: "13px", fontWeight: 700, color: "#0F1B2B" }}>
+              Email corporativo
+            </label>
+
+            {/* Input */}
+            <div style={{ position: "relative" }}>
+              <span style={{
+                position: "absolute",
+                left: "16px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                color: "#00BDA5",
+                display: "flex",
+                alignItems: "center",
+              }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="2" y="4" width="20" height="16" rx="2"/>
+                  <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+                </svg>
+              </span>
+              <input
+                type="email"
+                placeholder="nombre@tudespacho.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                style={{
+                  width: "100%",
+                  padding: "14px 16px 14px 48px",
+                  border: "1.5px solid #00BDA5",
+                  borderRadius: "10px",
+                  fontSize: "15px",
+                  color: "#0F1B2B",
+                  outline: "none",
+                  background: "#fff",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            {/* CTA Button */}
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "10px",
+                padding: "15px 24px",
+                background: "#00BDA5",
+                border: "none",
+                borderRadius: "10px",
+                color: "#ffffff",
+                fontSize: "16px",
+                fontWeight: 700,
+                cursor: loading ? "not-allowed" : "pointer",
+                opacity: loading ? 0.7 : 1,
+              }}
             >
-              <div className="mb-2 flex items-center gap-3">
-                <ShieldCheck className="h-5 w-5 shrink-0" style={{ color: "#2CD4D9" }} />
-                <p className="font-semibold" style={{ color: "#0F1B2B" }}>
-                  {testLink ? "Enlace generado · Modo Pruebas" : "¡Enlace en camino!"}
-                </p>
-              </div>
-              {testLink ? (
-                <div className="pl-8">
-                  <p className="mb-3 text-sm text-slate-500">
-                    Sin SMTP configurado aún. Haz clic para validar el acceso:
-                  </p>
-                  <a
-                    href={testLink}
-                    className="inline-flex rounded-lg px-4 py-2 text-sm font-semibold text-white transition"
-                    style={{ backgroundColor: "#0F1B2B" }}
-                  >
-                    Entrar a mi entorno →
-                  </a>
-                </div>
-              ) : (
-                <p className="pl-8 text-sm text-slate-500">
-                  Revisa tu bandeja de entrada. El enlace es válido 10 minutos.
-                </p>
-              )}
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <line x1="22" y1="2" x2="11" y2="13"/>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+              </svg>
+              {loading ? "Procesando..." : "Recibir enlace seguro"}
+            </button>
+
+            {/* Hint */}
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              justifyContent: "center",
+              color: "#9ca3af",
+              fontSize: "12px",
+            }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+              Te enviaremos un enlace válido por 10 minutos.
             </div>
-          )}
+          </form>
+        )}
 
-          {/* Form */}
-          {!success && (
-            <div className="flex flex-col gap-4">
-              <div>
-                <label
-                  htmlFor="email"
-                  className="mb-2 block text-sm font-semibold"
-                  style={{ color: "#0F1B2B" }}
-                >
-                  Email corporativo
-                </label>
-                <div className="relative">
-                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-                    <Mail className="h-5 w-5" style={{ color: "#2CD4D9" }} />
-                  </div>
-                  <input
-                    id="email"
-                    type="email"
-                    placeholder="nombre@tudespacho.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    onKeyDown={(e) => e.key === "Enter" && handleSubmit(e)}
-                    className="w-full rounded-xl border py-4 pl-12 pr-4 text-base outline-none transition"
-                    style={{
-                      borderColor: "#e2e8f0",
-                      color: "#0F1B2B",
-                    }}
-                    onFocus={(e) => (e.target.style.borderColor = "#2CD4D9")}
-                    onBlur={(e) => (e.target.style.borderColor = "#e2e8f0")}
-                  />
-                </div>
-              </div>
+        {/* Spacer */}
+        <div style={{ flex: 1 }} />
 
-              <button
-                onClick={handleSubmit}
-                disabled={loading || !email}
-                className="flex w-full items-center justify-center gap-3 rounded-xl py-4 text-base font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-                style={{ backgroundColor: "#2CD4D9" }}
-              >
-                {loading ? (
-                  "Procesando..."
-                ) : (
-                  <>
-                    <Send className="h-5 w-5" />
-                    Recibir enlace seguro
-                  </>
-                )}
-              </button>
-
-              <p className="flex items-center justify-center gap-2 text-sm" style={{ color: "#94a3b8" }}>
-                <Lock className="h-4 w-4" />
-                Te enviaremos un enlace válido por 10 minutos.
-              </p>
-            </div>
-          )}
-
-          {/* Divider + Acceso Cifrado */}
-          <div className="mt-auto pt-8">
-            <div className="mb-4 border-t" style={{ borderColor: "#f1f5f9" }} />
-            <div className="flex items-center gap-3">
-              <div
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
-                style={{ backgroundColor: "rgba(44,212,217,0.1)" }}
-              >
-                <Shield className="h-4 w-4" style={{ color: "#2CD4D9" }} />
-              </div>
-              <p className="text-sm" style={{ color: "#64748b" }}>
-                <strong style={{ color: "#0F1B2B" }}>Acceso cifrado.</strong> Solo tú puedes entrar.
-              </p>
-            </div>
+        {/* Divider + Acceso cifrado */}
+        <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: "20px", marginTop: "20px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00BDA5" strokeWidth="1.8">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+            <p style={{ fontSize: "14px", color: "#6b7280", margin: 0 }}>
+              <strong style={{ color: "#0F1B2B" }}>Acceso cifrado.</strong> Solo tú puedes entrar.
+            </p>
           </div>
         </div>
 
         {/* Footer */}
-        <div
-          className="flex items-center justify-between px-10 py-4 md:px-14"
-          style={{ borderTop: "1px solid #f1f5f9" }}
-        >
-          <p className="text-xs" style={{ color: "#94a3b8" }}>
+        <div style={{
+          borderTop: "1px solid #e5e7eb",
+          marginTop: "24px",
+          padding: "16px 0",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}>
+          <span style={{ fontSize: "12px", color: "#9ca3af" }}>
             © Aconvi. Todos los derechos reservados.
-          </p>
-          <div className="flex gap-4 text-xs" style={{ color: "#94a3b8" }}>
-            <a href="#" className="transition hover:text-slate-600">Aviso legal</a>
-            <a href="#" className="transition hover:text-slate-600">Privacidad</a>
-            <a href="#" className="transition hover:text-slate-600">Política de cookies</a>
+          </span>
+          <div style={{ display: "flex", gap: "20px" }}>
+            {["Aviso legal", "Privacidad", "Política de cookies"].map((link) => (
+              <a key={link} href="#" style={{ fontSize: "12px", color: "#9ca3af", textDecoration: "none" }}>
+                {link}
+              </a>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* ─── RIGHT PANEL ─────────────────────────────────── */}
-      <div
-        className="relative hidden overflow-hidden lg:block lg:w-1/2"
-        style={{ backgroundColor: "#F5F7FA" }}
-      >
-        {/* Decorative circles — positioned top-right like the reference */}
-        <div
-          className="absolute"
-          style={{
-            right: "-80px",
-            top: "-80px",
-            width: "340px",
-            height: "340px",
-            borderRadius: "50%",
-            border: "1px solid rgba(44,212,217,0.15)",
-          }}
-        />
-        <div
-          className="absolute"
-          style={{
-            right: "-40px",
-            top: "-40px",
-            width: "260px",
-            height: "260px",
-            borderRadius: "50%",
-            border: "1px solid rgba(44,212,217,0.12)",
-          }}
-        />
-        {/* Main sphere */}
-        <div
-          className="absolute"
-          style={{
-            right: "20px",
-            top: "20px",
-            width: "140px",
-            height: "140px",
-            borderRadius: "50%",
-            background: "radial-gradient(circle at 35% 35%, #4de8d5, #2CD4D9, #1aabb2)",
-            boxShadow: "0 16px 48px rgba(44,212,217,0.35)",
-          }}
-        />
+      {/* ═══════════════════════════ RIGHT PANEL ══════════════════════════ */}
+      <div style={{
+        position: "relative",
+        width: "46%",
+        background: "#f0faf8",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        padding: "56px 52px",
+      }}>
+
+        {/* Decorative ring (circle outline) — top right */}
+        <div style={{
+          position: "absolute",
+          top: "-40px",
+          right: "-60px",
+          width: "240px",
+          height: "240px",
+          borderRadius: "50%",
+          border: "1.5px solid rgba(0,189,165,0.18)",
+          pointerEvents: "none",
+        }} />
+
+        {/* Gradient sphere */}
+        <div style={{
+          position: "absolute",
+          top: "30px",
+          right: "40px",
+          width: "110px",
+          height: "110px",
+          borderRadius: "50%",
+          background: "radial-gradient(circle at 35% 35%, #5de8d5, #1bc4ac, #0da090)",
+          boxShadow: "0 8px 32px rgba(0,189,165,0.30)",
+          pointerEvents: "none",
+        }} />
+
         {/* Small dot */}
-        <div
-          className="absolute"
-          style={{
-            right: "190px",
-            top: "50px",
-            width: "10px",
-            height: "10px",
-            borderRadius: "50%",
-            backgroundColor: "#2CD4D9",
-          }}
-        />
+        <div style={{
+          position: "absolute",
+          top: "52px",
+          right: "168px",
+          width: "10px",
+          height: "10px",
+          borderRadius: "50%",
+          background: "#00BDA5",
+          pointerEvents: "none",
+        }} />
 
-        {/* Content */}
-        <div className="relative flex h-full flex-col justify-center px-14 py-20">
-          <h2
-            className="mb-12 text-3xl font-extrabold leading-tight tracking-tight"
-            style={{ color: "#0F1B2B" }}
-          >
-            Acceso inteligente<br />para equipos modernos
-          </h2>
+        {/* Heading */}
+        <h2 style={{
+          fontSize: "24px",
+          fontWeight: 800,
+          color: "#0F1B2B",
+          lineHeight: 1.3,
+          margin: "0 0 40px 0",
+        }}>
+          Acceso inteligente<br />para equipos modernos
+        </h2>
 
-          <div className="flex flex-col gap-8">
-            {/* Step 1 */}
-            <div className="relative flex items-start gap-5">
-              <div
-                className="absolute left-6 top-14 z-0"
-                style={{
-                  height: "calc(100% + 0.5rem)",
-                  width: "1px",
-                  borderLeft: "2px dashed #d1d5db",
-                }}
-              />
-              <div
-                className="relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white shadow-sm"
-                style={{ border: "1px solid #e2e8f0" }}
-              >
-                <Mail className="h-5 w-5" style={{ color: "#2CD4D9" }} />
+        {/* Steps */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
+
+          {/* Step 1 */}
+          <div style={{ display: "flex", gap: "20px" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+              <div style={{
+                width: "48px",
+                height: "48px",
+                borderRadius: "50%",
+                background: "#fff",
+                border: "1px solid #e5e7eb",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+                flexShrink: 0,
+              }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00BDA5" strokeWidth="2">
+                  <rect x="2" y="4" width="20" height="16" rx="2"/>
+                  <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+                </svg>
               </div>
-              <div className="pt-1">
-                <h3 className="mb-1 font-bold" style={{ color: "#0F1B2B" }}>
-                  1. Recibe el enlace
-                </h3>
-                <p className="text-sm" style={{ color: "#64748b" }}>
-                  Te lo enviamos a tu correo corporativo.
-                </p>
-              </div>
+              <div style={{ width: "1px", height: "32px", borderLeft: "2px dashed #d1d5db", margin: "4px 0" }} />
             </div>
-
-            {/* Step 2 */}
-            <div className="relative flex items-start gap-5">
-              <div
-                className="absolute left-6 top-14 z-0"
-                style={{
-                  height: "calc(100% + 0.5rem)",
-                  width: "1px",
-                  borderLeft: "2px dashed #d1d5db",
-                }}
-              />
-              <div
-                className="relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white shadow-sm"
-                style={{ border: "1px solid #e2e8f0" }}
-              >
-                <MousePointerClick className="h-5 w-5" style={{ color: "#2CD4D9" }} />
-              </div>
-              <div className="pt-1">
-                <h3 className="mb-1 font-bold" style={{ color: "#0F1B2B" }}>
-                  2. Confirma con un clic
-                </h3>
-                <p className="text-sm" style={{ color: "#64748b" }}>
-                  Abre el enlace en este dispositivo.
-                </p>
-              </div>
-            </div>
-
-            {/* Step 3 */}
-            <div className="flex items-start gap-5">
-              <div
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white shadow-sm"
-                style={{ border: "1px solid #e2e8f0" }}
-              >
-                <Lock className="h-5 w-5" style={{ color: "#2CD4D9" }} />
-              </div>
-              <div className="pt-1">
-                <h3 className="mb-1 font-bold" style={{ color: "#0F1B2B" }}>
-                  3. Accede al instante
-                </h3>
-                <p className="text-sm" style={{ color: "#64748b" }}>
-                  Entras directamente a tu entorno profesional de trabajo.
-                </p>
-              </div>
+            <div style={{ paddingTop: "12px", paddingBottom: "0" }}>
+              <div style={{ fontWeight: 700, color: "#0F1B2B", marginBottom: "4px" }}>1. Recibe el enlace</div>
+              <div style={{ fontSize: "13px", color: "#6b7280" }}>Te lo enviamos a tu correo corporativo.</div>
             </div>
           </div>
+
+          {/* Step 2 */}
+          <div style={{ display: "flex", gap: "20px" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+              <div style={{
+                width: "48px",
+                height: "48px",
+                borderRadius: "50%",
+                background: "#fff",
+                border: "1px solid #e5e7eb",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+                flexShrink: 0,
+              }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00BDA5" strokeWidth="2">
+                  <path d="M5 12h14"/>
+                  <path d="M12 5l7 7-7 7"/>
+                </svg>
+              </div>
+              <div style={{ width: "1px", height: "32px", borderLeft: "2px dashed #d1d5db", margin: "4px 0" }} />
+            </div>
+            <div style={{ paddingTop: "12px" }}>
+              <div style={{ fontWeight: 700, color: "#0F1B2B", marginBottom: "4px" }}>2. Confirma con un clic</div>
+              <div style={{ fontSize: "13px", color: "#6b7280" }}>Abre el enlace en este dispositivo.</div>
+            </div>
+          </div>
+
+          {/* Step 3 */}
+          <div style={{ display: "flex", gap: "20px" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+              <div style={{
+                width: "48px",
+                height: "48px",
+                borderRadius: "50%",
+                background: "#fff",
+                border: "1px solid #e5e7eb",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+                flexShrink: 0,
+              }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00BDA5" strokeWidth="2">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+              </div>
+            </div>
+            <div style={{ paddingTop: "12px" }}>
+              <div style={{ fontWeight: 700, color: "#0F1B2B", marginBottom: "4px" }}>3. Accede al instante</div>
+              <div style={{ fontSize: "13px", color: "#6b7280" }}>Entras directamente a tu entorno profesional de trabajo.</div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
