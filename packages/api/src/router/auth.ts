@@ -77,18 +77,9 @@ export const authRouter = {
       });
 
       if (userTokens.length === 0) {
-        // Dev mode: no device linked yet — auto-confirm after short delay (for testing)
-        console.log(`[PushAuth] No device tokens for user ${found.corporateUsername}. Dev mode: token=${token}`);
-        // Auto-confirm immediately for demo users
-        setTimeout(async () => {
-          await ctx.db
-            .update(pushAuthSession)
-            .set({ status: "CONFIRMED" })
-            .where(eq(pushAuthSession.token, token));
-          // @ts-ignore
-          (globalThis.__pushAuthSessions as Map<string, string>).set(token, "CONFIRMED");
-          console.log(`[PushAuth] Dev auto-confirmed token=${token}`);
-        }, 3000); // 3 seconds for demo
+        // Dev / demo mode: no device linked yet.
+        // Auto-confirm is handled in pollPushStatus (3 seconds after creation).
+        console.log(`[PushAuth] No device tokens for ${found.corporateUsername}. Auto-confirm via poll. token=${token}`);
       } else {
         // Send push notification to all linked devices
         await sendPushToUser(ctx.db, found.id, {
@@ -116,6 +107,25 @@ export const authRouter = {
 
       if (!session) return { status: "NOT_FOUND" as const };
 
+      // Auto-confirm demo mode: if no push tokens registered and >3s since creation
+      if (session.status === "PENDING") {
+        const ageMs = Date.now() - new Date(session.createdAt).getTime();
+        if (ageMs > 3000) {
+          const userTokens = await ctx.db.query.pushToken.findMany({
+            where: eq(pushToken.userId, session.userId),
+          });
+          if (userTokens.length === 0) {
+            // No linked device — auto-confirm for demo purposes
+            await ctx.db
+              .update(pushAuthSession)
+              .set({ status: "CONFIRMED" })
+              .where(eq(pushAuthSession.token, input.token));
+            session.status = "CONFIRMED";
+            console.log(`[PushAuth] Demo auto-confirmed token=${input.token}`);
+          }
+        }
+      }
+
       // Check expiry
       if (new Date() > session.expiresAt && session.status === "PENDING") {
         await ctx.db
@@ -138,7 +148,6 @@ export const authRouter = {
 
       return { status: session.status as "PENDING" | "CANCELLED" | "EXPIRED" };
     }),
-
 
   // ─── STEP 3: Confirm from mobile app ─────────────────────────────────────────
   // Called by the Expo app when the user taps "Confirmar" on the push notification.

@@ -10,24 +10,18 @@ type LoginState = "IDLE" | "LOADING" | "WAITING" | "SUCCESS" | "TIMEOUT";
 
 function DotsSpinner() {
   return (
-    <div style={{ position: "relative", width: "72px", height: "72px" }}>
-      {Array.from({ length: 12 }).map((_, i) => (
-        <span
-          key={i}
-          style={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            width: "7px",
-            height: "7px",
-            borderRadius: "50%",
-            backgroundColor: "#00BDA5",
-            transform: `rotate(${i * 30}deg) translateY(-28px) translateX(-3.5px)`,
-            opacity: (i + 1) / 12,
-          }}
-        />
-      ))}
-    </div>
+    <div
+      style={{
+        width: "56px",
+        height: "56px",
+        border: "3px solid transparent",
+        borderTopColor: "#00BDA5",
+        borderRightColor: "#00BDA5",
+        borderRadius: "50%",
+        animation: "acv-spin 1s linear infinite",
+        boxShadow: "0 0 0 2px rgba(0,189,165,0.12)",
+      }}
+    />
   );
 }
 
@@ -60,6 +54,7 @@ function Card({ children }: { children: React.ReactNode }) {
         minHeight: "480px",
       }}
     >
+      {/* Global animations — injected once per card mount */}
       <style>{`
         @keyframes acv-spin { to { transform: rotate(360deg); } }
         @keyframes acv-progress { from { width: 0%; } to { width: 100%; } }
