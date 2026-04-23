@@ -26,6 +26,7 @@ import {
   SidebarHeader,
 } from "@acme/ui/sidebar";
 import { useWebPush } from "~/hooks/useWebPush";
+import Image from "next/image";
 
 const items = [
   { title: "Inicio", url: "/incidents", icon: Home },
@@ -46,7 +47,7 @@ export function AppSidebar() {
     <Sidebar className="border-r border-slate-200 bg-white">
       <SidebarHeader className="px-6 py-5 border-b border-slate-100">
         <Link href="/incidents" className="flex items-baseline no-underline select-none">
-          <span
+          {/* <span
             style={{
               fontFamily: "'Inter', 'Geist', sans-serif",
               fontWeight: 800,
@@ -82,7 +83,13 @@ export function AppSidebar() {
             }}
           >
             convi
-          </span>
+          </span> */}
+          <Image
+            src="/logo.png"
+            alt="Logo"
+            width={100}
+            height={100}
+          />
         </Link>
       </SidebarHeader>
 
