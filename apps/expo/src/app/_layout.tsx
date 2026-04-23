@@ -26,7 +26,10 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
           string,
           string
         >;
-        if (data?.incidentId) {
+        if (data?.type === "auth_confirm" && data?.token) {
+          // Push login confirmation: navigate to the confirm screen
+          router.push(`/confirm-access?token=${data.token}`);
+        } else if (data?.incidentId) {
           router.push(`/(vecino)/incidents/${data.incidentId}`);
         } else if (data?.type === "rating") {
           router.push("/(vecino)/rating");

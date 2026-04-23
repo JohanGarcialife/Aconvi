@@ -15,6 +15,9 @@ export const user = pgTable("user", {
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
   role: text("role").default("Vecino").notNull(),
+  // Corporate username used for push-based professional login
+  // Format: firstname.lastname or af.lastname (e.g. jluis.admin, af.garcia)
+  corporateUsername: text("corporate_username").unique(),
 });
 
 export const session = pgTable(

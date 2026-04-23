@@ -1,454 +1,616 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
-
-import { authClient } from "~/auth/client";
 import { useTRPC } from "~/trpc/react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
+
+type LoginState = "IDLE" | "LOADING" | "WAITING" | "SUCCESS" | "TIMEOUT";
+
+function DotsSpinner() {
+  return (
+    <div style={{ position: "relative", width: "72px", height: "72px" }}>
+      {Array.from({ length: 12 }).map((_, i) => (
+        <span
+          key={i}
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            width: "7px",
+            height: "7px",
+            borderRadius: "50%",
+            backgroundColor: "#00BDA5",
+            transform: `rotate(${i * 30}deg) translateY(-28px) translateX(-3.5px)`,
+            opacity: (i + 1) / 12,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function CircleSpinner() {
+  return (
+    <div
+      style={{
+        width: "44px",
+        height: "44px",
+        border: "3px solid #e5e7eb",
+        borderTopColor: "#00BDA5",
+        borderRadius: "50%",
+        animation: "acv-spin 0.8s linear infinite",
+      }}
+    />
+  );
+}
+
+function Card({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        width: "100%",
+        background: "#ffffff",
+        borderRadius: "16px",
+        boxShadow: "0 2px 24px rgba(0,0,0,0.08)",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        minHeight: "480px",
+      }}
+    >
+      <style>{`
+        @keyframes acv-spin { to { transform: rotate(360deg); } }
+        @keyframes acv-progress { from { width: 0%; } to { width: 100%; } }
+      `}</style>
+      {children}
+    </div>
+  );
+}
+
+function LogoArea({ centered = false }: { centered?: boolean }) {
+  return (
+    <div style={{ padding: "32px 48px 0", textAlign: centered ? "center" : "left" }}>
+      <Image
+        src="/logo.png"
+        alt="Aconvi"
+        width={120}
+        height={34}
+        priority
+        style={{ objectFit: "contain", objectPosition: centered ? "center" : "left", display: "inline-block" }}
+      />
+    </div>
+  );
+}
+
+function FooterArea() {
+  return (
+    <div
+      style={{
+        borderTop: "1px solid #f0f0f0",
+        padding: "14px 48px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginTop: "auto",
+      }}
+    >
+      <span style={{ fontSize: "12px", color: "#9ca3af" }}>
+        © Aconvi. Todos los derechos reservados.
+      </span>
+      <a href="#" style={{ fontSize: "12px", color: "#00BDA5", textDecoration: "none" }}>
+        Ayuda
+      </a>
+    </div>
+  );
+}
 
 export function ProfessionalLogin() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const router = useRouter();
 
-  const [email, setEmail] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [state, setState] = useState<LoginState>("IDLE");
+  const [username, setUsername] = useState("");
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
-  const [testLink, setTestLink] = useState<string | null>(null);
+  const [pendingToken, setPendingToken] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || loading) return;
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => stopPolling(), [stopPolling]);
+
+  // tRPC mutations
+  const requestAccess = useMutation(
+    trpc.auth.requestPushAccess.mutationOptions(),
+  );
+  const cancelAccess = useMutation(
+    trpc.auth.cancelPushAccess.mutationOptions(),
+  );
+  const confirmAccess = useMutation(
+    trpc.auth.confirmPushAccess.mutationOptions(),
+  );
+
+  const startPolling = useCallback(
+    (token: string) => {
+      setState("WAITING");
+      const startedAt = Date.now();
+      const TIMEOUT_MS = 3 * 60 * 1000;
+
+      pollRef.current = setInterval(async () => {
+        if (Date.now() - startedAt > TIMEOUT_MS) {
+          stopPolling();
+          setState("TIMEOUT");
+          return;
+        }
+        try {
+          const result = await queryClient.fetchQuery(
+            trpc.auth.pollPushStatus.queryOptions({ token }),
+          );
+          if (result.status === "CONFIRMED") {
+            stopPolling();
+            setState("SUCCESS");
+            setTimeout(() => router.push("/incidents"), 1800);
+          } else if (
+            result.status === "EXPIRED" ||
+            result.status === "CANCELLED"
+          ) {
+            stopPolling();
+            setState("TIMEOUT");
+          }
+        } catch {
+          // silent
+        }
+      }, 2000);
+    },
+    [queryClient, router, stopPolling, trpc.auth.pollPushStatus],
+  );
+
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    const u = username.trim();
+    if (!u) return;
     setError("");
-    setSuccess(false);
-    setTestLink(null);
-    setLoading(true);
+    setState("LOADING");
 
     try {
-      const { error } = await authClient.signIn.magicLink({
-        email,
-        callbackURL: "/incidents",
+      const result = await requestAccess.mutateAsync({
+        corporateUsername: u,
+        loginUserAgent: navigator.userAgent,
       });
-      if (error) throw error;
-      setSuccess(true);
-
-      let attempts = 0;
-      const interval = setInterval(async () => {
-        try {
-          const url = (await queryClient.fetchQuery(
-            trpc.auth.getLatestMagicLink.queryOptions({ email }),
-          )) as string | null | undefined;
-          if (url && typeof url === "string") {
-            setTestLink(url);
-            clearInterval(interval);
-          }
-        } catch { /* silent */ }
-        if (++attempts > 8) clearInterval(interval);
-      }, 1000);
+      setPendingToken(result.token);
+      startPolling(result.token);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Error al solicitar acceso.");
-    } finally {
-      setLoading(false);
+      setState("IDLE");
+      setError(
+        err instanceof Error ? err.message : "Error al iniciar sesión.",
+      );
     }
   };
 
-  return (
-    <div style={{
-      display: "flex",
-      width: "100%",
-      maxWidth: "1060px",
-      minHeight: "600px",
-      background: "#ffffff",
-      borderRadius: "16px",
-      boxShadow: "0 4px 40px rgba(0,0,0,0.08)",
-      overflow: "hidden",
-    }}>
+  const handleCancel = async () => {
+    stopPolling();
+    if (pendingToken) {
+      try {
+        await cancelAccess.mutateAsync({ token: pendingToken });
+      } catch {
+        /* silent */
+      }
+    }
+    setPendingToken(null);
+    setState("IDLE");
+  };
 
-      {/* ═══════════════════════════ LEFT PANEL ═══════════════════════════ */}
-      <div style={{
-        display: "flex",
-        flexDirection: "column",
-        width: "54%",
-        background: "#ffffff",
-        padding: "56px 64px 0 64px",
-      }}>
+  const handleRetry = () => {
+    stopPolling();
+    setPendingToken(null);
+    void handleSubmit();
+  };
 
-        {/* Logo */}
-        <div style={{ marginBottom: "40px" }}>
-          <Image
-            src="/logo.png"
-            alt="Aconvi"
-            width={160}
-            height={46}
-            priority
-            style={{ objectFit: "contain", objectPosition: "left" }}
-          />
-        </div>
+  // ─── IDLE ──────────────────────────────────────────────────────────────────
+  if (state === "IDLE") {
+    return (
+      <Card>
+        <LogoArea />
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "40px 48px",
+          }}
+        >
+          <h1
+            style={{
+              fontSize: "28px",
+              fontWeight: 700,
+              color: "#0F1B2B",
+              margin: "0 0 32px",
+              textAlign: "center",
+            }}
+          >
+            Iniciar sesión
+          </h1>
 
-        {/* Tag */}
-        <div style={{
-          fontSize: "11px",
-          fontWeight: 700,
-          letterSpacing: "0.14em",
-          textTransform: "uppercase",
-          color: "#00BDA5",
-          marginBottom: "16px",
-        }}>
-          Entorno Profesional
-        </div>
-
-        {/* Heading */}
-        <h1 style={{
-          fontSize: "42px",
-          fontWeight: 800,
-          lineHeight: 1.15,
-          color: "#0F1B2B",
-          margin: "0 0 12px 0",
-          letterSpacing: "-0.5px",
-        }}>
-          Accede a tu<br />espacio de trabajo
-        </h1>
-
-        {/* Subheading */}
-        <p style={{
-          fontSize: "16px",
-          color: "#6b7280",
-          margin: "0 0 32px 0",
-        }}>
-          Sin contraseñas. Seguro. En segundos.
-        </p>
-
-        {/* Error */}
-        {error && (
-          <div style={{
-            background: "#fef2f2",
-            border: "1px solid #fca5a5",
-            borderRadius: "10px",
-            padding: "12px 16px",
-            color: "#dc2626",
-            fontSize: "14px",
-            marginBottom: "16px",
-          }}>
-            {error}
-          </div>
-        )}
-
-        {/* Test mode success box */}
-        {success && (
-          <div style={{
-            background: "rgba(0,189,165,0.06)",
-            border: "1px solid #00BDA5",
-            borderRadius: "12px",
-            padding: "18px",
-            marginBottom: "16px",
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00BDA5" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-              <span style={{ fontWeight: 600, color: "#0F1B2B" }}>
-                {testLink ? "Enlace generado · Modo Pruebas" : "¡Enlace en camino!"}
-              </span>
-            </div>
-            {testLink ? (
-              <div style={{ paddingLeft: "30px" }}>
-                <p style={{ color: "#6b7280", fontSize: "13px", marginBottom: "12px" }}>
-                  Sin SMTP configurado aún. Haz clic para acceder:
-                </p>
-                <a href={testLink} style={{
-                  display: "inline-block",
-                  padding: "8px 16px",
-                  background: "#0F1B2B",
-                  color: "#fff",
+          <form
+            onSubmit={handleSubmit}
+            style={{
+              width: "100%",
+              maxWidth: "440px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "14px",
+            }}
+          >
+            {error && (
+              <div
+                style={{
+                  background: "#fef2f2",
+                  border: "1px solid #fca5a5",
                   borderRadius: "8px",
+                  padding: "10px 14px",
+                  color: "#dc2626",
+                  fontSize: "13px",
+                }}
+              >
+                {error}
+              </div>
+            )}
+
+            <div>
+              <label
+                style={{
+                  display: "block",
                   fontSize: "13px",
                   fontWeight: 600,
-                  textDecoration: "none",
-                }}>
-                  Entrar a mi entorno →
-                </a>
-              </div>
-            ) : (
-              <p style={{ paddingLeft: "30px", color: "#6b7280", fontSize: "13px" }}>
-                Revisa tu bandeja. El enlace caduca en 10 minutos.
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Form */}
-        {!success && (
-          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-            {/* Label */}
-            <label style={{ fontSize: "13px", fontWeight: 700, color: "#0F1B2B" }}>
-              Email corporativo
-            </label>
-
-            {/* Input */}
-            <div style={{ position: "relative" }}>
-              <span style={{
-                position: "absolute",
-                left: "16px",
-                top: "50%",
-                transform: "translateY(-50%)",
-                color: "#00BDA5",
-                display: "flex",
-                alignItems: "center",
-              }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="2" y="4" width="20" height="16" rx="2"/>
-                  <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
-                </svg>
-              </span>
+                  color: "#374151",
+                  marginBottom: "8px",
+                }}
+              >
+                Usuario corporativo
+              </label>
               <input
-                type="email"
-                placeholder="nombre@tudespacho.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="text"
+                placeholder="ej. jlopez, af.martinez, proveedor.fontaneria"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 required
+                autoFocus
                 style={{
                   width: "100%",
-                  padding: "14px 16px 14px 48px",
-                  border: "1.5px solid #00BDA5",
-                  borderRadius: "10px",
+                  padding: "13px 16px",
+                  border: "1px solid #d1d5db",
+                  borderRadius: "8px",
                   fontSize: "15px",
                   color: "#0F1B2B",
                   outline: "none",
                   background: "#fff",
                   boxSizing: "border-box",
                 }}
+                onFocus={(e) => (e.target.style.borderColor = "#00BDA5")}
+                onBlur={(e) => (e.target.style.borderColor = "#d1d5db")}
               />
             </div>
 
-            {/* CTA Button */}
             <button
               type="submit"
-              disabled={loading}
               style={{
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: "10px",
-                padding: "15px 24px",
+                gap: "12px",
+                padding: "14px 24px",
                 background: "#00BDA5",
                 border: "none",
-                borderRadius: "10px",
-                color: "#ffffff",
+                borderRadius: "8px",
+                color: "#fff",
                 fontSize: "16px",
                 fontWeight: 700,
-                cursor: loading ? "not-allowed" : "pointer",
-                opacity: loading ? 0.7 : 1,
+                cursor: "pointer",
+                width: "100%",
               }}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <line x1="22" y1="2" x2="11" y2="13"/>
-                <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+              Entrar
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+              >
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
               </svg>
-              {loading ? "Procesando..." : "Recibir enlace seguro"}
             </button>
 
-            {/* Hint */}
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-              justifyContent: "center",
-              color: "#9ca3af",
-              fontSize: "12px",
-            }}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "7px",
+                color: "#9ca3af",
+                fontSize: "13px",
+              }}
+            >
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#00BDA5"
+                strokeWidth="2"
+              >
+                <rect x="3" y="11" width="18" height="11" rx="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
               </svg>
-              Te enviaremos un enlace válido por 10 minutos.
+              Confirmación en dispositivo
             </div>
           </form>
-        )}
+        </div>
+        <FooterArea />
+      </Card>
+    );
+  }
 
-        {/* Spacer */}
-        <div style={{ flex: 1 }} />
+  // ─── LOADING ───────────────────────────────────────────────────────────────
+  if (state === "LOADING") {
+    return (
+      <Card>
+        <LogoArea centered />
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "20px",
+          }}
+        >
+          <CircleSpinner />
+          <p style={{ color: "#9ca3af", fontSize: "15px", margin: 0 }}>
+            Iniciando sesión...
+          </p>
+        </div>
+        <FooterArea />
+      </Card>
+    );
+  }
 
-        {/* Divider + Acceso cifrado */}
-        <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: "20px", marginTop: "20px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00BDA5" strokeWidth="1.8">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+  // ─── WAITING ───────────────────────────────────────────────────────────────
+  if (state === "WAITING") {
+    return (
+      <Card>
+        <LogoArea centered />
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "24px",
+            padding: "40px",
+          }}
+        >
+          <DotsSpinner />
+          <div style={{ textAlign: "center" }}>
+            <h2
+              style={{
+                fontSize: "20px",
+                fontWeight: 700,
+                color: "#0F1B2B",
+                margin: "0 0 8px",
+              }}
+            >
+              Confirma en tu dispositivo
+            </h2>
+            <p style={{ color: "#9ca3af", fontSize: "14px", margin: 0 }}>
+              Esperando validación
+            </p>
+          </div>
+          <button
+            onClick={handleCancel}
+            style={{
+              color: "#00BDA5",
+              background: "none",
+              border: "none",
+              fontSize: "14px",
+              cursor: "pointer",
+              marginTop: "4px",
+            }}
+          >
+            Cancelar
+          </button>
+        </div>
+        <FooterArea />
+      </Card>
+    );
+  }
+
+  // ─── SUCCESS ───────────────────────────────────────────────────────────────
+  if (state === "SUCCESS") {
+    return (
+      <Card>
+        <LogoArea centered />
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "20px",
+            padding: "40px",
+          }}
+        >
+          <div
+            style={{
+              width: "72px",
+              height: "72px",
+              borderRadius: "50%",
+              background: "rgba(0,189,165,0.10)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <svg
+              width="36"
+              height="36"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#00BDA5"
+              strokeWidth="2.5"
+            >
+              <polyline points="20 6 9 17 4 12" />
             </svg>
-            <p style={{ fontSize: "14px", color: "#6b7280", margin: 0 }}>
-              <strong style={{ color: "#0F1B2B" }}>Acceso cifrado.</strong> Solo tú puedes entrar.
+          </div>
+          <div style={{ textAlign: "center" }}>
+            <h2
+              style={{
+                fontSize: "20px",
+                fontWeight: 700,
+                color: "#0F1B2B",
+                margin: "0 0 6px",
+              }}
+            >
+              Acceso confirmado
+            </h2>
+            <p style={{ color: "#9ca3af", fontSize: "14px", margin: 0 }}>
+              Redirigiendo...
             </p>
           </div>
         </div>
+        <div style={{ height: "4px", background: "#e5e7eb" }}>
+          <div
+            style={{
+              height: "4px",
+              background: "#00BDA5",
+              animation: "acv-progress 1.8s ease-in-out forwards",
+              width: "0%",
+            }}
+          />
+        </div>
+      </Card>
+    );
+  }
 
-        {/* Footer */}
-        <div style={{
-          borderTop: "1px solid #e5e7eb",
-          marginTop: "24px",
-          padding: "16px 0",
+  // ─── TIMEOUT ───────────────────────────────────────────────────────────────
+  return (
+    <Card>
+      <LogoArea centered />
+      <div
+        style={{
+          flex: 1,
           display: "flex",
-          justifyContent: "space-between",
+          flexDirection: "column",
           alignItems: "center",
-        }}>
-          <span style={{ fontSize: "12px", color: "#9ca3af" }}>
-            © Aconvi. Todos los derechos reservados.
+          justifyContent: "center",
+          gap: "20px",
+          padding: "40px",
+        }}
+      >
+        <div
+          style={{
+            width: "68px",
+            height: "68px",
+            borderRadius: "50%",
+            border: "3px solid #f59e0b",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <span
+            style={{ fontSize: "28px", fontWeight: 800, color: "#f59e0b", lineHeight: 1 }}
+          >
+            !
           </span>
-          <div style={{ display: "flex", gap: "20px" }}>
-            {["Aviso legal", "Privacidad", "Política de cookies"].map((link) => (
-              <a key={link} href="#" style={{ fontSize: "12px", color: "#9ca3af", textDecoration: "none" }}>
-                {link}
-              </a>
-            ))}
-          </div>
         </div>
-      </div>
-
-      {/* ═══════════════════════════ RIGHT PANEL ══════════════════════════ */}
-      <div style={{
-        position: "relative",
-        width: "46%",
-        background: "#f0faf8",
-        overflow: "hidden",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-        padding: "56px 52px",
-      }}>
-
-        {/* Decorative ring (circle outline) — top right */}
-        <div style={{
-          position: "absolute",
-          top: "-40px",
-          right: "-60px",
-          width: "240px",
-          height: "240px",
-          borderRadius: "50%",
-          border: "1.5px solid rgba(0,189,165,0.18)",
-          pointerEvents: "none",
-        }} />
-
-        {/* Gradient sphere */}
-        <div style={{
-          position: "absolute",
-          top: "30px",
-          right: "40px",
-          width: "110px",
-          height: "110px",
-          borderRadius: "50%",
-          background: "radial-gradient(circle at 35% 35%, #5de8d5, #1bc4ac, #0da090)",
-          boxShadow: "0 8px 32px rgba(0,189,165,0.30)",
-          pointerEvents: "none",
-        }} />
-
-        {/* Small dot */}
-        <div style={{
-          position: "absolute",
-          top: "52px",
-          right: "168px",
-          width: "10px",
-          height: "10px",
-          borderRadius: "50%",
-          background: "#00BDA5",
-          pointerEvents: "none",
-        }} />
-
-        {/* Heading */}
-        <h2 style={{
-          fontSize: "24px",
-          fontWeight: 800,
-          color: "#0F1B2B",
-          lineHeight: 1.3,
-          margin: "0 0 40px 0",
-        }}>
-          Acceso inteligente<br />para equipos modernos
-        </h2>
-
-        {/* Steps */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
-
-          {/* Step 1 */}
-          <div style={{ display: "flex", gap: "20px" }}>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-              <div style={{
-                width: "48px",
-                height: "48px",
-                borderRadius: "50%",
-                background: "#fff",
-                border: "1px solid #e5e7eb",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-                flexShrink: 0,
-              }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00BDA5" strokeWidth="2">
-                  <rect x="2" y="4" width="20" height="16" rx="2"/>
-                  <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
-                </svg>
-              </div>
-              <div style={{ width: "1px", height: "32px", borderLeft: "2px dashed #d1d5db", margin: "4px 0" }} />
-            </div>
-            <div style={{ paddingTop: "12px", paddingBottom: "0" }}>
-              <div style={{ fontWeight: 700, color: "#0F1B2B", marginBottom: "4px" }}>1. Recibe el enlace</div>
-              <div style={{ fontSize: "13px", color: "#6b7280" }}>Te lo enviamos a tu correo corporativo.</div>
-            </div>
-          </div>
-
-          {/* Step 2 */}
-          <div style={{ display: "flex", gap: "20px" }}>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-              <div style={{
-                width: "48px",
-                height: "48px",
-                borderRadius: "50%",
-                background: "#fff",
-                border: "1px solid #e5e7eb",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-                flexShrink: 0,
-              }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00BDA5" strokeWidth="2">
-                  <path d="M5 12h14"/>
-                  <path d="M12 5l7 7-7 7"/>
-                </svg>
-              </div>
-              <div style={{ width: "1px", height: "32px", borderLeft: "2px dashed #d1d5db", margin: "4px 0" }} />
-            </div>
-            <div style={{ paddingTop: "12px" }}>
-              <div style={{ fontWeight: 700, color: "#0F1B2B", marginBottom: "4px" }}>2. Confirma con un clic</div>
-              <div style={{ fontSize: "13px", color: "#6b7280" }}>Abre el enlace en este dispositivo.</div>
-            </div>
-          </div>
-
-          {/* Step 3 */}
-          <div style={{ display: "flex", gap: "20px" }}>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-              <div style={{
-                width: "48px",
-                height: "48px",
-                borderRadius: "50%",
-                background: "#fff",
-                border: "1px solid #e5e7eb",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-                flexShrink: 0,
-              }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00BDA5" strokeWidth="2">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                </svg>
-              </div>
-            </div>
-            <div style={{ paddingTop: "12px" }}>
-              <div style={{ fontWeight: 700, color: "#0F1B2B", marginBottom: "4px" }}>3. Accede al instante</div>
-              <div style={{ fontSize: "13px", color: "#6b7280" }}>Entras directamente a tu entorno profesional de trabajo.</div>
-            </div>
-          </div>
-
+        <div style={{ textAlign: "center" }}>
+          <h2
+            style={{
+              fontSize: "18px",
+              fontWeight: 700,
+              color: "#0F1B2B",
+              margin: "0 0 8px",
+            }}
+          >
+            No se ha recibido confirmación
+          </h2>
+          <p
+            style={{
+              color: "#9ca3af",
+              fontSize: "13px",
+              margin: 0,
+              maxWidth: "280px",
+            }}
+          >
+            Revisa tu dispositivo e inténtalo de nuevo.
+          </p>
         </div>
+
+        <button
+          onClick={handleRetry}
+          style={{
+            padding: "13px 0",
+            background: "#00BDA5",
+            border: "none",
+            borderRadius: "8px",
+            color: "#fff",
+            fontSize: "15px",
+            fontWeight: 700,
+            cursor: "pointer",
+            width: "100%",
+            maxWidth: "260px",
+          }}
+        >
+          Reintentar
+        </button>
+        <button
+          onClick={() => {
+            stopPolling();
+            void handleSubmit();
+          }}
+          style={{
+            color: "#00BDA5",
+            background: "none",
+            border: "none",
+            fontSize: "14px",
+            cursor: "pointer",
+          }}
+        >
+          Enviar de nuevo
+        </button>
+        <button
+          onClick={() => {
+            stopPolling();
+            setState("IDLE");
+            setPendingToken(null);
+          }}
+          style={{
+            color: "#9ca3af",
+            background: "none",
+            border: "none",
+            fontSize: "14px",
+            cursor: "pointer",
+          }}
+        >
+          Cancelar
+        </button>
       </div>
-    </div>
+      <FooterArea />
+    </Card>
   );
 }

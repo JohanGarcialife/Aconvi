@@ -4,8 +4,17 @@ import { ProfessionalLogin } from "./_components/professional-login";
 export default function HomePage() {
   return (
     <HydrateClient>
-      <main className="flex min-h-screen bg-slate-50 items-center justify-center p-4 sm:p-8">
-        <div className="w-full max-w-6xl mx-auto">
+      <main
+        style={{
+          minHeight: "100vh",
+          background: "#f5f5f5",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "16px",
+        }}
+      >
+        <div style={{ width: "100%", maxWidth: "800px" }}>
           <ProfessionalLogin />
         </div>
       </main>
