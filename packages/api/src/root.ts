@@ -5,6 +5,7 @@ import { noticeRouter } from "./router/notice";
 import { communityRouter } from "./router/community";
 import { notificationRouter } from "./router/notification";
 import { commonAreaRouter } from "./router/commonArea";
+import { providerRouter } from "./router/provider";
 import { createTRPCRouter } from "./trpc";
 
 export const appRouter = createTRPCRouter({
@@ -15,7 +16,9 @@ export const appRouter = createTRPCRouter({
   community: communityRouter,
   notification: notificationRouter,
   commonArea: commonAreaRouter,
+  provider: providerRouter,
 });
+
 
 
 

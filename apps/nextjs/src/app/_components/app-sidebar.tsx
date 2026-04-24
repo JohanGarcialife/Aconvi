@@ -29,7 +29,7 @@ import { useWebPush } from "~/hooks/useWebPush";
 import Image from "next/image";
 
 const items = [
-  { title: "Inicio", url: "/incidents", icon: Home },
+  { title: "Inicio", url: "/home", icon: Home },
   { title: "Comunidades", url: "/communities", icon: Building2 },
   { title: "Incidencias", url: "/incidents", icon: Bell, badge: "50" },
   { title: "Comunicación", url: "/communication", icon: MessageSquare },
@@ -45,7 +45,7 @@ export function AppSidebar() {
 
   return (
     <Sidebar className="border-r border-slate-200 bg-white">
-      <SidebarHeader className="px-6 py-5 border-b border-slate-100">
+      <SidebarHeader className="px-2 py-1 border-b border-slate-100">
         <Link href="/incidents" className="flex items-baseline no-underline select-none">
           {/* <span
             style={{
@@ -87,7 +87,7 @@ export function AppSidebar() {
           <Image
             src="/logo.png"
             alt="Logo"
-            width={100}
+            width={300}
             height={100}
           />
         </Link>

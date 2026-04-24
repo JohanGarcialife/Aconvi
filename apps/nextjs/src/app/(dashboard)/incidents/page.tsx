@@ -1,339 +1,832 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTRPC } from "~/trpc/react";
 import {
   Search,
-  MapPin,
-  ChevronLeft,
-  ChevronDown,
+  Filter,
   Check,
-  Circle,
   Star,
   Clock,
-  Wrench,
-  Droplets,
-  Layers,
-  Send,
+  Briefcase,
+  ChevronRight,
+  Plus,
+  UserRound,
+  XCircle,
+  CheckCircle2,
 } from "lucide-react";
 
-// ─── Mock data (will be replaced by real API data) ──────────────────────────
-const MOCK_INCIDENTS = [
-  {
-    id: "1",
-    title: "Gotera en tejado",
-    community: "Residencial Los Olivos",
-    address: "Av. de Andalucía, 105",
-    status: "SIN_ASIGNAR" as const,
-    checked: true,
-    icon: <Droplets className="h-4 w-4 text-slate-300" />,
-  },
-  {
-    id: "2",
-    title: "Piscina turbia",
-    community: "Jardines de la Costa",
-    address: "Calle del Tura, 26",
-    status: "SIN_ASIGNAR" as const,
-    checked: true,
-    icon: <Layers className="h-4 w-4 text-slate-300" />,
-  },
-  {
-    id: "3",
-    title: "Ascensor bloqueado",
-    community: "Residencial Colón",
-    address: "Av. del Oeste, 33",
-    status: "SIN_ASIGNAR" as const,
-    checked: false,
-    icon: <Wrench className="h-4 w-4 text-slate-300" />,
-  },
-  {
-    id: "4",
-    title: "Bajante atascado",
-    community: "Edificio Girasol",
-    address: "Av. de Francia, 48",
-    status: "SIN_ASIGNAR" as const,
-    checked: true,
-    icon: <Layers className="h-4 w-4 text-slate-300" />,
-  },
-  {
-    id: "5",
-    title: "Baja presión de agua",
-    community: "Residencial Ajameida",
-    address: "Av. de Francia, 46",
-    status: "ACEPTADA" as const,
-    checked: false,
-    icon: <Droplets className="h-4 w-4 text-slate-300" />,
-  },
-  {
-    id: "6",
-    title: "Edificio Girasol",
-    community: "Jardines de la Costa",
-    address: "Calle del Tura, 26",
-    status: "RESUELTA" as const,
-    checked: false,
-    icon: <Wrench className="h-4 w-4 text-slate-300" />,
-  },
-  {
-    id: "7",
-    title: "Luces del garaje fundidas",
-    community: "Edificio Girasol",
-    address: "Av. de Francia, 48",
-    status: "RESUELTA" as const,
-    checked: false,
-    icon: <Wrench className="h-4 w-4 text-slate-300" />,
-  },
+// ─── Tenant (stub — replace with session org) ─────────────────────────────────
+const TENANT_ID = "org_aconvi_demo";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+type IncidentStatus =
+  | "RECIBIDA"
+  | "EN_REVISION"
+  | "AGENDADA"
+  | "EN_CURSO"
+  | "RESUELTA"
+  | "RECHAZADA";
+
+const TIMELINE_STEPS: { key: IncidentStatus; label: string }[] = [
+  { key: "RECIBIDA", label: "Recibida" },
+  { key: "EN_REVISION", label: "En revisión" },
+  { key: "AGENDADA", label: "Agendada" },
+  { key: "EN_CURSO", label: "En curso" },
+  { key: "RESUELTA", label: "Resuelta" },
 ];
 
-const MOCK_PROVIDERS = [
-  {
-    id: "p1",
-    name: "Fontanería Pérez",
-    note: "Historial positivo en incidencias similares",
-    recommended: true,
-  },
-  { id: "p2", name: "Fontanería Gómez", note: "8 incidencias resueltas" },
-  { id: "p3", name: "Fontanería García", note: "5 incidencias resueltas" },
-];
+const STATUS_STEP_INDEX: Record<string, number> = {
+  RECIBIDA: 0,
+  EN_REVISION: 1,
+  AGENDADA: 2,
+  EN_CURSO: 3,
+  RESUELTA: 4,
+  RECHAZADA: -1,
+};
 
-// ─── Status badge ────────────────────────────────────────────────────────────
+// ─── Status Badge ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: string }) {
-  if (status === "SIN_ASIGNAR")
-    return (
-      <span className="text-xs text-slate-500 border border-slate-200 rounded-full px-2.5 py-0.5 whitespace-nowrap">
-        Sin asignar
-      </span>
-    );
-  if (status === "ACEPTADA")
-    return (
-      <span className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-0.5 whitespace-nowrap">
-        Aceptada <ChevronDown className="h-3 w-3" />
-      </span>
-    );
-  if (status === "RESUELTA")
-    return (
-      <span className="inline-flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-0.5 whitespace-nowrap">
-        Resuelta <ChevronDown className="h-3 w-3" />
-      </span>
-    );
-  return null;
+  const map: Record<string, { label: string; color: string; bg: string }> = {
+    RECIBIDA:    { label: "Pendiente",   color: "#92400e", bg: "#fef3c7" },
+    EN_REVISION: { label: "En revisión", color: "#1e40af", bg: "#dbeafe" },
+    AGENDADA:    { label: "Agendada",    color: "#5b21b6", bg: "#ede9fe" },
+    EN_CURSO:    { label: "En curso",    color: "#065f46", bg: "#d1fae5" },
+    RESUELTA:    { label: "Resuelta",    color: "#065f46", bg: "#d1fae5" },
+    RECHAZADA:   { label: "Rechazada",   color: "#991b1b", bg: "#fee2e2" },
+    URGENTE:     { label: "Urgente",     color: "#991b1b", bg: "#fee2e2" },
+  };
+  const s = map[status] ?? { label: status, color: "#374151", bg: "#f3f4f6" };
+  return (
+    <span
+      style={{
+        background: s.bg,
+        color: s.color,
+        borderRadius: "999px",
+        padding: "2px 10px",
+        fontSize: "12px",
+        fontWeight: 600,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {s.label}
+    </span>
+  );
 }
 
-// ─── Main page ───────────────────────────────────────────────────────────────
-export default function IncidentsPage() {
-  const [incidents, setIncidents] = useState(MOCK_INCIDENTS);
-  const [selectedId, setSelectedId] = useState("1");
-  const [selectedProvider, setSelectedProvider] = useState("p1");
-  const [providerDropdownOpen, setProviderDropdownOpen] = useState(false);
+// ─── Priority Dot ─────────────────────────────────────────────────────────────
+function PriorityDot({ priority }: { priority: string }) {
+  const colors: Record<string, string> = {
+    URGENTE: "#ef4444",
+    ALTA: "#f97316",
+    MEDIA: "#3b82f6",
+    BAJA: "#9ca3af",
+  };
+  return (
+    <span
+      style={{
+        width: 8,
+        height: 8,
+        borderRadius: "50%",
+        background: colors[priority] ?? "#9ca3af",
+        display: "inline-block",
+        flexShrink: 0,
+      }}
+    />
+  );
+}
 
-  const selected = incidents.find((i) => i.id === selectedId) ?? incidents[0];
-  const checkedCount = incidents.filter((i) => i.checked).length;
-
-  const toggleCheck = (id: string) =>
-    setIncidents((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, checked: !i.checked } : i))
-    );
-
-  const currentProvider =
-    MOCK_PROVIDERS.find((p) => p.id === selectedProvider) ?? MOCK_PROVIDERS[0]!;
+// ─── Status Timeline ──────────────────────────────────────────────────────────
+function StatusTimeline({
+  currentStatus,
+}: {
+  currentStatus: string;
+}) {
+  const activeIdx = STATUS_STEP_INDEX[currentStatus] ?? 0;
+  const rejected = currentStatus === "RECHAZADA";
 
   return (
-    <div className="flex h-screen flex-col bg-slate-50">
-      {/* ── Top bar ─────────────────────────────────────────────────────── */}
-      <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3 shrink-0">
-        <h1 className="text-xl font-bold text-slate-900">Incidencias</h1>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-500 w-72">
-            <Search className="h-4 w-4 shrink-0" />
-            <span>Buscar comunidad, avería, vecino…</span>
+    <div style={{ display: "flex", alignItems: "center", gap: 0, margin: "20px 0" }}>
+      {TIMELINE_STEPS.map((step, idx) => {
+        const done = activeIdx > idx;
+        const active = activeIdx === idx && !rejected;
+        const future = activeIdx < idx;
+
+        return (
+          <div
+            key={step.key}
+            style={{ display: "flex", alignItems: "center", flex: idx < 4 ? 1 : 0 }}
+          >
+            {/* Step circle */}
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+              <div
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  border: active ? "2.5px solid #00BDA5" : done ? "none" : "2px solid #d1d5db",
+                  background: done ? "#00BDA5" : active ? "#fff" : "#f9fafb",
+                  color: done ? "#fff" : active ? "#00BDA5" : "#9ca3af",
+                  flexShrink: 0,
+                  transition: "all 0.2s",
+                }}
+              >
+                {done ? (
+                  <Check size={14} strokeWidth={3} />
+                ) : (
+                  <span>{idx + 1}</span>
+                )}
+              </div>
+              <span
+                style={{
+                  fontSize: 10,
+                  color: done || active ? "#0F1B2B" : "#9ca3af",
+                  fontWeight: active ? 700 : 400,
+                  textAlign: "center",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {step.label}
+              </span>
+            </div>
+
+            {/* Connector line */}
+            {idx < TIMELINE_STEPS.length - 1 && (
+              <div
+                style={{
+                  flex: 1,
+                  height: 2,
+                  background: done ? "#00BDA5" : "#e5e7eb",
+                  marginBottom: 18,
+                  transition: "background 0.2s",
+                }}
+              />
+            )}
           </div>
-          <div className="h-9 w-9 rounded-full bg-slate-300 overflow-hidden shrink-0 flex items-center justify-center text-xs font-bold text-white">
-            AF
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Provider Panel ───────────────────────────────────────────────────────────
+function ProviderPanel({
+  providers,
+  selectedProviderId,
+  onSelect,
+  onAssign,
+  isAssigning,
+  currentProviderId,
+}: {
+  providers: any[];
+  selectedProviderId: string | null;
+  onSelect: (id: string) => void;
+  onAssign: () => void;
+  isAssigning: boolean;
+  currentProviderId?: string | null;
+}) {
+  const recommended = providers[0];
+  const others = providers.slice(1);
+  const selected =
+    providers.find((p) => p.id === selectedProviderId) ?? recommended;
+
+  return (
+    <div
+      style={{
+        width: 300,
+        flexShrink: 0,
+        borderLeft: "1px solid #f0f0f0",
+        background: "#fff",
+        display: "flex",
+        flexDirection: "column",
+        overflowY: "auto",
+      }}
+    >
+      {/* Recommended */}
+      {recommended && (
+        <div style={{ padding: "20px 20px 16px", borderBottom: "1px solid #f0f0f0" }}>
+          <p style={{ fontSize: 12, fontWeight: 700, color: "#9ca3af", marginBottom: 14, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            Proveedor recomendado
+          </p>
+          <div style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: 14 }}>
+            <div
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: "50%",
+                background: "#0F1B2B",
+                color: "#fff",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontWeight: 700,
+                fontSize: 14,
+                flexShrink: 0,
+              }}
+            >
+              {recommended.avatarInitials}
+            </div>
+            <div>
+              <p style={{ fontWeight: 700, fontSize: 14, color: "#0F1B2B", margin: 0 }}>
+                {recommended.name}
+              </p>
+              <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
+                <Star size={12} fill="#f59e0b" color="#f59e0b" />
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#0F1B2B" }}>
+                  {recommended.rating.toFixed(1)}
+                </span>
+              </div>
+              {recommended.isTrusted && (
+                <p style={{ fontSize: 11, color: "#00BDA5", margin: "2px 0 0" }}>
+                  Proveedor de confianza
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Stats */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Briefcase size={13} color="#9ca3af" />
+              <span style={{ fontSize: 13, color: "#374151" }}>
+                <strong>{recommended.completedJobs}</strong>{" "}
+                <span style={{ color: "#9ca3af" }}>Intervenciones realizadas</span>
+              </span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Clock size={13} color="#9ca3af" />
+              <span style={{ fontSize: 13, color: "#374151" }}>
+                <strong>{recommended.avgDaysToResolve} días</strong>{" "}
+                <span style={{ color: "#9ca3af" }}>Tiempo medio</span>
+              </span>
+            </div>
+            {recommended.priceRangeMin != null && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 13, color: "#9ca3af" }}>€</span>
+                <span style={{ fontSize: 13, color: "#374151" }}>
+                  <strong>
+                    {recommended.priceRangeMin}€ – {recommended.priceRangeMax}€
+                  </strong>{" "}
+                  <span style={{ color: "#9ca3af" }}>Coste estimado</span>
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Others */}
+      {others.length > 0 && (
+        <div style={{ padding: "16px 20px", borderBottom: "1px solid #f0f0f0", flex: 1 }}>
+          <p style={{ fontSize: 12, fontWeight: 700, color: "#9ca3af", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            Elegir otro proveedor
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {others.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => onSelect(p.id)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: "4px 0",
+                  width: "100%",
+                  textAlign: "left",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div
+                    style={{
+                      width: 18,
+                      height: 18,
+                      borderRadius: "50%",
+                      border: `2px solid ${selectedProviderId === p.id ? "#00BDA5" : "#d1d5db"}`,
+                      background: selectedProviderId === p.id ? "#00BDA5" : "#fff",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {selectedProviderId === p.id && <Check size={10} color="#fff" strokeWidth={3} />}
+                  </div>
+                  <span style={{ fontSize: 13, color: "#0F1B2B", fontWeight: 500 }}>
+                    {p.name}
+                  </span>
+                </div>
+                {p.priceRangeMin != null && (
+                  <span style={{ fontSize: 12, color: "#9ca3af" }}>
+                    {p.priceRangeMin}€ – {p.priceRangeMax}€
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Assign button */}
+      <div style={{ padding: "16px 20px" }}>
+        <button
+          onClick={onAssign}
+          disabled={isAssigning || !selectedProviderId}
+          style={{
+            width: "100%",
+            background: isAssigning || !selectedProviderId ? "#9ca3af" : "#00BDA5",
+            color: "#fff",
+            border: "none",
+            borderRadius: 10,
+            padding: "13px 0",
+            fontWeight: 700,
+            fontSize: 14,
+            cursor: isAssigning || !selectedProviderId ? "not-allowed" : "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+          }}
+        >
+          <UserRound size={15} />
+          {isAssigning ? "Asignando..." : "Asignar proveedor"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Add Note Form ────────────────────────────────────────────────────────────
+function AddNoteForm({
+  incidentId,
+  onAdded,
+}: {
+  incidentId: string;
+  onAdded: () => void;
+}) {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const [text, setText] = useState("");
+  const addNote = useMutation(trpc.incident.addNote.mutationOptions());
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!text.trim()) return;
+    await addNote.mutateAsync({
+      tenantId: TENANT_ID,
+      incidentId,
+      content: text.trim(),
+    });
+    setText("");
+    onAdded();
+  };
+
+  return (
+    <form onSubmit={handleSubmit} style={{ marginTop: 12, display: "flex", gap: 8 }}>
+      <input
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="Añadir nota interna..."
+        style={{
+          flex: 1,
+          border: "1px solid #e5e7eb",
+          borderRadius: 8,
+          padding: "8px 12px",
+          fontSize: 13,
+          color: "#0F1B2B",
+          outline: "none",
+        }}
+      />
+      <button
+        type="submit"
+        disabled={!text.trim() || addNote.isPending}
+        style={{
+          background: "#00BDA5",
+          color: "#fff",
+          border: "none",
+          borderRadius: 8,
+          padding: "8px 14px",
+          cursor: text.trim() ? "pointer" : "not-allowed",
+          opacity: text.trim() ? 1 : 0.5,
+        }}
+      >
+        <Plus size={16} />
+      </button>
+    </form>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+export default function IncidentsPage() {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [filterStatus, setFilterStatus] = useState<string>("ALL");
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
+
+  // Queries
+  const { data: incidents = [], refetch } = useQuery(
+    trpc.incident.all.queryOptions({ tenantId: TENANT_ID }),
+  );
+  const { data: providers = [] } = useQuery(
+    trpc.provider.listByOrg.queryOptions({ tenantId: TENANT_ID }),
+  );
+
+  // Selected incident (refetch detail when needed)
+  const selected = incidents.find((i) => i.id === selectedId) ?? incidents[0] ?? null;
+
+  // Auto-select first on load
+  if (!selectedId && incidents.length > 0 && incidents[0]) {
+    setSelectedId(incidents[0].id);
+  }
+
+  // Auto-select recommended provider
+  if (!selectedProviderId && providers.length > 0 && providers[0]) {
+    setSelectedProviderId(providers[0].id);
+  }
+
+  // Mutations
+  const assignProvider = useMutation(trpc.incident.assignProvider.mutationOptions());
+  const updateStatus = useMutation(trpc.incident.updateStatus.mutationOptions());
+  const rejectIncident = useMutation(trpc.incident.reject.mutationOptions());
+
+  const filtered = incidents.filter((i) =>
+    filterStatus === "ALL" ? true : i.status === filterStatus,
+  );
+
+  const handleAssign = async () => {
+    if (!selected || !selectedProviderId) return;
+    await assignProvider.mutateAsync({
+      tenantId: TENANT_ID,
+      id: selected.id,
+      providerId: selectedProviderId,
+    });
+    await refetch();
+  };
+
+  const handleResolve = async () => {
+    if (!selected) return;
+    await updateStatus.mutateAsync({
+      tenantId: TENANT_ID,
+      id: selected.id,
+      status: "RESUELTA",
+    });
+    await refetch();
+  };
+
+  const handleReject = async () => {
+    if (!selected) return;
+    await rejectIncident.mutateAsync({ tenantId: TENANT_ID, id: selected.id });
+    await refetch();
+  };
+
+  const FILTER_TABS = [
+    { key: "ALL", label: "Todas" },
+    { key: "RECIBIDA", label: "Pendientes" },
+    { key: "EN_REVISION", label: "En revisión" },
+    { key: "EN_CURSO", label: "En curso" },
+    { key: "RESUELTA", label: "Resueltas" },
+  ];
+
+  return (
+    <div style={{ display: "flex", height: "100vh", flexDirection: "column", background: "#f9fafb" }}>
+      {/* ── Top bar ───────────────────────────────────────────────────────────── */}
+      <header
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          borderBottom: "1px solid #e5e7eb",
+          background: "#fff",
+          padding: "12px 24px",
+          flexShrink: 0,
+        }}
+      >
+        <h1 style={{ fontSize: 20, fontWeight: 700, color: "#0F1B2B", margin: 0 }}>
+          Incidencias
+        </h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              border: "1px solid #e5e7eb",
+              borderRadius: 999,
+              background: "#f9fafb",
+              padding: "8px 16px",
+              width: 280,
+            }}
+          >
+            <Search size={15} color="#9ca3af" />
+            <input
+              placeholder="Buscar comunidad, avería, vecino..."
+              style={{ border: "none", background: "none", outline: "none", fontSize: 13, color: "#6b7280", width: "100%" }}
+            />
+          </div>
+          <div
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: "50%",
+              background: "#0F1B2B",
+              color: "#fff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 12,
+              fontWeight: 700,
+            }}
+          >
+            JL
           </div>
         </div>
       </header>
 
-      {/* ── Body: List + Detail ─────────────────────────────────────────── */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* ── Incident list ─────────────────────────────────────────────── */}
-        <div className="flex w-[320px] shrink-0 flex-col border-r border-slate-200 bg-white overflow-hidden">
-          {/* Bulk action bar */}
-          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 bg-slate-50">
-            <button className="flex items-center gap-1.5 text-sm text-slate-600 hover:text-slate-900">
-              <ChevronLeft className="h-4 w-4" />
-              <span className="font-medium">{checkedCount} seleccionadas</span>
-            </button>
-            <div className="flex items-center gap-2">
-              <button className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-1.5 text-sm font-semibold text-white hover:bg-primary/90 transition-colors">
-                Asignar
-                <ChevronDown className="h-3.5 w-3.5" />
-              </button>
-              <button className="flex items-center gap-1 rounded-xl border border-slate-200 px-2.5 py-1.5 text-sm text-slate-500 hover:bg-slate-100">
-                —
-              </button>
+      {/* ── Body ─────────────────────────────────────────────────────────────── */}
+      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+
+        {/* ── Column 1: Incident list ────────────────────────────────────────── */}
+        <div
+          style={{
+            width: 280,
+            flexShrink: 0,
+            borderRight: "1px solid #e5e7eb",
+            background: "#fff",
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          {/* Filter row */}
+          <div
+            style={{
+              padding: "12px 16px 0",
+              borderBottom: "1px solid #f3f4f6",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+              <Filter size={14} color="#9ca3af" />
+              <span style={{ fontSize: 12, fontWeight: 600, color: "#9ca3af" }}>FILTROS</span>
+            </div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", paddingBottom: 10 }}>
+              {FILTER_TABS.map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setFilterStatus(tab.key)}
+                  style={{
+                    border: "none",
+                    borderRadius: 999,
+                    padding: "4px 10px",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    background: filterStatus === tab.key ? "#00BDA5" : "#f3f4f6",
+                    color: filterStatus === tab.key ? "#fff" : "#6b7280",
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
           </div>
 
           {/* List */}
-          <ul className="flex-1 overflow-y-auto divide-y divide-slate-100">
-            {incidents.map((incident) => (
+          <ul
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              listStyle: "none",
+              padding: 0,
+              margin: 0,
+            }}
+          >
+            {filtered.length === 0 && (
+              <li style={{ padding: 24, textAlign: "center", color: "#9ca3af", fontSize: 13 }}>
+                Sin incidencias
+              </li>
+            )}
+            {filtered.map((incident) => (
               <li
                 key={incident.id}
-                className={`flex items-start gap-3 px-4 py-3.5 cursor-pointer transition-colors ${
-                  selectedId === incident.id
-                    ? "bg-slate-50"
-                    : "hover:bg-slate-50"
-                }`}
                 onClick={() => setSelectedId(incident.id)}
+                style={{
+                  padding: "14px 16px",
+                  borderBottom: "1px solid #f3f4f6",
+                  cursor: "pointer",
+                  background: selectedId === incident.id ? "#f0fdfa" : "#fff",
+                  borderLeft: selectedId === incident.id ? "3px solid #00BDA5" : "3px solid transparent",
+                  transition: "background 0.15s",
+                }}
               >
-                {/* Checkbox */}
-                <button
-                  className="mt-0.5 shrink-0"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleCheck(incident.id);
-                  }}
-                >
-                  <div
-                    className={`h-4.5 w-4.5 rounded flex items-center justify-center border-2 transition-colors ${
-                      incident.checked
-                        ? "bg-primary border-primary"
-                        : "border-slate-300 bg-white"
-                    }`}
-                    style={{ width: "18px", height: "18px" }}
-                  >
-                    {incident.checked && (
-                      <Check className="h-3 w-3 text-white" strokeWidth={3} />
-                    )}
-                  </div>
-                </button>
-
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="font-semibold text-sm text-slate-900 leading-tight">
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <PriorityDot priority={incident.priority} />
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#0F1B2B", lineHeight: 1.3 }}>
                       {incident.title}
                     </span>
-                    <StatusBadge status={incident.status} />
                   </div>
-                  <p className="text-xs text-slate-500 mt-0.5 leading-snug">
-                    {incident.community}
-                    <br />
-                    {incident.address}
-                  </p>
+                  <StatusBadge status={incident.priority === "URGENTE" ? "URGENTE" : incident.status} />
                 </div>
-
-                {/* Icon */}
-                <div className="mt-0.5 shrink-0">{incident.icon}</div>
+                <p style={{ fontSize: 11, color: "#9ca3af", margin: "4px 0 0 14px" }}>
+                  Residencial Los Olivos
+                  <br />
+                  Av. de Andalucía, 105
+                </p>
               </li>
             ))}
           </ul>
         </div>
 
-        {/* ── Incident detail panel ────────────────────────────────────── */}
-        {selected && (
-          <div className="flex-1 overflow-y-auto bg-white px-8 py-6">
-            {/* Title */}
-            <div className="mb-4">
-              <h2 className="text-2xl font-bold text-slate-900 mb-1">
-                {selected.title}
-              </h2>
-              <p className="flex items-center gap-1.5 text-sm text-slate-500">
-                <MapPin className="h-3.5 w-3.5 shrink-0" />
-                {selected.community} · {selected.address}
+        {/* ── Column 2: Incident detail ──────────────────────────────────────── */}
+        {selected ? (
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+          >
+            <div style={{ flex: 1, overflowY: "auto", padding: "24px 32px" }}>
+              {/* Header */}
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 4 }}>
+                <h2 style={{ fontSize: 24, fontWeight: 800, color: "#0F1B2B", margin: 0 }}>
+                  {selected.title}
+                </h2>
+                <StatusBadge status={selected.status} />
+              </div>
+              <p style={{ fontSize: 13, color: "#9ca3af", margin: "4px 0 0" }}>
+                Residencial Los Olivos · Av. de Andalucía, 105
               </p>
-            </div>
 
-            {/* Photo */}
-            <div className="mb-5 rounded-2xl overflow-hidden bg-slate-100 aspect-video w-full max-w-xl">
-              <div className="w-full h-full bg-linear-to-br from-slate-200 to-slate-300 flex items-center justify-center text-slate-400 text-sm">
-                Foto de la incidencia
-              </div>
-            </div>
+              {/* Timeline */}
+              <StatusTimeline currentStatus={selected.status} />
 
-            {/* Provider selector */}
-            <div className="mb-6 max-w-xl">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="h-5 w-5 rounded-full bg-primary flex items-center justify-center">
-                  <Check className="h-3 w-3 text-white" strokeWidth={3} />
-                </div>
-                <span className="font-semibold text-slate-900">Proveedor</span>
-              </div>
-
-              {/* Dropdown trigger */}
-              <button
-                onClick={() => setProviderDropdownOpen((v) => !v)}
-                className="flex w-full items-center justify-between rounded-xl border-2 border-primary px-4 py-3 text-sm font-semibold text-primary bg-primary/5 hover:bg-primary/10 transition-colors"
+              {/* Photo */}
+              <div
+                style={{
+                  borderRadius: 12,
+                  overflow: "hidden",
+                  background: "#f3f4f6",
+                  aspectRatio: "16/7",
+                  maxWidth: 520,
+                  marginBottom: 24,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
               >
-                <div className="flex items-center gap-2">
-                  <div className="h-5 w-5 rounded-full bg-primary flex items-center justify-center">
-                    <Check className="h-3 w-3 text-white" strokeWidth={3} />
-                  </div>
-                  {currentProvider?.name}
-                </div>
-                <ChevronDown
-                  className={`h-4 w-4 transition-transform ${providerDropdownOpen ? "rotate-180" : ""}`}
-                />
-              </button>
+                {selected.photoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={selected.photoUrl} alt="Incidencia" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : (
+                  <span style={{ color: "#d1d5db", fontSize: 13 }}>Sin fotografía</span>
+                )}
+              </div>
 
-              {/* Dropdown list */}
-              {providerDropdownOpen && (
-                <div className="mt-1 rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                  {MOCK_PROVIDERS.map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() => {
-                        setSelectedProvider(p.id);
-                        setProviderDropdownOpen(false);
+              {/* Description */}
+              <section style={{ marginBottom: 24 }}>
+                <h3 style={{ fontSize: 14, fontWeight: 700, color: "#0F1B2B", marginBottom: 8 }}>
+                  Descripción
+                </h3>
+                <p style={{ fontSize: 14, color: "#4b5563", lineHeight: 1.6, margin: 0 }}>
+                  {selected.description}
+                </p>
+              </section>
+
+              {/* Internal Notes */}
+              <section>
+                <h3 style={{ fontSize: 14, fontWeight: 700, color: "#0F1B2B", marginBottom: 10 }}>
+                  Notas internas
+                </h3>
+
+                {(selected.notes ?? []).length === 0 && (
+                  <p style={{ fontSize: 13, color: "#9ca3af", marginBottom: 8 }}>Sin notas aún.</p>
+                )}
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {(selected.notes ?? []).map((note: any) => (
+                    <div
+                      key={note.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        justifyContent: "space-between",
+                        background: "#f9fafb",
+                        border: "1px solid #f0f0f0",
+                        borderRadius: 8,
+                        padding: "10px 14px",
                       }}
-                      className="flex w-full items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left"
                     >
-                      <div
-                        className={`h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                          selectedProvider === p.id
-                            ? "border-primary bg-primary"
-                            : "border-slate-300"
-                        }`}
-                      >
-                        {selectedProvider === p.id && (
-                          <Check
-                            className="h-3 w-3 text-white"
-                            strokeWidth={3}
-                          />
-                        )}
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                        <span style={{ fontSize: 14, color: "#00BDA5", marginTop: 1 }}>✎</span>
+                        <div>
+                          <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#0F1B2B" }}>
+                            {note.content}
+                          </p>
+                          <p style={{ margin: "2px 0 0", fontSize: 11, color: "#9ca3af" }}>
+                            – {note.author?.name ?? "AF"},{" "}
+                            {new Date(note.createdAt).toLocaleDateString("es-ES", {
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "numeric",
+                            })}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-semibold text-sm text-slate-900">
-                          {p.name}
-                        </p>
-                        <p className="text-xs text-slate-500 flex items-center gap-1">
-                          {p.recommended && (
-                            <Check className="h-3 w-3 text-primary" />
-                          )}
-                          {p.note}
-                        </p>
-                      </div>
-                    </button>
+                      <ChevronRight size={14} color="#d1d5db" />
+                    </div>
                   ))}
                 </div>
-              )}
 
-              {/* Description / timestamp */}
-              <div className="mt-4 text-sm text-slate-600">
-                <p>Se ha producido una gotera grande en el techo del ático.</p>
-                <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  Mar 11, 10:24 CEST
-                </p>
-              </div>
+                <AddNoteForm incidentId={selected.id} onAdded={() => refetch()} />
+              </section>
             </div>
 
-            {/* CTA */}
-            <div className="max-w-xl">
-              <button className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3.5 text-sm font-bold text-white hover:bg-primary/90 transition-colors shadow-sm">
-                <Send className="h-4 w-4" />
-                Asignar y Notificar Vecino
+            {/* ── Bottom action bar ─────────────────────────────────────────── */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 12,
+                padding: "14px 32px",
+                borderTop: "1px solid #e5e7eb",
+                background: "#fff",
+                flexShrink: 0,
+              }}
+            >
+              <button
+                onClick={() => setSelectedId(selected.id)} // opens assign — handled by provider panel
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  border: "1px solid #e5e7eb", borderRadius: 8,
+                  padding: "10px 20px", background: "#fff",
+                  color: "#374151", fontSize: 13, fontWeight: 600, cursor: "pointer",
+                }}
+              >
+                <UserRound size={14} />
+                Asignar
+              </button>
+
+              <button
+                onClick={handleReject}
+                disabled={rejectIncident.isPending || selected.status === "RECHAZADA"}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  border: "1px solid #e5e7eb", borderRadius: 8,
+                  padding: "10px 20px", background: "#fff",
+                  color: "#374151", fontSize: 13, fontWeight: 600,
+                  cursor: selected.status === "RECHAZADA" ? "not-allowed" : "pointer",
+                  opacity: selected.status === "RECHAZADA" ? 0.4 : 1,
+                }}
+              >
+                <XCircle size={14} />
+                No procede
+              </button>
+
+              <button
+                onClick={handleResolve}
+                disabled={updateStatus.isPending || selected.status === "RESUELTA"}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  border: "none", borderRadius: 8,
+                  padding: "10px 24px",
+                  background: selected.status === "RESUELTA" ? "#9ca3af" : "#00BDA5",
+                  color: "#fff", fontSize: 13, fontWeight: 700,
+                  cursor: selected.status === "RESUELTA" ? "not-allowed" : "pointer",
+                }}
+              >
+                <CheckCircle2 size={14} />
+                Marcar como resuelta
               </button>
             </div>
           </div>
+        ) : (
+          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af" }}>
+            Selecciona una incidencia
+          </div>
+        )}
+
+        {/* ── Column 3: Provider panel ───────────────────────────────────────── */}
+        {selected && (
+          <ProviderPanel
+            providers={providers}
+            selectedProviderId={selectedProviderId}
+            onSelect={setSelectedProviderId}
+            onAssign={handleAssign}
+            isAssigning={assignProvider.isPending}
+            currentProviderId={selected.providerId}
+          />
         )}
       </div>
     </div>
