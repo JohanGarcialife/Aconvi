@@ -1,10 +1,10 @@
-import { eq, desc, and, inArray } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { z } from "zod";
 
 import { incident, incidentNote, provider } from "@acme/db/schema";
 import { sendPushToUser } from "./notification";
 
-import { createTRPCRouter, tenantProcedure } from "../trpc";
+import { createTRPCRouter, publicProcedure, tenantProcedure } from "../trpc";
 
 const INCIDENT_STATUSES = [
   "RECIBIDA",
@@ -16,20 +16,19 @@ const INCIDENT_STATUSES = [
 ] as const;
 
 export const incidentRouter = createTRPCRouter({
-  // ─── List with optional status filter ────────────────────────────────────────
-  all: tenantProcedure
+  // ─── List with optional status filter (public — no auth needed for viewing) ──
+  all: publicProcedure
     .input(
-      z
-        .object({
-          status: z.enum(INCIDENT_STATUSES).optional(),
-        })
-        .optional(),
+      z.object({
+        tenantId: z.string().min(1),
+        status: z.enum(INCIDENT_STATUSES).optional(),
+      }),
     )
     .query(({ ctx, input }) => {
       return ctx.db.query.incident.findMany({
         where: and(
-          eq(incident.organizationId, input?.tenantId ?? ""),
-          input?.status ? eq(incident.status, input.status) : undefined,
+          eq(incident.organizationId, input.tenantId),
+          input.status ? eq(incident.status, input.status) : undefined,
         ),
         orderBy: desc(incident.createdAt),
         with: {
@@ -44,9 +43,9 @@ export const incidentRouter = createTRPCRouter({
       });
     }),
 
-  // ─── Single incident with full detail ────────────────────────────────────────
-  byId: tenantProcedure
-    .input(z.object({ id: z.string().uuid() }))
+  // ─── Single incident detail (public) ─────────────────────────────────────────
+  byId: publicProcedure
+    .input(z.object({ id: z.string().uuid(), tenantId: z.string().min(1) }))
     .query(({ ctx, input }) => {
       return ctx.db.query.incident.findFirst({
         where: and(

@@ -3,16 +3,18 @@ import { z } from "zod";
 
 import { provider } from "@acme/db/schema";
 
-import { createTRPCRouter, tenantProcedure } from "../trpc";
+import { createTRPCRouter, publicProcedure, tenantProcedure } from "../trpc";
 
 export const providerRouter = createTRPCRouter({
-  // List all providers for a tenant (organization)
-  listByOrg: tenantProcedure.query(({ ctx, input }) => {
-    return ctx.db.query.provider.findMany({
-      where: eq(provider.organizationId, input.tenantId),
-      orderBy: [desc(provider.isTrusted), desc(provider.rating)],
-    });
-  }),
+  // Public — anyone with the orgId can list providers (read-only)
+  listByOrg: publicProcedure
+    .input(z.object({ tenantId: z.string().min(1) }))
+    .query(({ ctx, input }) => {
+      return ctx.db.query.provider.findMany({
+        where: eq(provider.organizationId, input.tenantId),
+        orderBy: [desc(provider.isTrusted), desc(provider.rating)],
+      });
+    }),
 
   // Create a new provider
   create: tenantProcedure
