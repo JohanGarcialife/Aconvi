@@ -12,7 +12,9 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter, Stack } from "expo-router";
+import { useRouter, Stack, useLocalSearchParams } from "expo-router";
+import { useTRPC } from "~/utils/api";
+import { useMutation } from "@tanstack/react-query";
 
 const PRIMARY = "#4aa19b";
 const DARK = "#0f172a";
@@ -148,23 +150,51 @@ function CostRow({ label, emoji, value, min, max, step, scaleMarks, onChange }: 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 export default function EstimateScreen() {
   const router = useRouter();
+  const trpc = useTRPC();
+  const params = useLocalSearchParams<{ incidentId?: string; providerId?: string }>();
   const [departure, setDeparture] = useState(40);
   const [labor, setLabor] = useState(80);
   const [materials, setMaterials] = useState(35);
   const [goNow, setGoNow] = useState(true);
-  const [isSending, setIsSending] = useState(false);
 
+  const DEMO_TENANT_ID = "org_aconvi_demo";
   const total = departure + labor + materials;
 
-  const handleSend = async () => {
-    setIsSending(true);
-    await new Promise((r) => setTimeout(r, 1000));
-    setIsSending(false);
-    Alert.alert(
-      "Estimación enviada ✓",
-      `El administrador recibirá tu presupuesto de ${total} €.`,
-      [{ text: "OK", onPress: () => router.push("/(proveedor)/job/inprogress") }]
-    );
+  const acceptMutation = useMutation(
+    trpc.incident.providerAccept.mutationOptions({
+      onSuccess: () => {
+        Alert.alert(
+          "Estimación enviada ✓",
+          `Presupuesto de ${total}€ guardado. El administrador será notificado.`,
+          [{ text: "OK", onPress: () => router.push({
+            pathname: "/(proveedor)/job/inprogress",
+            params: { incidentId: params.incidentId, providerId: params.providerId },
+          }) }]
+        );
+      },
+      onError: (e) => Alert.alert("Error", e.message),
+    }),
+  );
+
+  const handleSend = () => {
+    const incidentId = params.incidentId;
+    const providerId = params.providerId;
+
+    if (!incidentId || !providerId) {
+      // Demo fallback
+      Alert.alert("Estimación enviada ✓", `Presupuesto de ${total}€ enviado.`,
+        [{ text: "OK", onPress: () => router.push("/(proveedor)/job/inprogress") }]
+      );
+      return;
+    }
+
+    acceptMutation.mutate({
+      id: incidentId,
+      tenantId: DEMO_TENANT_ID,
+      providerId,
+      estimatedCost: total,
+      notes: goNow ? "Salida inmediata" : "Salida programada",
+    });
   };
 
   return (
@@ -249,12 +279,12 @@ export default function EstimateScreen() {
 
         {/* CTA */}
         <TouchableOpacity
-          style={[styles.sendButton, isSending && { opacity: 0.7 }]}
+          style={[styles.sendButton, acceptMutation.isPending && { opacity: 0.7 }]}
           onPress={handleSend}
-          disabled={isSending}
+          disabled={acceptMutation.isPending}
           activeOpacity={0.85}
         >
-          {isSending ? (
+          {acceptMutation.isPending ? (
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={styles.sendButtonText}>Enviar estimación</Text>

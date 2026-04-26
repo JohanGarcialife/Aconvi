@@ -10,7 +10,9 @@ import {
   AppStateStatus,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter, Stack } from "expo-router";
+import { useRouter, Stack, useLocalSearchParams } from "expo-router";
+import { useTRPC } from "~/utils/api";
+import { useMutation } from "@tanstack/react-query";
 
 const PRIMARY = "#4aa19b";
 const DARK = "#0f172a";
@@ -49,12 +51,24 @@ async function tryUploadQueue(onSuccess: () => void) {
 // ─── Main screen ──────────────────────────────────────────────────────────────
 export default function CompleteJobScreen() {
   const router = useRouter();
+  const trpc = useTRPC();
+  const params = useLocalSearchParams<{ incidentId?: string; providerId?: string }>();
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
   const [queueCount, setQueueCount] = useState(0);
   const appState = useRef(AppState.currentState);
+
+  const DEMO_TENANT_ID = "org_aconvi_demo";
+
+  const completeMutation = useMutation(
+    trpc.incident.providerComplete.mutationOptions({
+      onSuccess: () => {
+        router.push("/(proveedor)/job/done");
+      },
+      onError: (e) => Alert.alert("Error al cerrar", e.message),
+    }),
+  );
 
   // Listen for app coming back to foreground → drain offline queue
   useEffect(() => {
@@ -94,51 +108,22 @@ export default function CompleteJobScreen() {
       return;
     }
 
-    setIsSubmitting(true);
+    const incidentId = params.incidentId;
+    const providerId = params.providerId;
 
-    let networkAvailable = true;
-    try {
-      // Lightweight connectivity check
-      const r = await fetch("https://1.1.1.1", {
-        method: "HEAD",
-        signal: AbortSignal.timeout(3000),
-      });
-      networkAvailable = r.ok;
-    } catch {
-      networkAvailable = false;
-    }
-
-    if (!networkAvailable) {
-      // Save to offline queue
-      const upload: PendingUpload = {
-        id: `upload_${Date.now()}`,
-        incidentId: "INC-2025-0412",
-        photoUri,
-        notes,
-        status: "pending",
-        createdAt: Date.now(),
-      };
-      offlineQueue.push(upload);
-      setQueueCount((c) => c + 1);
-      setIsOffline(true);
-      setIsSubmitting(false);
-      Alert.alert(
-        "Sin conexión — Guardado localmente",
-        "La foto se enviará automáticamente cuando recuperes la conexión.",
-        [{ text: "OK" }]
-      );
+    if (!incidentId || !providerId) {
+      // No IDs – still navigate (demo fallback)
+      router.push("/(proveedor)/job/done");
       return;
     }
 
-    // Upload immediately (online)
-    try {
-      await new Promise((r) => setTimeout(r, 1200));
-      setIsSubmitting(false);
-      router.push("/(proveedor)/job/done");
-    } catch {
-      setIsSubmitting(false);
-      Alert.alert("Error", "No se pudo enviar. Se guardará para reintento automático.");
-    }
+    completeMutation.mutate({
+      id: incidentId,
+      tenantId: DEMO_TENANT_ID,
+      providerId,
+      completionNote: notes || "Trabajo completado satisfactoriamente",
+      // In production: upload photo and pass the URL here
+    });
   };
 
   return (
@@ -216,13 +201,13 @@ export default function CompleteJobScreen() {
         <TouchableOpacity
           style={[
             styles.submitButton,
-            (!photoUri || isSubmitting) && { opacity: 0.5 },
+            (!photoUri || completeMutation.isPending) && { opacity: 0.5 },
           ]}
           onPress={handleSubmit}
-          disabled={!photoUri || isSubmitting}
+          disabled={!photoUri || completeMutation.isPending}
           activeOpacity={0.85}
         >
-          {isSubmitting ? (
+          {completeMutation.isPending ? (
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={styles.submitButtonText}>

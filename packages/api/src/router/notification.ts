@@ -46,6 +46,36 @@ export async function sendPushToUser(
   }
 }
 
+// ─── Broadcast push to ALL members of an org ─────────────────────────────
+// Call this when publishing a notice/aviso to reach all org vecinos
+export async function sendPushToAllMembers(
+  db: any,
+  organizationId: string,
+  notification: { title: string; body: string; data?: Record<string, string> },
+): Promise<{ sent: number; failed: number }> {
+  const { member } = await import("@acme/db/schema");
+  const { eq } = await import("drizzle-orm");
+
+  const members = await db.query.member.findMany({
+    where: eq(member.organizationId, organizationId),
+  });
+
+  const userIds = [...new Set(members.map((m: any) => m.userId as string))];
+  let sent = 0;
+  let failed = 0;
+
+  for (const uid of userIds) {
+    try {
+      await sendPushToUser(db, uid, notification);
+      sent++;
+    } catch {
+      failed++;
+    }
+  }
+
+  return { sent, failed };
+}
+
 // ─── Expo Push helper ─────────────────────────────────────────────────────────
 async function sendExpoPush(
   expoPushToken: string,

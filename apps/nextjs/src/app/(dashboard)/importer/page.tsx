@@ -233,22 +233,65 @@ export default function ExcelImporterPage() {
     setSheetNames([]);
   };
 
+  const downloadTemplate = () => {
+    const templateRows = [
+      {
+        nombre_comunidad: "Residencial Los Olivos",
+        direccion: "Av. de Andalucía, 105, Madrid",
+        nombre_vecino: "Ana García López",
+        email_vecino: "ana.garcia@ejemplo.com",
+        telefono: "+34 600 111 222",
+        piso_puerta: "2B",
+        coeficiente: 8.5,
+      },
+      {
+        nombre_comunidad: "Residencial Los Olivos",
+        direccion: "Av. de Andalucía, 105, Madrid",
+        nombre_vecino: "Carlos Martínez",
+        email_vecino: "carlos.martinez@ejemplo.com",
+        telefono: "+34 600 333 444",
+        piso_puerta: "3A",
+        coeficiente: 12.3,
+      },
+      {
+        nombre_comunidad: "Torre El Lago",
+        direccion: "Calle Los Sauces, 345, Sevilla",
+        nombre_vecino: "María Fernández",
+        email_vecino: "maria.fernandez@ejemplo.com",
+        telefono: "+34 600 555 666",
+        piso_puerta: "1C",
+        coeficiente: 5.2,
+      },
+    ];
+    const ws = XLSX.utils.json_to_sheet(templateRows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Comunidades");
+    XLSX.writeFile(wb, "plantilla-aconvi.xlsx");
+  };
+
   const totalNeighbors = communities.reduce((acc, c) => acc + c.neighbors.length, 0);
 
   return (
     <div className="flex flex-col gap-8 max-w-5xl">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight mb-2">Importador Masivo</h1>
-        <p className="text-muted-foreground text-sm max-w-xl">
-          Carga un Excel con los datos de comunidades y vecinos. Las columnas reconocidas son:{" "}
-          <code className="bg-muted px-1 rounded text-xs">nombre_comunidad</code>,{" "}
-          <code className="bg-muted px-1 rounded text-xs">direccion</code>,{" "}
-          <code className="bg-muted px-1 rounded text-xs">nombre_vecino</code>,{" "}
-          <code className="bg-muted px-1 rounded text-xs">email_vecino</code>,{" "}
-          <code className="bg-muted px-1 rounded text-xs">telefono</code>,{" "}
-          <code className="bg-muted px-1 rounded text-xs">piso_puerta</code>.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight mb-2">Importador Masivo</h1>
+          <p className="text-muted-foreground text-sm max-w-xl">
+            Carga un Excel con los datos de comunidades y vecinos. Las columnas reconocidas son:{" "}
+            <code className="bg-muted px-1 rounded text-xs">nombre_comunidad</code>,{" "}
+            <code className="bg-muted px-1 rounded text-xs">direccion</code>,{" "}
+            <code className="bg-muted px-1 rounded text-xs">nombre_vecino</code>,{" "}
+            <code className="bg-muted px-1 rounded text-xs">email_vecino</code>,{" "}
+            <code className="bg-muted px-1 rounded text-xs">telefono</code>,{" "}
+            <code className="bg-muted px-1 rounded text-xs">piso_puerta</code>,{" "}
+            <code className="bg-muted px-1 rounded text-xs">coeficiente</code>.
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={downloadTemplate} className="shrink-0">
+          <FileSpreadsheet className="mr-2 h-4 w-4" />
+          Descargar plantilla
+        </Button>
       </div>
 
       {/* Success result */}

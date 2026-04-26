@@ -194,4 +194,113 @@ export const incidentRouter = createTRPCRouter({
         .returning();
       return note;
     }),
+
+  // ─── Provider: list incidents assigned to them ────────────────────────────
+  assignedToProvider: publicProcedure
+    .input(
+      z.object({
+        providerId: z.string().uuid(),
+        tenantId: z.string().min(1).optional(),
+      }),
+    )
+    .query(({ ctx, input }) => {
+      return ctx.db.query.incident.findMany({
+        where: and(
+          eq(incident.providerId, input.providerId),
+          input.tenantId ? eq(incident.organizationId, input.tenantId) : undefined,
+        ),
+        orderBy: desc(incident.createdAt),
+        with: {
+          reporter: { columns: { id: true, name: true, phoneNumber: true } },
+          provider: true,
+          notes: {
+            orderBy: (n, { asc }) => asc(n.createdAt),
+          },
+        },
+      });
+    }),
+
+  // ─── Provider: accept job (→ EN_CURSO) ────────────────────────────────────
+  providerAccept: publicProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        tenantId: z.string().min(1),
+        providerId: z.string().uuid(),
+        estimatedDays: z.number().int().min(1).optional(),
+        estimatedCost: z.number().min(0).optional(),
+        notes: z.string().max(1000).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [updated] = await ctx.db
+        .update(incident)
+        .set({ status: "EN_CURSO", providerId: input.providerId })
+        .where(
+          and(
+            eq(incident.id, input.id),
+            eq(incident.organizationId, input.tenantId),
+          ),
+        )
+        .returning();
+
+      // Save estimate as internal note
+      if (input.notes || input.estimatedCost || input.estimatedDays) {
+        const noteContent = [
+          input.notes,
+          input.estimatedDays ? `Plazo estimado: ${input.estimatedDays} días` : null,
+          input.estimatedCost ? `Coste estimado: ${input.estimatedCost}€` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ");
+
+        await ctx.db.insert(incidentNote).values({
+          incidentId: input.id,
+          authorId: input.providerId,
+          content: `📋 Presupuesto: ${noteContent}`,
+        });
+      }
+
+      return updated;
+    }),
+
+  // ─── Provider: complete job (→ RESUELTA) ──────────────────────────────────
+  providerComplete: publicProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        tenantId: z.string().min(1),
+        providerId: z.string().uuid(),
+        completionNote: z.string().max(1000).optional(),
+        finalPhotoUrl: z.string().url().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [updated] = await ctx.db
+        .update(incident)
+        .set({ status: "RESUELTA", resolvedAt: new Date() })
+        .where(
+          and(
+            eq(incident.id, input.id),
+            eq(incident.organizationId, input.tenantId),
+          ),
+        )
+        .returning();
+
+      const noteContent = [
+        "✅ Trabajo completado",
+        input.completionNote,
+        input.finalPhotoUrl ? `Foto final: ${input.finalPhotoUrl}` : null,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+
+      await ctx.db.insert(incidentNote).values({
+        incidentId: input.id,
+        authorId: input.providerId,
+        content: noteContent,
+      });
+
+      return updated;
+    }),
 });

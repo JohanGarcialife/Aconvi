@@ -22,7 +22,8 @@ import {
 import { Megaphone, AlertTriangle, Info, Pin, Trash2, Plus } from "lucide-react";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const TENANT_ID = "org_123"; // TODO: replace with session tenant
+// Use same tenant as incidents for consistent demo experience
+const TENANT_ID = "org_aconvi_demo";
 
 const NOTICE_TYPES = [
   {
@@ -62,14 +63,18 @@ function PublishNoticeDialog({ onSuccess }: { onSuccess: () => void }) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
 
+  const [pushResult, setPushResult] = useState<{ recipientCount?: number } | null>(null);
+
   const createMutation = useMutation(
     trpc.notice.create.mutationOptions({
-      onSuccess: () => {
+      onSuccess: (data: any) => {
         setOpen(false);
         setTitle("");
         setContent("");
         setType("COMUNICADO");
+        if (data?.recipientCount !== undefined) setPushResult({ recipientCount: data.recipientCount });
         onSuccess();
+        setTimeout(() => setPushResult(null), 5000);
       },
     }),
   );
@@ -144,17 +149,15 @@ function PublishNoticeDialog({ onSuccess }: { onSuccess: () => void }) {
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            Cancelar
-          </Button>
+      <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
           <Button
             onClick={() =>
               createMutation.mutate({ tenantId: TENANT_ID, title, content, type })
             }
             disabled={!title.trim() || !content.trim() || createMutation.isPending}
           >
-            {createMutation.isPending ? "Publicando..." : "Publicar"}
+            {createMutation.isPending ? "Publicando..." : "📢 Publicar y notificar"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -211,9 +214,14 @@ function NoticeCard({
       {/* Footer */}
       <div className="mt-auto pt-3 border-t flex items-center justify-between text-xs text-muted-foreground">
         <span className="font-medium">{notice.author?.name ?? "Administrador"}</span>
-        <span>
-          {format(new Date(notice.createdAt), "d MMM yyyy · HH:mm", { locale: es })}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="flex items-center gap-1 text-emerald-600 font-medium">
+            <span>🔔</span> Push enviado
+          </span>
+          <span>
+            {format(new Date(notice.createdAt), "d MMM yyyy · HH:mm", { locale: es })}
+          </span>
+        </div>
       </div>
     </div>
   );
