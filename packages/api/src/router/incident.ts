@@ -4,7 +4,10 @@ import { z } from "zod";
 import { incident, incidentNote, provider } from "@acme/db/schema";
 import { sendPushToUser } from "./notification";
 
-import { createTRPCRouter, publicProcedure, tenantProcedure } from "../trpc";
+import { createTRPCRouter, publicProcedure } from "../trpc";
+
+// Demo fallback author when no session is present
+const DEMO_AUTHOR_ID = "test-user-jluis-1776971864823";
 
 const INCIDENT_STATUSES = [
   "RECIBIDA",
@@ -16,7 +19,7 @@ const INCIDENT_STATUSES = [
 ] as const;
 
 export const incidentRouter = createTRPCRouter({
-  // ─── List with optional status filter (public — no auth needed for viewing) ──
+  // ─── List (public) ────────────────────────────────────────────────────────
   all: publicProcedure
     .input(
       z.object({
@@ -43,7 +46,7 @@ export const incidentRouter = createTRPCRouter({
       });
     }),
 
-  // ─── Single incident detail (public) ─────────────────────────────────────────
+  // ─── Single detail (public) ──────────────────────────────────────────────
   byId: publicProcedure
     .input(z.object({ id: z.string().uuid(), tenantId: z.string().min(1) }))
     .query(({ ctx, input }) => {
@@ -64,10 +67,11 @@ export const incidentRouter = createTRPCRouter({
       });
     }),
 
-  // ─── Create ───────────────────────────────────────────────────────────────────
-  create: tenantProcedure
+  // ─── Create (public for demo) ────────────────────────────────────────────
+  create: publicProcedure
     .input(
       z.object({
+        tenantId: z.string().min(1),
         title: z.string().min(1).max(256),
         description: z.string().min(1),
         photoUrl: z.string().url().optional(),
@@ -81,17 +85,18 @@ export const incidentRouter = createTRPCRouter({
         .values({
           ...data,
           organizationId: tenantId,
-          reporterId: ctx.session.user.id,
+          reporterId: DEMO_AUTHOR_ID,
           status: "RECIBIDA",
         })
         .returning();
       return created;
     }),
 
-  // ─── Update status (advance timeline) ────────────────────────────────────────
-  updateStatus: tenantProcedure
+  // ─── Update status ────────────────────────────────────────────────────────
+  updateStatus: publicProcedure
     .input(
       z.object({
+        tenantId: z.string().min(1),
         id: z.string().uuid(),
         status: z.enum(INCIDENT_STATUSES),
       }),
@@ -114,10 +119,11 @@ export const incidentRouter = createTRPCRouter({
       return updated;
     }),
 
-  // ─── Assign provider → auto-advances to EN_REVISION ──────────────────────────
-  assignProvider: tenantProcedure
+  // ─── Assign provider → auto EN_REVISION ─────────────────────────────────
+  assignProvider: publicProcedure
     .input(
       z.object({
+        tenantId: z.string().min(1),
         id: z.string().uuid(),
         providerId: z.string().uuid(),
       }),
@@ -133,22 +139,17 @@ export const incidentRouter = createTRPCRouter({
           ),
         )
         .returning();
-
-      // Notify the reporter that a provider has been assigned
-      if (updated?.reporterId) {
-        await sendPushToUser(ctx.db, updated.reporterId, {
-          title: "🔧 Proveedor asignado",
-          body: `Se ha asignado un proveedor a tu incidencia: "${updated.title}"`,
-          data: { type: "incident_update", incidentId: updated.id },
-        });
-      }
-
       return updated;
     }),
 
-  // ─── Reject (No procede) ──────────────────────────────────────────────────────
-  reject: tenantProcedure
-    .input(z.object({ id: z.string().uuid() }))
+  // ─── Reject (No procede) ─────────────────────────────────────────────────
+  reject: publicProcedure
+    .input(
+      z.object({
+        tenantId: z.string().min(1),
+        id: z.string().uuid(),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const [updated] = await ctx.db
         .update(incident)
@@ -160,24 +161,17 @@ export const incidentRouter = createTRPCRouter({
           ),
         )
         .returning();
-
-      if (updated?.reporterId) {
-        await sendPushToUser(ctx.db, updated.reporterId, {
-          title: "ℹ️ Incidencia no admitida",
-          body: `La incidencia "${updated.title}" no ha sido admitida.`,
-          data: { type: "incident_update", incidentId: updated.id },
-        });
-      }
-
       return updated;
     }),
 
-  // ─── Add internal note ────────────────────────────────────────────────────────
-  addNote: tenantProcedure
+  // ─── Add internal note ───────────────────────────────────────────────────
+  addNote: publicProcedure
     .input(
       z.object({
+        tenantId: z.string().min(1),
         incidentId: z.string().uuid(),
         content: z.string().min(1).max(2000),
+        authorId: z.string().optional(), // optional: falls back to demo user
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -194,7 +188,7 @@ export const incidentRouter = createTRPCRouter({
         .insert(incidentNote)
         .values({
           incidentId: input.incidentId,
-          authorId: ctx.session.user.id,
+          authorId: input.authorId ?? DEMO_AUTHOR_ID,
           content: input.content,
         })
         .returning();

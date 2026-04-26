@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useTRPC } from "~/trpc/react";
 import {
   Search,
@@ -427,11 +427,16 @@ function AddNoteForm({
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function IncidentsPage() {
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ msg: string; type: "ok" | "err" } | null>(null);
+
+  const showToast = (msg: string, type: "ok" | "err" = "ok") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   // Queries
   const { data: incidents = [], refetch } = useQuery(
@@ -441,18 +446,21 @@ export default function IncidentsPage() {
     trpc.provider.listByOrg.queryOptions({ tenantId: TENANT_ID }),
   );
 
-  // Selected incident (refetch detail when needed)
-  const selected = incidents.find((i) => i.id === selectedId) ?? incidents[0] ?? null;
+  // Auto-select first incident on load
+  useEffect(() => {
+    if (!selectedId && incidents.length > 0 && incidents[0]) {
+      setSelectedId(incidents[0].id);
+    }
+  }, [incidents, selectedId]);
 
-  // Auto-select first on load
-  if (!selectedId && incidents.length > 0 && incidents[0]) {
-    setSelectedId(incidents[0].id);
-  }
+  // Auto-select recommended provider on load
+  useEffect(() => {
+    if (!selectedProviderId && providers.length > 0 && providers[0]) {
+      setSelectedProviderId(providers[0].id);
+    }
+  }, [providers, selectedProviderId]);
 
-  // Auto-select recommended provider
-  if (!selectedProviderId && providers.length > 0 && providers[0]) {
-    setSelectedProviderId(providers[0].id);
-  }
+  const selected = incidents.find((i) => i.id === selectedId) ?? null;
 
   // Mutations
   const assignProvider = useMutation(trpc.incident.assignProvider.mutationOptions());
@@ -465,28 +473,43 @@ export default function IncidentsPage() {
 
   const handleAssign = async () => {
     if (!selected || !selectedProviderId) return;
-    await assignProvider.mutateAsync({
-      tenantId: TENANT_ID,
-      id: selected.id,
-      providerId: selectedProviderId,
-    });
-    await refetch();
+    try {
+      await assignProvider.mutateAsync({
+        tenantId: TENANT_ID,
+        id: selected.id,
+        providerId: selectedProviderId,
+      });
+      await refetch();
+      showToast("✅ Proveedor asignado correctamente");
+    } catch (e) {
+      showToast("❌ Error al asignar proveedor", "err");
+    }
   };
 
   const handleResolve = async () => {
     if (!selected) return;
-    await updateStatus.mutateAsync({
-      tenantId: TENANT_ID,
-      id: selected.id,
-      status: "RESUELTA",
-    });
-    await refetch();
+    try {
+      await updateStatus.mutateAsync({
+        tenantId: TENANT_ID,
+        id: selected.id,
+        status: "RESUELTA",
+      });
+      await refetch();
+      showToast("✅ Incidencia marcada como resuelta");
+    } catch (e) {
+      showToast("❌ Error al actualizar estado", "err");
+    }
   };
 
   const handleReject = async () => {
     if (!selected) return;
-    await rejectIncident.mutateAsync({ tenantId: TENANT_ID, id: selected.id });
-    await refetch();
+    try {
+      await rejectIncident.mutateAsync({ tenantId: TENANT_ID, id: selected.id });
+      await refetch();
+      showToast("✅ Incidencia marcada como no procede");
+    } catch (e) {
+      showToast("❌ Error al rechazar", "err");
+    }
   };
 
   const FILTER_TABS = [
@@ -498,7 +521,21 @@ export default function IncidentsPage() {
   ];
 
   return (
-    <div style={{ display: "flex", height: "100vh", flexDirection: "column", background: "#f9fafb" }}>
+    <div style={{ display: "flex", height: "100vh", flexDirection: "column", background: "#f9fafb", position: "relative" }}>
+
+      {/* Toast notification */}
+      {toast && (
+        <div style={{
+          position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
+          background: toast.type === "ok" ? "#0F1B2B" : "#dc2626",
+          color: "#fff", padding: "10px 20px", borderRadius: 10,
+          fontSize: 13, fontWeight: 600, zIndex: 9999,
+          boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
+          transition: "opacity 0.3s",
+        }}>
+          {toast.msg}
+        </div>
+      )}
       {/* ── Top bar ───────────────────────────────────────────────────────────── */}
       <header
         style={{
@@ -766,16 +803,18 @@ export default function IncidentsPage() {
               }}
             >
               <button
-                onClick={() => setSelectedId(selected.id)} // opens assign — handled by provider panel
+                onClick={handleAssign}
+                disabled={assignProvider.isPending || !selectedProviderId}
                 style={{
                   display: "flex", alignItems: "center", gap: 6,
                   border: "1px solid #e5e7eb", borderRadius: 8,
                   padding: "10px 20px", background: "#fff",
                   color: "#374151", fontSize: 13, fontWeight: 600, cursor: "pointer",
+                  opacity: assignProvider.isPending ? 0.6 : 1,
                 }}
               >
                 <UserRound size={14} />
-                Asignar
+                {assignProvider.isPending ? "Asignando..." : "Asignar"}
               </button>
 
               <button
