@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
-import { authClient } from "~/auth/client";
-import { getDevMagicLink } from "./dev-actions";
+import { useRouter } from "next/navigation";
 
 function Card({ children }: { children: React.ReactNode }) {
   return (
@@ -61,54 +60,90 @@ function FooterArea() {
   );
 }
 
+type LoginStatus = "idle" | "loading" | "awaiting_push" | "approved" | "error" | "user_not_found";
+
 export function ProfessionalLogin() {
-  const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "loading" | "sent" | "error">("idle");
+  const router = useRouter();
+  const [username, setUsername] = useState("");
+  const [status, setStatus] = useState<LoginStatus>("idle");
   const [errorMessage, setErrorMessage] = useState("");
-  const [devLink, setDevLink] = useState<string | null>(null);
+  const [requestId, setRequestId] = useState<string | null>(null);
+  const [pollCount, setPollCount] = useState(0);
+
+  // Poll the server to check if push has been approved
+  const pollForApproval = useCallback(async (reqId: string) => {
+    try {
+      const res = await fetch(`/api/auth/check-push?requestId=${reqId}`);
+      if (!res.ok) return;
+      const data = await res.json() as { status: string; sessionToken?: string };
+      if (data.status === "approved" && data.sessionToken) {
+        setStatus("approved");
+        // Redirect to auth-success to detect role and redirect accordingly
+        router.push("/auth-success");
+      } else if (data.status === "expired") {
+        setStatus("error");
+        setErrorMessage("La solicitud de acceso ha expirado. Intenta de nuevo.");
+      }
+    } catch {
+      // Silent fail — keep polling
+    }
+  }, [router]);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (status === "sent") {
-      // Poll para obtener el link (se escribe al disco asíncronamente)
-      interval = setInterval(async () => {
-        const url = await getDevMagicLink(email);
-        if (url) {
-          setDevLink(url);
-          clearInterval(interval);
-        }
-      }, 1000);
+    if (status !== "awaiting_push" || !requestId) return;
+    // Poll every 2 seconds for up to 2 minutes (60 polls)
+    if (pollCount >= 60) {
+      setStatus("error");
+      setErrorMessage("No se recibió respuesta del dispositivo. Inténtalo de nuevo.");
+      return;
     }
-    return () => clearInterval(interval);
-  }, [status, email]);
+    const timer = setTimeout(() => {
+      void pollForApproval(requestId);
+      setPollCount((c) => c + 1);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [status, requestId, pollCount, pollForApproval]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) return;
+    const trimmed = username.trim().toLowerCase();
+    if (!trimmed) return;
 
     setStatus("loading");
     setErrorMessage("");
-    setDevLink(null);
+    setRequestId(null);
+    setPollCount(0);
 
     try {
-      const { error } = await authClient.signIn.magicLink({
-        email,
-        callbackURL: "/auth-success", // Redirige aquí para separar por Rol
+      const res = await fetch("/api/auth/request-push-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: trimmed }),
       });
 
-      if (error) {
-        setStatus("error");
-        setErrorMessage(error.message || "No pudimos enviar el Magic Link.");
-      } else {
-        setStatus("sent");
+      const data = await res.json() as { ok: boolean; requestId?: string; error?: string; code?: string };
+
+      if (!res.ok || !data.ok) {
+        if (data.code === "USER_NOT_FOUND") {
+          setStatus("user_not_found");
+          setErrorMessage("Usuario corporativo no encontrado.");
+        } else {
+          setStatus("error");
+          setErrorMessage(data.error ?? "No se pudo iniciar la solicitud de acceso.");
+        }
+        return;
       }
-    } catch (err: any) {
+
+      setRequestId(data.requestId ?? null);
+      setStatus("awaiting_push");
+    } catch {
       setStatus("error");
-      setErrorMessage(err.message || "Ocurrió un error inesperado.");
+      setErrorMessage("Ocurrió un error inesperado. Intenta de nuevo.");
     }
   };
 
-  if (status === "sent") {
+  // ── Awaiting Push screen ────────────────────────────────────────────────────
+  if (status === "awaiting_push" || status === "approved") {
     return (
       <Card>
         <LogoArea centered />
@@ -123,80 +158,72 @@ export function ProfessionalLogin() {
             textAlign: "center",
           }}
         >
+          {/* Animated push icon */}
           <div
             style={{
-              width: "64px",
-              height: "64px",
+              width: "72px",
+              height: "72px",
               borderRadius: "50%",
-              background: "rgba(0,189,165,0.15)",
+              background: "rgba(0,189,165,0.12)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              marginBottom: "16px",
+              marginBottom: "20px",
+              animation: "pulse 2s infinite",
             }}
           >
-            <span style={{ fontSize: "28px" }}>📩</span>
-          </div>
-          <h2 style={{ fontSize: "20px", fontWeight: 700, color: "#0F1B2B", margin: "0 0 8px" }}>
-            Revisa tu correo
-          </h2>
-          <p style={{ color: "#6b7280", fontSize: "15px", marginBottom: "24px" }}>
-            Hemos enviado un Magic Link a <strong>{email}</strong>. Haz clic en el enlace para iniciar sesión.
-          </p>
-          
-          <div style={{
-            background: "#f0fdfa",
-            border: "1px dashed #14b8a6",
-            borderRadius: "12px",
-            padding: "20px",
-            marginBottom: "24px",
-            width: "100%",
-            maxWidth: "400px"
-          }}>
-            <p style={{ fontSize: "12px", color: "#0f766e", fontWeight: "bold", marginBottom: "12px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-              🧪 Entorno de Pruebas (Beta)
-            </p>
-            {devLink ? (
-              <a
-                href={devLink}
-                style={{
-                  display: "block",
-                  padding: "12px 16px",
-                  background: "#00BDA5",
-                  color: "white",
-                  textDecoration: "none",
-                  fontWeight: 600,
-                  borderRadius: "8px",
-                  boxShadow: "0 4px 14px rgba(0,189,165,0.3)"
-                }}
-              >
-                🚀 Autenticar Ahora (Simular Click)
-              </a>
-            ) : (
-              <p style={{ fontSize: "14px", color: "#0f766e", opacity: 0.7 }}>
-                Generando enlace mágico...
-              </p>
-            )}
+            <span style={{ fontSize: "32px" }}>{status === "approved" ? "✅" : "📲"}</span>
           </div>
 
-          <button
-            onClick={() => setStatus("idle")}
-            style={{
-              background: "transparent",
-              color: "#00BDA5",
-              border: "none",
-              cursor: "pointer",
-              fontWeight: 600,
-            }}
-          >
-            Volver
-          </button>
+          <h2 style={{ fontSize: "20px", fontWeight: 700, color: "#0F1B2B", margin: "0 0 8px" }}>
+            {status === "approved" ? "Acceso aprobado" : "Aprobar desde tu móvil"}
+          </h2>
+          <p style={{ color: "#6b7280", fontSize: "15px", marginBottom: "24px", maxWidth: "360px" }}>
+            {status === "approved"
+              ? "Redirigiendo a tu panel..."
+              : `Hemos enviado una notificación push a tu dispositivo registrado. Ábrela y confirma el acceso para continuar.`}
+          </p>
+
+          {status === "awaiting_push" && (
+            <>
+              {/* Progress dots */}
+              <div style={{ display: "flex", gap: 6, marginBottom: 24 }}>
+                {[0, 1, 2].map((i) => (
+                  <div
+                    key={i}
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: "50%",
+                      background: "#00BDA5",
+                      opacity: (pollCount % 3) === i ? 1 : 0.3,
+                      transition: "opacity 0.4s",
+                    }}
+                  />
+                ))}
+              </div>
+              <button
+                onClick={() => { setStatus("idle"); setRequestId(null); setPollCount(0); }}
+                style={{
+                  background: "transparent",
+                  color: "#00BDA5",
+                  border: "none",
+                  cursor: "pointer",
+                  fontWeight: 600,
+                  fontSize: "14px",
+                }}
+              >
+                Cancelar y volver
+              </button>
+            </>
+          )}
         </div>
         <FooterArea />
       </Card>
     );
   }
 
+  // ── Main login form ─────────────────────────────────────────────────────────
   return (
     <Card>
       <LogoArea />
@@ -215,12 +242,15 @@ export function ProfessionalLogin() {
             fontSize: "28px",
             fontWeight: 700,
             color: "#0F1B2B",
-            margin: "0 0 32px",
+            margin: "0 0 8px",
             textAlign: "center",
           }}
         >
-          Iniciar sesión
+          Acceso Corporativo
         </h1>
+        <p style={{ color: "#6b7280", fontSize: "14px", marginBottom: "32px", textAlign: "center" }}>
+          Introduce tu usuario corporativo para recibir la notificación de acceso.
+        </p>
 
         <form
           onSubmit={handleSubmit}
@@ -232,7 +262,7 @@ export function ProfessionalLogin() {
             gap: "16px",
           }}
         >
-          {status === "error" && (
+          {(status === "error" || status === "user_not_found") && (
             <div
               style={{
                 background: "#fef2f2",
@@ -257,16 +287,17 @@ export function ProfessionalLogin() {
                 marginBottom: "8px",
               }}
             >
-              Correo electrónico
+              Usuario corporativo
             </label>
             <input
-              type="email"
-              placeholder="ej. administrador@fincas.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text"
+              placeholder="ej. jluis.admin"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               required
               disabled={status === "loading"}
               autoFocus
+              autoComplete="username"
               style={{
                 width: "100%",
                 padding: "13px 16px",
@@ -278,10 +309,15 @@ export function ProfessionalLogin() {
                 background: "#fff",
                 boxSizing: "border-box",
                 opacity: status === "loading" ? 0.7 : 1,
+                fontFamily: "monospace",
+                letterSpacing: "0.5px",
               }}
               onFocus={(e) => (e.target.style.borderColor = "#00BDA5")}
               onBlur={(e) => (e.target.style.borderColor = "#d1d5db")}
             />
+            <p style={{ fontSize: "12px", color: "#9ca3af", marginTop: "6px" }}>
+              Formato: nombre.apellido &nbsp;·&nbsp; El acceso es gestionado por Aconvi.
+            </p>
           </div>
 
           <button
@@ -291,8 +327,9 @@ export function ProfessionalLogin() {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              gap: "8px",
               padding: "14px 24px",
-              background: "#00BDA5",
+              background: "linear-gradient(135deg, #00BDA5 0%, #0891b2 100%)",
               border: "none",
               borderRadius: "8px",
               color: "#fff",
@@ -301,9 +338,19 @@ export function ProfessionalLogin() {
               cursor: status === "loading" ? "not-allowed" : "pointer",
               width: "100%",
               opacity: status === "loading" ? 0.7 : 1,
+              boxShadow: "0 4px 14px rgba(0,189,165,0.3)",
             }}
           >
-            {status === "loading" ? "Enviando..." : "Entrar con Magic Link"}
+            {status === "loading" ? (
+              <>
+                <span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⟳</span>
+                {" "}Verificando...
+              </>
+            ) : (
+              <>
+                📲 Solicitar acceso
+              </>
+            )}
           </button>
         </form>
       </div>

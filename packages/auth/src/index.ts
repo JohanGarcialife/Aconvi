@@ -2,7 +2,7 @@ import type { BetterAuthOptions, BetterAuthPlugin } from "better-auth";
 import { expo } from "@better-auth/expo";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { oAuthProxy, magicLink, organization, phoneNumber } from "better-auth/plugins";
+import { oAuthProxy, organization, phoneNumber } from "better-auth/plugins";
 
 import { db } from "@acme/db/client";
 import * as schema from "@acme/db/schema";
@@ -40,25 +40,8 @@ export function initAuth<
         productionURL: options.productionUrl,
       }),
       expo(),
-      magicLink({
-        sendMagicLink: async ({ email, token, url }) => {
-          console.log(`[AUTH] Magic link for ${email}: ${url}`);
-          try {
-            const fs = require("fs");
-            const path = require("path");
-            // NextJS runs from apps/nextjs, auth runs from there. We save in process.cwd()
-            const filePath = path.join(process.cwd(), ".magic-links.json");
-            let links: Record<string, string> = {};
-            if (fs.existsSync(filePath)) {
-              links = JSON.parse(fs.readFileSync(filePath, "utf8"));
-            }
-            links[email] = url;
-            fs.writeFileSync(filePath, JSON.stringify(links, null, 2), "utf8");
-          } catch (e) {}
-        },
-      }),
       phoneNumber({
-        sendOTP: async ({ phoneNumber, code }, request) => {
+        sendOTP: async ({ phoneNumber, code }) => {
           console.log(`[AUTH] OTP requested for ${phoneNumber}: ${code}`);
           // Send SMS logic goes here (e.g., Twilio)
         },

@@ -1,41 +1,41 @@
 import Link from "next/link";
 
 export const metadata = {
-  title: "Aconvi — Gestión inteligente de comunidades",
+  title: "Aconvi — Nueva forma de operar comunidades",
   description:
-    "La plataforma integral para administradores de fincas. Incidencias, comunicados, reservas, votaciones y documentación en un solo lugar.",
+    "Gestionar comunidades no debería ser caótico. Aconvi es la plataforma que organiza el trabajo de administradores, vecinos y proveedores en un solo lugar.",
 };
 
 const FEATURES = [
   {
     emoji: "🔧",
     title: "Gestión de Incidencias",
-    desc: "Reporta, asigna y resuelve incidencias con proveedores especializados. Seguimiento en tiempo real para residentes y administradores.",
+    desc: "Las incidencias no se pierden.\nNo se duplican.\nNo tienes que perseguirlas.",
   },
   {
     emoji: "📢",
-    title: "Comunicados y Tablón Digital",
-    desc: "Publica avisos y comunicados a toda la comunidad. Notificaciones push instantáneas a todos los dispositivos.",
+    title: "Comunicados",
+    desc: "Todos están informados.\nSin repetir mensajes.\nSin perseguir a nadie.",
   },
   {
     emoji: "🏊",
-    title: "Reservas de Zonas Comunes",
-    desc: "Gestiona piscinas, salones y pistas deportivas con un sistema de reservas automatizado sin conflictos.",
+    title: "Reservas",
+    desc: "Sin conflictos.\nSin discusiones.\nSin intervención constante.",
   },
   {
     emoji: "🗳️",
-    title: "Votaciones Online Legales",
-    desc: "Convocatorias digitales con ponderación por coeficiente. Actas generadas automáticamente al cerrar la votación.",
+    title: "Votaciones",
+    desc: "Decisiones claras.\nSin reuniones eternas.\nSin fricción.",
   },
   {
     emoji: "📁",
     title: "Gestión Documental",
-    desc: "Centraliza estatutos, actas de junta y contratos. Acceso inmediato para residentes desde el móvil.",
+    desc: "Todo está donde debe estar.\nAccesible.\nSin búsquedas interminables.",
   },
   {
     emoji: "📅",
-    title: "Agenda Inteligente",
-    desc: "Tareas con recordatorios automáticos, recurrencia configurable e indicadores de vencimiento para el AF.",
+    title: "Agenda",
+    desc: "Nada se olvida.\nNada depende de memoria.\nTodo sigue su curso.",
   },
 ];
 
@@ -43,19 +43,19 @@ const AUDIENCE = [
   {
     emoji: "👨‍💼",
     role: "Administradores de Fincas",
-    desc: "Dashboard completo para gestionar múltiples comunidades, proveedores y documentación desde un solo panel.",
+    desc: "Menos llamadas.\nMenos control manual.\nMás claridad.",
     color: "#00bda5",
   },
   {
     emoji: "🏘️",
     role: "Propietarios y Vecinos",
-    desc: "App móvil para reportar incidencias, votar, reservar espacios y recibir comunicados al instante.",
+    desc: "Saben qué pasa.\nSin preguntar.\nSin insistir.",
     color: "#6366f1",
   },
   {
     emoji: "🔨",
     role: "Proveedores y Técnicos",
-    desc: "Recibe solicitudes de trabajo, envía presupuestos y registra la resolución con evidencia fotográfica.",
+    desc: "Saben qué hacer.\nCuándo hacerlo.\nSin fricción.",
     color: "#f59e0b",
   },
 ];
@@ -145,7 +145,7 @@ export default function LandingPage() {
             marginBottom: 28,
           }}
         >
-          ✨ La plataforma definitiva para administradores de fincas
+          ✨ Gestionar comunidades no debería ser caótico.
         </div>
 
         <h1
@@ -160,7 +160,7 @@ export default function LandingPage() {
             backgroundClip: "text",
           }}
         >
-          Gestión inteligente de comunidades de vecinos
+          Pero lo es.
         </h1>
 
         <p
@@ -172,7 +172,9 @@ export default function LandingPage() {
             lineHeight: 1.7,
           }}
         >
-          Una plataforma integral que conecta administradores, vecinos y proveedores para gestionar la comunidad de forma eficiente, transparente y sin papel.
+          Hay una forma distinta de operar comunidades.{" "}
+          <br />Sin llamadas constantes.{" "}
+          <br />Sin depender de todo a la vez.
         </p>
 
         <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
@@ -189,59 +191,39 @@ export default function LandingPage() {
               boxShadow: "0 8px 32px rgba(0,189,165,0.2)",
             }}
           >
-            Comenzar ahora →
+            Ver cómo funciona →
           </Link>
-          <a
-            href="#features"
-            style={{
-              background: "#fafafa",
-              border: "1px solid #e4e4e7",
-              color: "#18181b",
-              padding: "14px 32px",
-              borderRadius: 10,
-              fontWeight: 600,
-              fontSize: 16,
-              textDecoration: "none",
-              transition: "background 0.2s",
-            }}
-            className="hover:bg-zinc-100"
-          >
-            Ver funcionalidades
-          </a>
         </div>
 
-        {/* Stats */}
+        {/* Mantras */}
         <div
           style={{
-            display: "flex",
-            gap: 40,
-            justifyContent: "center",
             marginTop: 72,
-            flexWrap: "wrap",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 8,
           }}
         >
           {[
-            { value: "100%", label: "Digital y sin papel" },
-            { value: "3", label: "Roles integrados" },
-            { value: "∞", label: "Comunidades por AF" },
-            { value: "RGPD", label: "Cumplimiento legal" },
-          ].map(({ value, label }) => (
-            <div key={label} style={{ textAlign: "center" }}>
-              <p
-                style={{
-                  fontSize: 28,
-                  fontWeight: 800,
-                  background: "linear-gradient(135deg, #00bda5 0%, #0891b2 100%)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                  marginBottom: 4,
-                }}
-              >
-                {value}
-              </p>
-              <p style={{ fontSize: 13, color: "#71717a" }}>{label}</p>
-            </div>
+            "Nada se pierde.",
+            "Nada se queda sin responder.",
+            "Todo está bajo control.",
+          ].map((text) => (
+            <p
+              key={text}
+              style={{
+                fontSize: 20,
+                fontWeight: 700,
+                background: "linear-gradient(135deg, #00bda5 0%, #0891b2 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+                margin: 0,
+              }}
+            >
+              {text}
+            </p>
           ))}
         </div>
       </section>
@@ -257,10 +239,10 @@ export default function LandingPage() {
               color: "#18181b"
             }}
           >
-            Todo lo que necesita una comunidad
+            El problema no es tener herramientas.
           </h2>
           <p style={{ color: "#52525b", fontSize: 16, maxWidth: 500, margin: "0 auto" }}>
-            Funcionalidades diseñadas específicamente para el ecosistema de gestión de fincas español.
+            Es cómo está organizado el trabajo.
           </p>
         </div>
 
@@ -299,7 +281,7 @@ export default function LandingPage() {
                 {emoji}
               </div>
               <h3 style={{ fontWeight: 700, fontSize: 17, marginBottom: 8, color: "#18181b" }}>{title}</h3>
-              <p style={{ color: "#52525b", fontSize: 14, lineHeight: 1.6 }}>{desc}</p>
+              <p style={{ color: "#52525b", fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-line" }}>{desc}</p>
             </div>
           ))}
         </div>
@@ -323,11 +305,8 @@ export default function LandingPage() {
               color: "#18181b"
             }}
           >
-            ¿Para quién es Aconvi?
+            Cuando el trabajo está organizado, todos lo notan.
           </h2>
-          <p style={{ color: "#52525b", fontSize: 16, marginBottom: 48 }}>
-            Diseñado para los tres protagonistas de la gestión comunitaria.
-          </p>
 
           <div
             style={{
@@ -366,7 +345,7 @@ export default function LandingPage() {
                 <h3 style={{ fontWeight: 700, fontSize: 17, marginBottom: 8, color: "#18181b" }}>
                   {role}
                 </h3>
-                <p style={{ color: "#52525b", fontSize: 14, lineHeight: 1.6 }}>{desc}</p>
+                <p style={{ color: "#52525b", fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-line" }}>{desc}</p>
               </div>
             ))}
           </div>
@@ -386,10 +365,10 @@ export default function LandingPage() {
             backgroundClip: "text",
           }}
         >
-          Empieza hoy mismo
+          Esto no va de digitalizar.
         </h2>
         <p style={{ color: "#52525b", fontSize: 16, marginBottom: 36 }}>
-          Accede al portal y transforma la gestión de tu comunidad.
+          Va de dejar de trabajar así.
         </p>
         <Link
           href="/login"
@@ -407,7 +386,7 @@ export default function LandingPage() {
           }}
           className="hover:-translate-y-1"
         >
-          Acceso al Portal →
+          Descubrir Aconvi →
         </Link>
       </section>
 
@@ -419,11 +398,16 @@ export default function LandingPage() {
           textAlign: "center",
         }}
       >
-        <p style={{ color: "#71717a", fontSize: 13 }}>
-          © {new Date().getFullYear()} Aconvi · Gestión Inteligente de Comunidades ·{" "}
+        <p style={{ color: "#71717a", fontSize: 13, marginBottom: 8 }}>
+          © {new Date().getFullYear()} Aconvi · Nueva forma de operar comunidades ·{" "}
           <Link href="/login" style={{ color: "#00bda5", textDecoration: "none", fontWeight: 500 }}>
             Acceso al Portal
           </Link>
+        </p>
+        <p style={{ color: "#71717a", fontSize: 12 }}>
+          <a href="#" style={{ color: "#71717a", textDecoration: "none", marginRight: 12 }}>Condiciones Generales</a>
+          <a href="#" style={{ color: "#71717a", textDecoration: "none", marginRight: 12 }}>Política de Privacidad</a>
+          <a href="#" style={{ color: "#71717a", textDecoration: "none" }}>Política de Cookies</a>
         </p>
       </footer>
     </div>

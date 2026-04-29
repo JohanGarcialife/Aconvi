@@ -1,5 +1,5 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
+/documentos
 /Screenshots
 
 .antigravity.md
@@ -62,3 +62,4 @@ temp_pdf/
 .magic-links.json
 magic-link.txt
 
+.pdfvenv/

@@ -206,6 +206,34 @@ export const excelImportJob = pgTable("excel_import_job", {
   createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
 });
 
+// ─── Push Login Request ────────────────────────────────────────────────────────
+// Tracks corporate push-based login flow (web → push → approval → session)
+export const pushLoginRequest = pgTable("push_login_request", {
+  id: uuid().notNull().primaryKey().defaultRandom(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  status: varchar({ length: 32 }).notNull().default("PENDING"), // PENDING, APPROVED, REJECTED, EXPIRED
+  // IP and device info at time of request (for security validation)
+  requestIp: text("request_ip"),
+  requestUserAgent: text("request_user_agent"),
+  // Once approved, the session token is stored here so the web can pick it up
+  sessionToken: text("session_token"),
+  expiresAt: timestamp("expires_at", { mode: "date", withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
+    .defaultNow()
+    .$onUpdateFn(() => new Date())
+    .notNull(),
+});
+
+export const pushLoginRequestRelations = relations(pushLoginRequest, ({ one }) => ({
+  user: one(user, {
+    fields: [pushLoginRequest.userId],
+    references: [user.id],
+  }),
+}));
+
 // ─── Community Document ────────────────────────────────────────────────────────
 // Stores metadata and URLs for community documents (actas, estatutos, etc.)
 // Files are hosted externally (Google Drive, Dropbox, etc.) — URL-based approach.
