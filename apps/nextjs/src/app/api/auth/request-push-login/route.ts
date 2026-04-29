@@ -14,9 +14,21 @@ export async function POST(req: NextRequest) {
     }
 
     // Look up the user by corporate username
-    const foundUser = await db.query.user.findFirst({
+    let foundUser = await db.query.user.findFirst({
       where: eq(user.corporateUsername, username_input),
     });
+
+    // SIMULACIÓN: Crear el usuario jluis.test si no existe para la demo
+    if (!foundUser && username_input === "jluis.test") {
+      const [newUser] = await db.insert(user).values({
+        id: "test-user-" + Date.now(),
+        name: "José Luis (Simulación)",
+        email: "jluis.test@aconvi.app",
+        corporateUsername: "jluis.test",
+        role: "Administrador",
+      }).returning();
+      foundUser = newUser;
+    }
 
     if (!foundUser) {
       return NextResponse.json({ ok: false, error: "Usuario corporativo no encontrado.", code: "USER_NOT_FOUND" }, { status: 404 });
