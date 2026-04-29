@@ -1,12 +1,14 @@
 "use client";
 
 import { UsersRound, ShieldAlert } from "lucide-react";
-import { trpc } from "~/utils/trpc";
+import { useQuery } from "@tanstack/react-query";
+import { useTRPC } from "~/trpc/react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
 export default function SuperAdminAdministratorsPage() {
-  const { data: admins, isLoading } = trpc.superadmin.getAdministrators.useQuery();
+  const trpc = useTRPC();
+  const { data: admins, isLoading } = useQuery(trpc.superadmin.getAdministrators.queryOptions());
 
   return (
     <div className="space-y-6">

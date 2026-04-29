@@ -1,12 +1,14 @@
 "use client";
 
 import { Building2 } from "lucide-react";
-import { trpc } from "~/utils/trpc";
+import { useQuery } from "@tanstack/react-query";
+import { useTRPC } from "~/trpc/react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
 export default function SuperAdminCommunitiesPage() {
-  const { data: communities, isLoading } = trpc.superadmin.getCommunities.useQuery();
+  const trpc = useTRPC();
+  const { data: communities, isLoading } = useQuery(trpc.superadmin.getCommunities.queryOptions());
 
   return (
     <div className="space-y-6">

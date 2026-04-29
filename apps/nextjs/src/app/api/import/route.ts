@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import * as xlsx from "xlsx";
 import { db } from "@acme/db/client";
 import { user, member, excelImportJob } from "@acme/db/schema";
-import { auth } from "~/auth";
+import { auth } from "~/auth/server";
 import { eq } from "drizzle-orm";
 
 export async function POST(req: NextRequest) {
