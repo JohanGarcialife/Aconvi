@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
 
     // SIMULATION FOR TESTING (jluis.test)
     if (loginReq.status === "PENDING") {
-      const { user, session } = await import("@acme/db/schema");
+      const { user } = await import("@acme/db/schema");
       const userForReq = await db.query.user.findFirst({ where: eq(user.id, loginReq.userId) });
       
       if (userForReq?.corporateUsername === "jluis.test") {
@@ -54,24 +54,23 @@ export async function GET(req: NextRequest) {
         
         // Auto-approve after 4 seconds to simulate waiting for mobile push
         if (timeElapsed > 4000) {
-          const crypto = require("crypto");
-          const token = crypto.randomBytes(32).toString("hex");
-          const expiresAt = new Date(Date.now() + 45 * 24 * 60 * 60 * 1000);
+          const { auth } = await import("~/auth/server");
           
-          await db.insert(session).values({
-            id: "test-sess-" + Date.now(),
-            userId: userForReq.id,
-            token,
-            expiresAt,
-            ipAddress: req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip") ?? "127.0.0.1",
-            userAgent: req.headers.get("user-agent") ?? "Simulation",
+          // Let Better Auth natively create the session and generate a valid token
+          const session = await auth.api.createSession({
+            body: {
+              userId: userForReq.id,
+              userAgent: req.headers.get("user-agent") ?? "Simulation",
+              ipAddress: req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip") ?? "127.0.0.1",
+            },
+            headers: req.headers,
           });
 
           await db.update(pushLoginRequest)
-            .set({ status: "APPROVED", sessionToken: token })
+            .set({ status: "APPROVED", sessionToken: session.token })
             .where(eq(pushLoginRequest.id, requestId));
             
-          return NextResponse.json({ status: "approved", sessionToken: token });
+          return NextResponse.json({ status: "approved", sessionToken: session.token });
         }
       }
     }
