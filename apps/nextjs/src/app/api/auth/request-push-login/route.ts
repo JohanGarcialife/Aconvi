@@ -13,6 +13,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "Usuario requerido.", code: "MISSING_USERNAME" }, { status: 400 });
     }
 
+    const { sql } = await import("drizzle-orm");
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS push_login_request (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+          status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+          request_ip TEXT,
+          request_user_agent TEXT,
+          session_token TEXT,
+          expires_at TIMESTAMPTZ NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+      `);
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS push_login_request_user_id_idx ON push_login_request(user_id);`);
+    } catch (e) {
+      console.log("Error creating table dynamically:", e);
+    }
+
     // Look up the user by corporate username
     let foundUser = await db.query.user.findFirst({
       where: eq(user.corporateUsername, username_input),
