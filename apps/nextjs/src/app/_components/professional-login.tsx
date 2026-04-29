@@ -78,6 +78,9 @@ export function ProfessionalLogin() {
       const data = await res.json() as { status: string; sessionToken?: string };
       if (data.status === "approved" && data.sessionToken) {
         setStatus("approved");
+        // Aseguramos que la sesión se guarde en la cookie que BetterAuth lee
+        document.cookie = `better-auth.session_token=${data.sessionToken}; path=/; max-age=${45 * 24 * 60 * 60}`;
+        document.cookie = `__Secure-better-auth.session_token=${data.sessionToken}; path=/; secure; max-age=${45 * 24 * 60 * 60}`;
         // Redirect to auth-success to detect role and redirect accordingly
         router.push("/auth-success");
       } else if (data.status === "expired") {
