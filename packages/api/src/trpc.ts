@@ -178,3 +178,26 @@ export const createRoleProcedure = (allowedRoles: string[]) =>
     }
     return next();
   });
+
+/**
+ * SuperAdmin (SaaS) protected procedure
+ *
+ * This procedure enforces that the caller is a system administrator
+ * ("SuperAdmin" or "AgenteAconvi") globally in the user table.
+ */
+export const superAdminProcedure = protectedProcedure.use(({ ctx, next }) => {
+  // BetterAuth / DB user role
+  const userRole = (ctx.session.user as any).role || "Vecino";
+  if (userRole !== "SuperAdmin" && userRole !== "AgenteAconvi") {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Acceso denegado. Se requieren permisos de SuperAdmin.",
+    });
+  }
+  return next({
+    ctx: {
+      ...ctx,
+      user: ctx.session.user,
+    },
+  });
+});

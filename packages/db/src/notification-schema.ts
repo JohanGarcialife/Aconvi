@@ -11,8 +11,8 @@ export const pushToken = pgTable("push_token", {
     .references(() => user.id, { onDelete: "cascade" }),
   token: text("token").notNull(),
   platform: platformEnum("platform").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at")
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
     .defaultNow()
     .$onUpdate(() => new Date())
     .notNull(),
@@ -26,12 +26,6 @@ export const pushTokenRelations = relations(pushToken, ({ one }) => ({
 }));
 
 // ─── Push Auth Session ────────────────────────────────────────────────────────
-// Records pending push-based login attempts:
-//   1. User enters corporate username on web
-//   2. A pushAuthSession is created (status=PENDING, expires in 3 min)
-//   3. Push notification sent to the user's linked device
-//   4. The mobile app receives and sends confirmPushAccess → status=CONFIRMED
-//   5. Web polls pollPushStatus → detects CONFIRMED → creates Better-Auth session
 export const pushAuthSession = pgTable("push_auth_session", {
   id: text("id").primaryKey(),
   userId: text("user_id")
@@ -40,12 +34,12 @@ export const pushAuthSession = pgTable("push_auth_session", {
   token: text("token").notNull().unique(),
   // PENDING | CONFIRMED | EXPIRED | CANCELLED
   status: text("status").notNull().default("PENDING"),
-  // IP of the web login attempt (for session validation)
+  // IP of the web login attempt
   loginIp: text("login_ip"),
   // User-Agent of the web browser
   loginUserAgent: text("login_user_agent"),
-  expiresAt: timestamp("expires_at").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at", { mode: "date", withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
 });
 
 export const pushAuthSessionRelations = relations(pushAuthSession, ({ one }) => ({

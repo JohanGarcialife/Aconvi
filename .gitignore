@@ -56,3 +56,9 @@ dist/
 
 # tanstack
 .tanstack
+# Temp docs
+Aconvi.txt
+temp_pdf/
+.magic-links.json
+magic-link.txt
+

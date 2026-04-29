@@ -155,6 +155,7 @@ export default function EstimateScreen() {
   const [departure, setDeparture] = useState(40);
   const [labor, setLabor] = useState(80);
   const [materials, setMaterials] = useState(35);
+  const [days, setDays] = useState(1);
   const [goNow, setGoNow] = useState(true);
 
   const DEMO_TENANT_ID = "org_aconvi_demo";
@@ -193,6 +194,7 @@ export default function EstimateScreen() {
       tenantId: DEMO_TENANT_ID,
       providerId,
       estimatedCost: total,
+      estimatedDays: days,
       notes: goNow ? "Salida inmediata" : "Salida programada",
     });
   };
@@ -235,8 +237,6 @@ export default function EstimateScreen() {
         </View>
         <Text style={styles.deadlineHint}>Antes de las 17:00</Text>
 
-        <Text style={styles.etaLabel}>🕐 Llegada estimada</Text>
-
         {/* Sliders */}
         <CostRow
           label="Desplazamiento"
@@ -267,6 +267,17 @@ export default function EstimateScreen() {
           step={5}
           scaleMarks={["0 €", "20 €", "40 €", "80 €", "100 €"]}
           onChange={setMaterials}
+        />
+
+        <CostRow
+          label="Plazo estimado"
+          emoji="⏳"
+          value={days}
+          min={1}
+          max={15}
+          step={1}
+          scaleMarks={["1d", "3d", "5d", "10d", "15d"]}
+          onChange={setDays}
         />
 
         {/* Total */}

@@ -1,61 +1,92 @@
-import { sql, relations } from "drizzle-orm";
-import { pgTable, integer, real, boolean } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
+import {
+  pgTable,
+  text,
+  timestamp,
+  varchar,
+  uuid,
+  boolean,
+  integer,
+  real,
+} from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod/v4";
-import { organization, user } from "./auth-schema";
 
-// ─── Post (demo) ──────────────────────────────────────────────────────────────
-export const Post = pgTable("post", (t) => ({
-  id: t.uuid().notNull().primaryKey().defaultRandom(),
-  title: t.varchar({ length: 256 }).notNull(),
-  content: t.text().notNull(),
-  createdAt: t.timestamp().defaultNow().notNull(),
-  updatedAt: t
-    .timestamp({ mode: "date", withTimezone: true })
-    .$onUpdateFn(() => sql`now()`),
-}));
+import { user, organization, provider, member } from "./auth-schema";
 
-export const CreatePostSchema = createInsertSchema(Post, {
-  title: z.string().max(256),
-  content: z.string().max(256),
-}).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
+// ─── Re-export from other schemas for convenience ───────────────────────────
+export * from "./auth-schema";
+export * from "./notification-schema";
+
+// ─── Post ───────────────────────────────────────────────────────────────────
+export const Post = pgTable("post", {
+  id: uuid("id").notNull().primaryKey().defaultRandom(),
+  title: varchar("title", { length: 256 }).notNull(),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
+    .defaultNow()
+    .$onUpdate(() => new Date())
+    .notNull(),
 });
 
-// ─── Provider ─────────────────────────────────────────────────────────────────
-// External companies or technicians that can be assigned to resolve incidents.
-export const provider = pgTable("provider", (t) => ({
-  id: t.uuid().notNull().primaryKey().defaultRandom(),
-  organizationId: t.text("organization_id")
+export const CreatePostSchema = createInsertSchema(Post).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+
+// ─── Common Area ─────────────────────────────────────────────────────────────
+export const commonArea = pgTable("common_area", {
+  id: uuid().notNull().primaryKey().defaultRandom(),
+  organizationId: text("organization_id")
     .notNull()
     .references(() => organization.id, { onDelete: "cascade" }),
-  name: t.varchar({ length: 256 }).notNull(),
-  avatarInitials: t.varchar("avatar_initials", { length: 4 }).default("?").notNull(),
-  rating: real("rating").default(0).notNull(),           // 0–5
-  isTrusted: boolean("is_trusted").default(false).notNull(),
-  speciality: t.varchar({ length: 128 }),                // e.g. "Fontanería"
-  completedJobs: integer("completed_jobs").default(0).notNull(),
-  avgDaysToResolve: integer("avg_days").default(0).notNull(),
-  priceRangeMin: integer("price_min"),                   // EUR
-  priceRangeMax: integer("price_max"),
-  phone: t.varchar({ length: 32 }),
-  email: t.varchar({ length: 256 }),
-  createdAt: t.timestamp().defaultNow().notNull(),
-}));
+  name: varchar({ length: 256 }).notNull(),
+  description: text(),
+  isActive: boolean("is_active").default(true).notNull(),
+  openTime: varchar("open_time", { length: 5 }).default("08:00").notNull(),
+  closeTime: varchar("close_time", { length: 5 }).default("22:00").notNull(),
+  slotDurationMinutes: integer("slot_duration_minutes").default(60).notNull(),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+});
 
-export const providerRelations = relations(provider, ({ one, many }) => ({
+export const commonAreaRelations = relations(commonArea, ({ one, many }) => ({
   organization: one(organization, {
-    fields: [provider.organizationId],
+    fields: [commonArea.organizationId],
     references: [organization.id],
   }),
-  incidents: many(incident),
+  bookings: many(commonAreaBooking),
+}));
+
+// ─── Common Area Booking ─────────────────────────────────────────────────────
+export const commonAreaBooking = pgTable("common_area_booking", {
+  id: uuid().notNull().primaryKey().defaultRandom(),
+  commonAreaId: uuid("common_area_id")
+    .notNull()
+    .references(() => commonArea.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  date: varchar({ length: 10 }).notNull(), // ISO Date string: YYYY-MM-DD
+  startTime: varchar("start_time", { length: 5 }).notNull(), // HH:mm
+  endTime: varchar("end_time", { length: 5 }).notNull(), // HH:mm
+  status: varchar({ length: 64 }).notNull().default("CONFIRMADA"), // PENDING, CONFIRMADA, CANCELADA
+  notes: text(),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+});
+
+export const commonAreaBookingRelations = relations(commonAreaBooking, ({ one }) => ({
+  commonArea: one(commonArea, {
+    fields: [commonAreaBooking.commonAreaId],
+    references: [commonArea.id],
+  }),
+  user: one(user, {
+    fields: [commonAreaBooking.userId],
+    references: [user.id],
+  }),
 }));
 
 // ─── Incident ─────────────────────────────────────────────────────────────────
-// 5-step workflow: RECIBIDA → EN_REVISION → AGENDADA → EN_CURSO → RESUELTA
-// Terminal alternative: RECHAZADA
 export const incident = pgTable("incident", (t) => ({
   id: t.uuid().notNull().primaryKey().defaultRandom(),
   title: t.varchar({ length: 256 }).notNull(),
@@ -75,12 +106,17 @@ export const incident = pgTable("incident", (t) => ({
   providerId: t.uuid("provider_id").references(() => provider.id, {
     onDelete: "set null",
   }),
-  resolvedAt: t.timestamp("resolved_at"),
-  rejectedAt: t.timestamp("rejected_at"),
-  createdAt: t.timestamp().defaultNow().notNull(),
+  estimatedCost: t.real("estimated_cost"),
+  estimatedDays: t.integer("estimated_days"),
+  assignedAt: t.timestamp("assigned_at", { mode: "date", withTimezone: true }),
+  resolvedAt: t.timestamp("resolved_at", { mode: "date", withTimezone: true }),
+  rejectedAt: t.timestamp("rejected_at", { mode: "date", withTimezone: true }),
+  createdAt: t.timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   updatedAt: t
-    .timestamp({ mode: "date", withTimezone: true })
-    .$onUpdateFn(() => sql`now()`),
+    .timestamp("updated_at", { mode: "date", withTimezone: true })
+    .defaultNow()
+    .$onUpdateFn(() => new Date())
+    .notNull(),
 }));
 
 export const incidentRelations = relations(incident, ({ one, many }) => ({
@@ -106,7 +142,6 @@ export const incidentRelations = relations(incident, ({ one, many }) => ({
 }));
 
 // ─── Incident Note ────────────────────────────────────────────────────────────
-// Internal notes added by AF agents during incident management.
 export const incidentNote = pgTable("incident_note", (t) => ({
   id: t.uuid().notNull().primaryKey().defaultRandom(),
   incidentId: t.uuid("incident_id")
@@ -116,7 +151,7 @@ export const incidentNote = pgTable("incident_note", (t) => ({
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
   content: t.text().notNull(),
-  createdAt: t.timestamp().defaultNow().notNull(),
+  createdAt: t.timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
 }));
 
 export const incidentNoteRelations = relations(incidentNote, ({ one }) => ({
@@ -141,10 +176,12 @@ export const notice = pgTable("notice", (t) => ({
   authorId: t.text("author_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
-  createdAt: t.timestamp().defaultNow().notNull(),
+  createdAt: t.timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   updatedAt: t
-    .timestamp({ mode: "date", withTimezone: true })
-    .$onUpdateFn(() => sql`now()`),
+    .timestamp("updated_at", { mode: "date", withTimezone: true })
+    .defaultNow()
+    .$onUpdateFn(() => new Date())
+    .notNull(),
 }));
 
 export const noticeRelations = relations(notice, ({ one }) => ({
@@ -158,58 +195,185 @@ export const noticeRelations = relations(notice, ({ one }) => ({
   }),
 }));
 
-export * from "./auth-schema";
-export * from "./notification-schema";
-
-// ─── Common Areas ─────────────────────────────────────────────────────────────
-export const commonArea = pgTable("common_area", (t) => ({
-  id: t.uuid().notNull().primaryKey().defaultRandom(),
-  organizationId: t.text("organization_id")
+// ─── Excel Template (Metadata / Helpers) ──────────────────────────────────────
+export const excelImportJob = pgTable("excel_import_job", {
+  id: uuid().notNull().primaryKey().defaultRandom(),
+  organizationId: text("organization_id")
     .notNull()
     .references(() => organization.id, { onDelete: "cascade" }),
-  name: t.varchar({ length: 128 }).notNull(),
-  description: t.text(),
-  capacity: t.integer().default(10).notNull(),
-  icon: t.varchar({ length: 32 }).default("🏠").notNull(),
-  rules: t.text(),
-  openTime: t.varchar({ length: 5 }).default("08:00").notNull(),
-  closeTime: t.varchar({ length: 5 }).default("22:00").notNull(),
-  slotDurationMinutes: t.integer().default(60).notNull(),
-  isActive: t.boolean().default(true).notNull(),
-  createdAt: t.timestamp().defaultNow().notNull(),
-}));
+  status: varchar({ length: 64 }).notNull().default("PENDING"), // PENDING, PROCESSING, COMPLETED, FAILED
+  resultJson: text(), // Summary of imports
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+});
 
-export const commonAreaBooking = pgTable("common_area_booking", (t) => ({
-  id: t.uuid().notNull().primaryKey().defaultRandom(),
-  commonAreaId: t.uuid("common_area_id")
+// ─── Community Document ────────────────────────────────────────────────────────
+// Stores metadata and URLs for community documents (actas, estatutos, etc.)
+// Files are hosted externally (Google Drive, Dropbox, etc.) — URL-based approach.
+export const communityDocument = pgTable("community_document", {
+  id: uuid().notNull().primaryKey().defaultRandom(),
+  organizationId: text("organization_id")
     .notNull()
-    .references(() => commonArea.id, { onDelete: "cascade" }),
-  userId: t.text("user_id")
+    .references(() => organization.id, { onDelete: "cascade" }),
+  authorId: text("author_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
-  date: t.varchar({ length: 10 }).notNull(),
-  startTime: t.varchar({ length: 5 }).notNull(),
-  endTime: t.varchar({ length: 5 }).notNull(),
-  status: t.varchar({ length: 32 }).default("CONFIRMADA").notNull(),
-  notes: t.text(),
-  createdAt: t.timestamp().defaultNow().notNull(),
-}));
+  title: varchar({ length: 256 }).notNull(),
+  description: text(),
+  category: varchar({ length: 64 }).notNull().default("OTRO"), // ACTA, ESTATUTO, REGLAMENTO, CONTRATO, OTRO
+  fileUrl: text("file_url").notNull(),
+  fileName: varchar("file_name", { length: 256 }).notNull(),
+  mimeType: varchar("mime_type", { length: 128 }),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+});
 
-export const commonAreaRelations = relations(commonArea, ({ one, many }) => ({
+export const communityDocumentRelations = relations(communityDocument, ({ one }) => ({
   organization: one(organization, {
-    fields: [commonArea.organizationId],
+    fields: [communityDocument.organizationId],
     references: [organization.id],
   }),
-  bookings: many(commonAreaBooking),
-}));
-
-export const commonAreaBookingRelations = relations(commonAreaBooking, ({ one }) => ({
-  commonArea: one(commonArea, {
-    fields: [commonAreaBooking.commonAreaId],
-    references: [commonArea.id],
-  }),
-  user: one(user, {
-    fields: [commonAreaBooking.userId],
+  author: one(user, {
+    fields: [communityDocument.authorId],
     references: [user.id],
   }),
 }));
+
+// ─── Vote Session ──────────────────────────────────────────────────────────────
+// Represents a single voting session (e.g. "Aprobación obras piscina")
+export const voteSession = pgTable("vote_session", {
+  id: uuid().notNull().primaryKey().defaultRandom(),
+  organizationId: text("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  authorId: text("author_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  title: varchar({ length: 256 }).notNull(),
+  description: text(),
+  status: varchar({ length: 32 }).notNull().default("DRAFT"), // DRAFT, OPEN, CLOSED
+  coefficientWeighted: boolean("coefficient_weighted").default(false).notNull(),
+  closesAt: timestamp("closes_at", { mode: "date", withTimezone: true }),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  closedAt: timestamp("closed_at", { mode: "date", withTimezone: true }),
+});
+
+export const voteSessionRelations = relations(voteSession, ({ one, many }) => ({
+  organization: one(organization, {
+    fields: [voteSession.organizationId],
+    references: [organization.id],
+  }),
+  author: one(user, {
+    fields: [voteSession.authorId],
+    references: [user.id],
+  }),
+  options: many(voteOption),
+  casts: many(voteCast),
+  minute: one(voteMinute, {
+    fields: [voteSession.id],
+    references: [voteMinute.sessionId],
+  }),
+}));
+
+// ─── Vote Option ───────────────────────────────────────────────────────────────
+// Each possible answer within a voting session
+export const voteOption = pgTable("vote_option", {
+  id: uuid().notNull().primaryKey().defaultRandom(),
+  sessionId: uuid("session_id")
+    .notNull()
+    .references(() => voteSession.id, { onDelete: "cascade" }),
+  label: varchar({ length: 256 }).notNull(),
+  voteCount: integer("vote_count").notNull().default(0),
+  weightedTotal: real("weighted_total").notNull().default(0),
+  displayOrder: integer("display_order").notNull().default(0),
+});
+
+export const voteOptionRelations = relations(voteOption, ({ one, many }) => ({
+  session: one(voteSession, {
+    fields: [voteOption.sessionId],
+    references: [voteSession.id],
+  }),
+  casts: many(voteCast),
+}));
+
+// ─── Vote Cast ─────────────────────────────────────────────────────────────────
+// Records each individual vote cast by a resident
+export const voteCast = pgTable("vote_cast", {
+  id: uuid().notNull().primaryKey().defaultRandom(),
+  sessionId: uuid("session_id")
+    .notNull()
+    .references(() => voteSession.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  optionId: uuid("option_id")
+    .notNull()
+    .references(() => voteOption.id, { onDelete: "cascade" }),
+  coefficient: real("coefficient").notNull().default(1), // resident coefficient at time of vote
+  castAt: timestamp("cast_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  ipAddress: varchar("ip_address", { length: 64 }), // for audit/timestamping
+});
+
+export const voteCastRelations = relations(voteCast, ({ one }) => ({
+  session: one(voteSession, {
+    fields: [voteCast.sessionId],
+    references: [voteSession.id],
+  }),
+  user: one(user, {
+    fields: [voteCast.userId],
+    references: [user.id],
+  }),
+  option: one(voteOption, {
+    fields: [voteCast.optionId],
+    references: [voteOption.id],
+  }),
+}));
+
+// ─── Vote Minute ───────────────────────────────────────────────────────────────
+// Auto-generated minutes document when a session is closed
+export const voteMinute = pgTable("vote_minute", {
+  id: uuid().notNull().primaryKey().defaultRandom(),
+  sessionId: uuid("session_id")
+    .notNull()
+    .unique()
+    .references(() => voteSession.id, { onDelete: "cascade" }),
+  content: text().notNull(), // plain text minutes content
+  generatedAt: timestamp("generated_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+});
+
+export const voteMinuteRelations = relations(voteMinute, ({ one }) => ({
+  session: one(voteSession, {
+    fields: [voteMinute.sessionId],
+    references: [voteSession.id],
+  }),
+}));
+
+// ─── Agenda Task ───────────────────────────────────────────────────────────────
+// Tasks for the Property Manager's intelligent agenda
+export const agendaTask = pgTable("agenda_task", {
+  id: uuid().notNull().primaryKey().defaultRandom(),
+  organizationId: text("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  authorId: text("author_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  title: varchar({ length: 256 }).notNull(),
+  description: text(),
+  category: varchar({ length: 64 }).notNull().default("ADMINISTRATIVO"), // MANTENIMIENTO, LEGAL, ADMINISTRATIVO, FINANCIERO, OTRO
+  dueDate: varchar("due_date", { length: 10 }).notNull(), // ISO date YYYY-MM-DD
+  recurrence: varchar({ length: 32 }).notNull().default("NONE"), // NONE, WEEKLY, MONTHLY, ANNUAL
+  isDone: boolean("is_done").notNull().default(false),
+  doneAt: timestamp("done_at", { mode: "date", withTimezone: true }),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+});
+
+export const agendaTaskRelations = relations(agendaTask, ({ one }) => ({
+  organization: one(organization, {
+    fields: [agendaTask.organizationId],
+    references: [organization.id],
+  }),
+  author: one(user, {
+    fields: [agendaTask.authorId],
+    references: [user.id],
+  }),
+}));
+

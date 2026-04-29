@@ -6,6 +6,10 @@ import { communityRouter } from "./router/community";
 import { notificationRouter } from "./router/notification";
 import { commonAreaRouter } from "./router/commonArea";
 import { providerRouter } from "./router/provider";
+import { documentRouter } from "./router/document";
+import { votingRouter } from "./router/voting";
+import { agendaRouter } from "./router/agenda";
+import { superadminRouter } from "./router/superadmin";
 import { createTRPCRouter } from "./trpc";
 
 export const appRouter = createTRPCRouter({
@@ -17,6 +21,10 @@ export const appRouter = createTRPCRouter({
   notification: notificationRouter,
   commonArea: commonAreaRouter,
   provider: providerRouter,
+  document: documentRouter,
+  voting: votingRouter,
+  agenda: agendaRouter,
+  superadmin: superadminRouter,
 });
 
 

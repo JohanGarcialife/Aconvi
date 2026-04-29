@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { incident, incidentNote, provider } from "@acme/db/schema";
 import { sendPushToUser } from "./notification";
+import { emitWebSocketEvent } from "../utils/ws";
 
 import { createTRPCRouter, publicProcedure } from "../trpc";
 
@@ -89,6 +90,10 @@ export const incidentRouter = createTRPCRouter({
           status: "RECIBIDA",
         })
         .returning();
+
+      // Emit realtime event to the tenant room
+      await emitWebSocketEvent(tenantId, "incident-created", created);
+
       return created;
     }),
 
@@ -116,6 +121,10 @@ export const incidentRouter = createTRPCRouter({
           ),
         )
         .returning();
+
+      // Emit realtime event to the tenant room
+      await emitWebSocketEvent(input.tenantId, "incident-updated", updated);
+
       return updated;
     }),
 
@@ -131,7 +140,11 @@ export const incidentRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const [updated] = await ctx.db
         .update(incident)
-        .set({ providerId: input.providerId, status: "EN_REVISION" })
+        .set({ 
+          providerId: input.providerId, 
+          status: "EN_REVISION",
+          assignedAt: new Date()
+        })
         .where(
           and(
             eq(incident.id, input.id),
@@ -139,6 +152,13 @@ export const incidentRouter = createTRPCRouter({
           ),
         )
         .returning();
+
+      // Notify provider user room
+      await emitWebSocketEvent(input.providerId, "incident-assigned", updated);
+
+      // Emit realtime event to the tenant room
+      await emitWebSocketEvent(input.tenantId, "incident-updated", updated);
+
       return updated;
     }),
 
@@ -235,7 +255,12 @@ export const incidentRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const [updated] = await ctx.db
         .update(incident)
-        .set({ status: "EN_CURSO", providerId: input.providerId })
+        .set({ 
+          status: "EN_CURSO", 
+          providerId: input.providerId,
+          estimatedCost: input.estimatedCost,
+          estimatedDays: input.estimatedDays,
+        })
         .where(
           and(
             eq(incident.id, input.id),
@@ -246,18 +271,15 @@ export const incidentRouter = createTRPCRouter({
 
       // Save estimate as internal note
       if (input.notes || input.estimatedCost || input.estimatedDays) {
-        const noteContent = [
-          input.notes,
-          input.estimatedDays ? `Plazo estimado: ${input.estimatedDays} días` : null,
-          input.estimatedCost ? `Coste estimado: ${input.estimatedCost}€` : null,
-        ]
-          .filter(Boolean)
-          .join(" · ");
+        let noteLines = [];
+        if (input.notes) noteLines.push(input.notes);
+        if (input.estimatedCost) noteLines.push(`💰 Presupuesto estimado: ${input.estimatedCost}€`);
+        if (input.estimatedDays) noteLines.push(`⏳ Tiempo estimado: ${input.estimatedDays} días`);
 
         await ctx.db.insert(incidentNote).values({
           incidentId: input.id,
-          authorId: input.providerId,
-          content: `📋 Presupuesto: ${noteContent}`,
+          authorId: input.providerId, // In real app, relate to provider user
+          content: noteLines.join('\n'),
         });
       }
 

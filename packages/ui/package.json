@@ -19,7 +19,8 @@
     "./tooltip": "./src/tooltip.tsx",
     "./dialog": "./src/dialog.tsx",
     "./textarea": "./src/textarea.tsx",
-    "./badge": "./src/badge.tsx"
+    "./badge": "./src/badge.tsx",
+    "./alert-dialog": "./src/alert-dialog.tsx"
   },
   "license": "MIT",
   "scripts": {

@@ -44,6 +44,7 @@ interface CommunityGroup {
     email: string;
     phone?: string;
     unit?: string;
+    coefficient?: number;
   }[];
 }
 
@@ -88,6 +89,7 @@ function groupByCommunity(rows: ParsedRow[]): CommunityGroup[] {
           unit:
             String(row.piso_puerta ?? row["Piso/Puerta"] ?? row["piso"] ?? "").trim() ||
             undefined,
+          coefficient: Number(row.coeficiente ?? row["Coeficiente"] ?? row["coeficiente"] ?? 100),
         });
       }
     }
@@ -404,28 +406,38 @@ export default function ExcelImporterPage() {
                       <TableHead>Comunidad</TableHead>
                       <TableHead>Dirección</TableHead>
                       <TableHead className="text-right">Vecinos</TableHead>
+                      <TableHead className="text-right">Coef. prom.</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {communities.slice(0, 10).map((c, i) => (
-                      <TableRow key={i}>
-                        <TableCell className="font-medium">
-                          <div className="flex items-center gap-2">
-                            <Building2 className="h-4 w-4 text-muted-foreground" />
-                            {c.name}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-sm">
-                          {c.address ?? "—"}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-semibold">
-                            <Users className="h-3 w-3" />
-                            {c.neighbors.length}
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {communities.slice(0, 10).map((c, i) => {
+                      const avgCoef = c.neighbors.length > 0 
+                        ? (c.neighbors.reduce((acc, curr) => acc + (curr.coefficient ?? 0), 0) / c.neighbors.length).toFixed(1)
+                        : "0";
+                      
+                      return (
+                        <TableRow key={i}>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              <Building2 className="h-4 w-4 text-muted-foreground" />
+                              {c.name}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm">
+                            {c.address ?? "—"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-semibold">
+                              <Users className="h-3 w-3" />
+                              {c.neighbors.length}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right text-muted-foreground">
+                            {avgCoef}%
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                     {communities.length > 10 && (
                       <TableRow>
                         <TableCell colSpan={3} className="text-center text-xs text-muted-foreground py-2">

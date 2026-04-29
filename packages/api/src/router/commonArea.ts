@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod";
 import { commonArea, commonAreaBooking } from "@acme/db/schema";
 import { createTRPCRouter, tenantProcedure, protectedProcedure } from "../trpc";
@@ -140,4 +140,69 @@ export const commonAreaRouter = createTRPCRouter({
       orderBy: (t, { asc }) => [asc(t.date), asc(t.startTime)],
     });
   }),
+
+  // ── AF: create a new common area ─────────────────────────────────────────
+  create: tenantProcedure
+    .input(
+      z.object({
+        name: z.string().min(1).max(256),
+        description: z.string().optional(),
+        openTime: z.string().regex(/^\d{2}:\d{2}$/).default("08:00"),
+        closeTime: z.string().regex(/^\d{2}:\d{2}$/).default("22:00"),
+        slotDurationMinutes: z.number().int().min(15).max(480).default(60),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [area] = await ctx.db
+        .insert(commonArea)
+        .values({
+          id: crypto.randomUUID(),
+          organizationId: input.tenantId,
+          name: input.name,
+          description: input.description ?? null,
+          openTime: input.openTime,
+          closeTime: input.closeTime,
+          slotDurationMinutes: input.slotDurationMinutes,
+          isActive: true,
+        })
+        .returning();
+      return area;
+    }),
+
+  // ── AF: toggle active/inactive ────────────────────────────────────────────
+  toggleArea: tenantProcedure
+    .input(z.object({ areaId: z.string().uuid(), isActive: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db
+        .update(commonArea)
+        .set({ isActive: input.isActive })
+        .where(eq(commonArea.id, input.areaId));
+      return { ok: true };
+    }),
+
+  // ── AF: view all bookings for the community ───────────────────────────────
+  allBookings: tenantProcedure
+    .input(
+      z.object({
+        areaId: z.string().uuid().optional(),
+        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      // Build where conditions dynamically
+      const conditions = [];
+      if (input.areaId) conditions.push(eq(commonAreaBooking.commonAreaId, input.areaId));
+      if (input.date) conditions.push(eq(commonAreaBooking.date, input.date));
+
+      return ctx.db.query.commonAreaBooking.findMany({
+        where: conditions.length > 0 ? and(...conditions) : undefined,
+        with: {
+          commonArea: {
+            columns: { id: true, name: true, organizationId: true },
+          },
+          user: { columns: { id: true, name: true, phoneNumber: true } },
+        },
+        orderBy: [desc(commonAreaBooking.date), desc(commonAreaBooking.startTime)],
+      });
+    }),
 });

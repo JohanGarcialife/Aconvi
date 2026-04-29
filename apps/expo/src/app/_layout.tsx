@@ -1,15 +1,24 @@
 import { useColorScheme } from "react-native";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { QueryClientProvider } from "@tanstack/react-query";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useEffect, useRef } from "react";
 import * as Notifications from "expo-notifications";
+
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
 
 import { queryClient } from "~/utils/api";
 import { usePushNotifications } from "~/utils/usePushNotifications";
 
 import "../styles.css";
+
+import { SocketProvider } from "~/components/SocketProvider";
+
+const asyncStoragePersister = createAsyncStoragePersister({
+  storage: AsyncStorage,
+});
 
 // ─── Inner component wraps hooks that need QueryClient ────────────────────────
 function AppInitializer({ children }: { children: React.ReactNode }) {
@@ -48,22 +57,27 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <QueryClientProvider client={queryClient}>
-        <AppInitializer>
-          <Stack
-            screenOptions={{
-              headerStyle: { backgroundColor: "#FFFFFF" },
-              headerTintColor: "#4aa19b",
-              headerTitleStyle: { fontWeight: "700", color: "#0f172a" },
-              contentStyle: {
-                backgroundColor: "#FFFFFF",
-              },
-              headerShadowVisible: false,
-            }}
-          />
-        </AppInitializer>
+      <PersistQueryClientProvider
+        client={queryClient}
+        persistOptions={{ persister: asyncStoragePersister }}
+      >
+        <SocketProvider>
+          <AppInitializer>
+            <Stack
+              screenOptions={{
+                headerStyle: { backgroundColor: "#FFFFFF" },
+                headerTintColor: "#4aa19b",
+                headerTitleStyle: { fontWeight: "700", color: "#0f172a" },
+                contentStyle: {
+                  backgroundColor: "#FFFFFF",
+                },
+                headerShadowVisible: false,
+              }}
+            />
+          </AppInitializer>
+        </SocketProvider>
         <StatusBar style="dark" />
-      </QueryClientProvider>
+      </PersistQueryClientProvider>
     </GestureHandlerRootView>
   );
 }

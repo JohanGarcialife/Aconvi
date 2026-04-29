@@ -18,9 +18,8 @@ export default function RootIndex() {
     if (isPending) return;
 
     if (!session) {
-      // Not logged in → send to provisional access
-      // In production: router.replace("/login");
-      router.replace("/(vecino)");
+      // Not logged in → send to login screen
+      router.replace("/login");
       return;
     }
 

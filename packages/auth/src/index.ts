@@ -43,10 +43,18 @@ export function initAuth<
       magicLink({
         sendMagicLink: async ({ email, token, url }) => {
           console.log(`[AUTH] Magic link for ${email}: ${url}`);
-          // @ts-ignore
-          if (!globalThis.__magicLinks) globalThis.__magicLinks = new Map();
-          // @ts-ignore
-          globalThis.__magicLinks.set(email, url);
+          try {
+            const fs = require("fs");
+            const path = require("path");
+            // NextJS runs from apps/nextjs, auth runs from there. We save in process.cwd()
+            const filePath = path.join(process.cwd(), ".magic-links.json");
+            let links: Record<string, string> = {};
+            if (fs.existsSync(filePath)) {
+              links = JSON.parse(fs.readFileSync(filePath, "utf8"));
+            }
+            links[email] = url;
+            fs.writeFileSync(filePath, JSON.stringify(links, null, 2), "utf8");
+          } catch (e) {}
         },
       }),
       phoneNumber({

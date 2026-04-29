@@ -19,6 +19,7 @@ function TabIcon({
     Comunicados: "✉",
     Zonas: "🏢",
     Documentos: "☰",
+    Votaciones: "🗳️",
     "Mis cuotas": "€",
   };
   return (
@@ -121,6 +122,15 @@ export default function VecinoLayout() {
           title: "Documentos",
           tabBarIcon: ({ focused }) => (
             <TabIcon name="Documentos" focused={focused} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="voting"
+        options={{
+          title: "Votaciones",
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name="Votaciones" focused={focused} />
           ),
         }}
       />
