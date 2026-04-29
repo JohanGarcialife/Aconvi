@@ -32,7 +32,7 @@ export function initAuth<
     baseURL: options.baseUrl,
     secret: options.secret,
     session: {
-      expiresIn: 60 * 60 * 24 * 365, // 1 year (Estilo WhatsApp)
+      expiresIn: 60 * 60 * 24 * 45, // 45 days (Requisito corporativo)
       updateAge: 60 * 60 * 24, // Update session every 1 day
     },
     plugins: [
