@@ -69,7 +69,7 @@ export function ProfessionalLogin() {
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (status === "sent" && process.env.NODE_ENV !== "production") {
+    if (status === "sent") {
       // Poll para obtener el link (se escribe al disco asíncronamente)
       interval = setInterval(async () => {
         const url = await getDevMagicLink(email);
@@ -144,42 +144,40 @@ export function ProfessionalLogin() {
             Hemos enviado un Magic Link a <strong>{email}</strong>. Haz clic en el enlace para iniciar sesión.
           </p>
           
-          {process.env.NODE_ENV !== "production" && (
-            <div style={{
-              background: "#f0fdfa",
-              border: "1px dashed #14b8a6",
-              borderRadius: "12px",
-              padding: "20px",
-              marginBottom: "24px",
-              width: "100%",
-              maxWidth: "400px"
-            }}>
-              <p style={{ fontSize: "12px", color: "#0f766e", fontWeight: "bold", marginBottom: "12px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                🧪 Entorno de Pruebas
+          <div style={{
+            background: "#f0fdfa",
+            border: "1px dashed #14b8a6",
+            borderRadius: "12px",
+            padding: "20px",
+            marginBottom: "24px",
+            width: "100%",
+            maxWidth: "400px"
+          }}>
+            <p style={{ fontSize: "12px", color: "#0f766e", fontWeight: "bold", marginBottom: "12px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+              🧪 Entorno de Pruebas (Beta)
+            </p>
+            {devLink ? (
+              <a
+                href={devLink}
+                style={{
+                  display: "block",
+                  padding: "12px 16px",
+                  background: "#00BDA5",
+                  color: "white",
+                  textDecoration: "none",
+                  fontWeight: 600,
+                  borderRadius: "8px",
+                  boxShadow: "0 4px 14px rgba(0,189,165,0.3)"
+                }}
+              >
+                🚀 Autenticar Ahora (Simular Click)
+              </a>
+            ) : (
+              <p style={{ fontSize: "14px", color: "#0f766e", opacity: 0.7 }}>
+                Generando enlace mágico...
               </p>
-              {devLink ? (
-                <a
-                  href={devLink}
-                  style={{
-                    display: "block",
-                    padding: "12px 16px",
-                    background: "#00BDA5",
-                    color: "white",
-                    textDecoration: "none",
-                    fontWeight: 600,
-                    borderRadius: "8px",
-                    boxShadow: "0 4px 14px rgba(0,189,165,0.3)"
-                  }}
-                >
-                  🚀 Autenticar Ahora (Simular Click)
-                </a>
-              ) : (
-                <p style={{ fontSize: "14px", color: "#0f766e", opacity: 0.7 }}>
-                  Generando enlace mágico...
-                </p>
-              )}
-            </div>
-          )}
+            )}
+          </div>
 
           <button
             onClick={() => setStatus("idle")}

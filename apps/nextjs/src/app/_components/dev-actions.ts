@@ -4,8 +4,6 @@ import fs from "fs";
 import path from "path";
 
 export async function getDevMagicLink(email: string) {
-  if (process.env.NODE_ENV === "production") return null;
-  
   try {
     const filePath = path.join(process.cwd(), ".magic-links.json");
     if (fs.existsSync(filePath)) {
