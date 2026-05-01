@@ -54,6 +54,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "Usuario corporativo no encontrado.", code: "USER_NOT_FOUND" }, { status: 404 });
     }
 
+    // Account must be activated via PIN before push login is available
+    if (!foundUser.pinActivated) {
+      return NextResponse.json({
+        ok: false,
+        error: "Esta cuenta aún no ha sido activada. Introduce tu usuario corporativo y el PIN inicial que te entregó Aconvi.",
+        code: "ACCOUNT_NOT_ACTIVATED"
+      }, { status: 403 });
+    }
+
     // Expire any previous pending requests for this user
     await db
       .update(pushLoginRequest)

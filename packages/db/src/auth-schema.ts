@@ -18,6 +18,13 @@ export const user = pgTable("user", {
   // Corporate username used for push-based professional login
   // Format: firstname.lastname or af.lastname (e.g. jluis.admin, af.garcia)
   corporateUsername: text("corporate_username").unique(),
+  // ─── PIN inicial de un solo uso (para activación de cuenta en web)
+  // Generado por el administrador al crear el usuario. SHA-256 hash.
+  initialPinHash: text("initial_pin_hash"),
+  pinActivated: boolean("pin_activated").default(false).notNull(),
+  // ─── Device token del móvil vinculado (Expo / FCM / APNs)
+  deviceToken: text("device_token"),
+  deviceActivatedAt: timestamp("device_activated_at", { mode: "date", withTimezone: true }),
 });
 
 export const session = pgTable(

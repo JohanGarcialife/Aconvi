@@ -60,7 +60,7 @@ function FooterArea() {
   );
 }
 
-type LoginStatus = "idle" | "loading" | "awaiting_push" | "approved" | "error" | "user_not_found";
+type LoginStatus = "idle" | "loading" | "awaiting_push" | "approved" | "error" | "user_not_found" | "activation" | "activating";
 
 export function ProfessionalLogin() {
   const router = useRouter();
@@ -69,6 +69,7 @@ export function ProfessionalLogin() {
   const [errorMessage, setErrorMessage] = useState("");
   const [requestId, setRequestId] = useState<string | null>(null);
   const [pollCount, setPollCount] = useState(0);
+  const [pin, setPin] = useState("");
 
   // Poll the server to check if push has been approved
   const pollForApproval = useCallback(async (reqId: string) => {
@@ -130,6 +131,10 @@ export function ProfessionalLogin() {
         if (data.code === "USER_NOT_FOUND") {
           setStatus("user_not_found");
           setErrorMessage("Usuario corporativo no encontrado.");
+        } else if (data.code === "ACCOUNT_NOT_ACTIVATED") {
+          // Redirect to PIN activation flow
+          setStatus("activation");
+          setErrorMessage("");
         } else {
           setStatus("error");
           setErrorMessage(data.error ?? "No se pudo iniciar la solicitud de acceso.");
@@ -144,6 +149,108 @@ export function ProfessionalLogin() {
       setErrorMessage("Ocurrió un error inesperado. Intenta de nuevo.");
     }
   };
+
+  // ── PIN Activation handler ──────────────────────────────────────────────────
+  const handleActivateWithPin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pin.trim()) return;
+    setStatus("activating");
+    setErrorMessage("");
+    try {
+      const res = await fetch("/api/auth/activate-with-pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: username.trim().toLowerCase(), pin: pin.trim() }),
+      });
+      const data = await res.json() as { ok: boolean; sessionToken?: string; error?: string; code?: string };
+      if (!res.ok || !data.ok) {
+        setStatus("activation");
+        setErrorMessage(data.error ?? "PIN incorrecto. Verifica e intenta de nuevo.");
+        return;
+      }
+      // Save session cookie and redirect
+      document.cookie = `better-auth.session_token=${data.sessionToken}; path=/; max-age=${45 * 24 * 60 * 60}`;
+      document.cookie = `__Secure-better-auth.session_token=${data.sessionToken}; path=/; secure; max-age=${45 * 24 * 60 * 60}`;
+      setStatus("approved");
+      router.push("/auth-success");
+    } catch {
+      setStatus("activation");
+      setErrorMessage("Ocurrió un error inesperado. Intenta de nuevo.");
+    }
+  };
+
+  // ── PIN Activation screen ───────────────────────────────────────────────────
+  if (status === "activation" || status === "activating") {
+    return (
+      <Card>
+        <LogoArea centered />
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px" }}>
+          <div style={{ width: "64px", height: "64px", borderRadius: "50%", background: "rgba(0,189,165,0.12)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "20px" }}>
+            <span style={{ fontSize: "28px" }}>🔑</span>
+          </div>
+          <h2 style={{ fontSize: "20px", fontWeight: 700, color: "#0F1B2B", margin: "0 0 8px", textAlign: "center" }}>
+            Activación de cuenta
+          </h2>
+          <p style={{ color: "#6b7280", fontSize: "14px", textAlign: "center", maxWidth: "320px", marginBottom: "24px", lineHeight: 1.5 }}>
+            Introduce el <strong>PIN de activación</strong> que te entregó Aconvi. Solo puede usarse una vez.
+          </p>
+          {errorMessage && (
+            <div style={{ background: "#fef2f2", color: "#991b1b", border: "1px solid #fca5a5", borderRadius: "8px", padding: "10px 16px", fontSize: "14px", marginBottom: "16px", width: "100%", maxWidth: "320px", textAlign: "center" }}>
+              {errorMessage}
+            </div>
+          )}
+          <form onSubmit={handleActivateWithPin} style={{ width: "100%", maxWidth: "320px", display: "flex", flexDirection: "column", gap: "12px" }}>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={6}
+              value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
+              placeholder="000000"
+              style={{
+                fontSize: "28px",
+                letterSpacing: "8px",
+                textAlign: "center",
+                padding: "14px",
+                borderRadius: "12px",
+                border: "1.5px solid #e5e7eb",
+                outline: "none",
+                fontWeight: 700,
+                color: "#0F1B2B",
+              }}
+              autoFocus
+              required
+            />
+            <button
+              type="submit"
+              disabled={status === "activating" || pin.length < 4}
+              style={{
+                background: status === "activating" || pin.length < 4 ? "#9ca3af" : "#00BDA5",
+                color: "#fff",
+                border: "none",
+                borderRadius: "12px",
+                padding: "14px",
+                fontSize: "16px",
+                fontWeight: 700,
+                cursor: status === "activating" || pin.length < 4 ? "not-allowed" : "pointer",
+                transition: "background 0.2s",
+              }}
+            >
+              {status === "activating" ? "Verificando..." : "Activar cuenta"}
+            </button>
+          </form>
+          <button
+            onClick={() => { setStatus("idle"); setPin(""); setErrorMessage(""); }}
+            style={{ marginTop: "16px", background: "transparent", color: "#00BDA5", border: "none", cursor: "pointer", fontWeight: 600, fontSize: "14px" }}
+          >
+            ← Volver
+          </button>
+        </div>
+        <FooterArea />
+      </Card>
+    );
+  }
 
   // ── Awaiting Push screen ────────────────────────────────────────────────────
   if (status === "awaiting_push" || status === "approved") {
