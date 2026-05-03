@@ -29,6 +29,12 @@ export async function POST(req: NextRequest) {
         );
       `);
       await db.execute(sql`CREATE INDEX IF NOT EXISTS push_login_request_user_id_idx ON push_login_request(user_id);`);
+      
+      // TEMPORARY MIGRATION: Ensure new auth columns exist in production DB
+      await db.execute(sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS initial_pin_hash text;`);
+      await db.execute(sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS pin_activated boolean DEFAULT false NOT NULL;`);
+      await db.execute(sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS device_token text;`);
+      await db.execute(sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS device_activated_at timestamp;`);
     } catch (e) {
       console.log("Error creating table dynamically:", e);
     }
