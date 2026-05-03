@@ -95,9 +95,13 @@ export async function POST(req: NextRequest) {
       // Include user info for the push notification (sent to the app)
       userDisplayName: foundUser.name,
     });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Internal error";
+  } catch (error: any) {
     console.error("[API_REQUEST_PUSH_LOGIN]", error);
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    return NextResponse.json({ 
+      ok: false, 
+      error: error.message || "Internal error",
+      stack: error.stack,
+      details: JSON.stringify(error)
+    }, { status: 500 });
   }
 }
