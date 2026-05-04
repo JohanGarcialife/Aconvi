@@ -54,23 +54,29 @@ export async function GET(req: NextRequest) {
         
         // Auto-approve after 4 seconds to simulate waiting for mobile push
         if (timeElapsed > 4000) {
-          const { auth } = await import("~/auth/server");
           
-          // Let Better Auth natively create the session and generate a valid token
-          const session = await auth.api.createSession({
-            body: {
-              userId: userForReq.id,
-              userAgent: req.headers.get("user-agent") ?? "Simulation",
-              ipAddress: req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip") ?? "127.0.0.1",
-            },
-            headers: req.headers,
+          // Create a session directly via DB (Better Auth programmatic bypass)
+          const { session } = await import("@acme/db/schema");
+          const { randomUUID } = await import("crypto");
+          
+          const token = randomUUID();
+          const expiresAt = new Date();
+          expiresAt.setDate(expiresAt.getDate() + 30); // 30 days expiry
+          
+          await db.insert(session).values({
+            id: token,
+            token,
+            userId: userForReq.id,
+            expiresAt,
+            ipAddress: req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip") ?? "127.0.0.1",
+            userAgent: req.headers.get("user-agent") ?? "Simulation",
           });
 
           await db.update(pushLoginRequest)
-            .set({ status: "APPROVED", sessionToken: session.token })
+            .set({ status: "APPROVED", sessionToken: token, updatedAt: new Date() })
             .where(eq(pushLoginRequest.id, requestId));
-            
-          return NextResponse.json({ status: "approved", sessionToken: session.token });
+
+          return NextResponse.json({ status: "approved", sessionToken: token });
         }
       }
     }

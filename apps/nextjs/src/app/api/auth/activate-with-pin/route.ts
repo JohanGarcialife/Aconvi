@@ -60,19 +60,26 @@ export async function POST(req: NextRequest) {
       .set({ pinActivated: true, initialPinHash: null }) // Remove hash after use
       .where(eq(user.id, foundUser.id));
 
-    // Create a valid Better Auth session
-    const session = await auth.api.createSession({
-      body: {
-        userId: foundUser.id,
-        userAgent: req.headers.get("user-agent") ?? "Web",
-        ipAddress: req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip") ?? "unknown",
-      },
-      headers: req.headers,
+    // Create a session directly via DB (Better Auth programmatic bypass)
+    const { session } = await import("@acme/db/schema");
+    const { randomUUID } = await import("crypto");
+    
+    const token = randomUUID();
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30); // 30 days expiry
+    
+    await db.insert(session).values({
+      id: token,
+      token,
+      userId: foundUser.id,
+      expiresAt,
+      ipAddress: req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip") ?? "unknown",
+      userAgent: req.headers.get("user-agent") ?? "Web",
     });
 
     console.log(`[ACTIVATE_PIN] User ${foundUser.corporateUsername} activated account and logged in.`);
 
-    return NextResponse.json({ ok: true, sessionToken: session.token });
+    return NextResponse.json({ ok: true, sessionToken: token });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Internal error";
     console.error("[API_ACTIVATE_WITH_PIN]", error);
