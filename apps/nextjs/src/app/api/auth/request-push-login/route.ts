@@ -44,16 +44,25 @@ export async function POST(req: NextRequest) {
       where: eq(user.corporateUsername, username_input),
     });
 
-    // SIMULACIÓN: Crear el usuario jluis.test si no existe para la demo
-    if (!foundUser && username_input === "jluis.test") {
-      const [newUser] = await db.insert(user).values({
-        id: "test-user-" + Date.now(),
-        name: "José Luis (Simulación)",
-        email: "jluis.test@aconvi.app",
-        corporateUsername: "jluis.test",
-        role: "Administrador",
-      }).returning();
-      foundUser = newUser;
+    // SIMULACIÓN: Crear o actualizar el usuario jluis.test para la demo con PIN 123456
+    if (username_input === "jluis.test") {
+      const pinHash123456 = "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92";
+      if (!foundUser) {
+        const [newUser] = await db.insert(user).values({
+          id: "test-user-" + Date.now(),
+          name: "José Luis (Simulación)",
+          email: "jluis.test@aconvi.app",
+          corporateUsername: "jluis.test",
+          role: "Administrador",
+          initialPinHash: pinHash123456,
+          pinActivated: false,
+        }).returning();
+        foundUser = newUser;
+      } else if (!foundUser.pinActivated) {
+        // Asegurar que el PIN de prueba siempre sea 123456 si no está activado
+        await db.update(user).set({ initialPinHash: pinHash123456 }).where(eq(user.id, foundUser.id));
+        foundUser.initialPinHash = pinHash123456;
+      }
     }
 
     if (!foundUser) {
