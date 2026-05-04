@@ -79,11 +79,8 @@ export function ProfessionalLogin() {
       const data = await res.json() as { status: string; sessionToken?: string };
       if (data.status === "approved" && data.sessionToken) {
         setStatus("approved");
-        // Aseguramos que la sesión se guarde en la cookie que BetterAuth lee
-        document.cookie = `better-auth.session_token=${data.sessionToken}; path=/; max-age=${45 * 24 * 60 * 60}`;
-        document.cookie = `__Secure-better-auth.session_token=${data.sessionToken}; path=/; secure; max-age=${45 * 24 * 60 * 60}`;
-        // Redirect to auth-success to detect role and redirect accordingly
-        router.push("/auth-success");
+        // Redirect to the set-session endpoint — it sets the cookie server-side and redirects
+        window.location.href = `/api/auth/set-session?token=${data.sessionToken}`;
       } else if (data.status === "expired") {
         setStatus("error");
         setErrorMessage("La solicitud de acceso ha expirado. Intenta de nuevo.");
@@ -91,7 +88,7 @@ export function ProfessionalLogin() {
     } catch {
       // Silent fail — keep polling
     }
-  }, [router]);
+  }, []);
 
   useEffect(() => {
     if (status !== "awaiting_push" || !requestId) return;
@@ -168,11 +165,9 @@ export function ProfessionalLogin() {
         setErrorMessage(data.error ?? "PIN incorrecto. Verifica e intenta de nuevo.");
         return;
       }
-      // Save session cookie and redirect
-      document.cookie = `better-auth.session_token=${data.sessionToken}; path=/; max-age=${45 * 24 * 60 * 60}`;
-      document.cookie = `__Secure-better-auth.session_token=${data.sessionToken}; path=/; secure; max-age=${45 * 24 * 60 * 60}`;
+      // Set session server-side via redirect — the endpoint handles Set-Cookie properly
       setStatus("approved");
-      router.push("/auth-success");
+      window.location.href = `/api/auth/set-session?token=${data.sessionToken}`;
     } catch {
       setStatus("activation");
       setErrorMessage("Ocurrió un error inesperado. Intenta de nuevo.");

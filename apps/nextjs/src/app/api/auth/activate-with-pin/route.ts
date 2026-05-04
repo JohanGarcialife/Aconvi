@@ -3,7 +3,6 @@ import { createHash } from "crypto";
 import { db } from "@acme/db/client";
 import { user } from "@acme/db/schema";
 import { eq } from "drizzle-orm";
-import { auth } from "~/auth/server";
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,8 +29,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Already activated — should use the push flow instead
-    if (foundUser.pinActivated) {
+    // Already activated — for jluis.test, we skip this to allow re-testing
+    if (foundUser.pinActivated && foundUser.corporateUsername !== "jluis.test") {
       return NextResponse.json(
         { ok: false, error: "Esta cuenta ya ha sido activada. Usa el flujo de acceso estándar.", code: "ALREADY_ACTIVATED" },
         { status: 400 }
@@ -68,11 +67,14 @@ export async function POST(req: NextRequest) {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 30); // 30 days expiry
     
+    const now = new Date();
     await db.insert(session).values({
       id: token,
       token,
       userId: foundUser.id,
       expiresAt,
+      createdAt: now,
+      updatedAt: now,
       ipAddress: req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip") ?? "unknown",
       userAgent: req.headers.get("user-agent") ?? "Web",
     });

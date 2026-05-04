@@ -63,11 +63,14 @@ export async function GET(req: NextRequest) {
           const expiresAt = new Date();
           expiresAt.setDate(expiresAt.getDate() + 30); // 30 days expiry
           
+          const now = new Date();
           await db.insert(session).values({
             id: token,
             token,
             userId: userForReq.id,
             expiresAt,
+            createdAt: now,
+            updatedAt: now,
             ipAddress: req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip") ?? "127.0.0.1",
             userAgent: req.headers.get("user-agent") ?? "Simulation",
           });

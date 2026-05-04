@@ -45,6 +45,7 @@ export async function POST(req: NextRequest) {
     });
 
     // SIMULACIÓN: Crear o actualizar el usuario jluis.test para la demo con PIN 123456
+    // IMPORTANTE: Siempre resetear a pinActivated=false para que el flujo PIN esté disponible en pruebas
     if (username_input === "jluis.test") {
       const pinHash123456 = "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92";
       if (!foundUser) {
@@ -58,10 +59,13 @@ export async function POST(req: NextRequest) {
           pinActivated: false,
         }).returning();
         foundUser = newUser;
-      } else if (!foundUser.pinActivated) {
-        // Asegurar que el PIN de prueba siempre sea 123456 si no está activado
-        await db.update(user).set({ initialPinHash: pinHash123456 }).where(eq(user.id, foundUser.id));
+      } else {
+        // Siempre resetear PIN y desactivar para pruebas (para que siempre pida PIN)
+        await db.update(user)
+          .set({ initialPinHash: pinHash123456, pinActivated: false })
+          .where(eq(user.id, foundUser.id));
         foundUser.initialPinHash = pinHash123456;
+        foundUser.pinActivated = false;
       }
     }
 
