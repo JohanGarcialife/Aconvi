@@ -44,12 +44,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ status: "expired" });
     }
 
-    // SIMULATION FOR TESTING (jluis.test)
+    // SIMULATION FOR TESTING (jluis.test / jluis.push)
     if (loginReq.status === "PENDING") {
       const { user } = await import("@acme/db/schema");
       const userForReq = await db.query.user.findFirst({ where: eq(user.id, loginReq.userId) });
       
-      if (userForReq?.corporateUsername === "jluis.test") {
+      if (userForReq?.corporateUsername === "jluis.test" || userForReq?.corporateUsername === "jluis.push") {
         const timeElapsed = new Date().getTime() - loginReq.createdAt.getTime();
         
         // Auto-approve after 4 seconds to simulate waiting for mobile push

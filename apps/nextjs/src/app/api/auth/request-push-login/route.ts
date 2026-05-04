@@ -46,26 +46,28 @@ export async function POST(req: NextRequest) {
 
     // SIMULACIÓN: Crear o actualizar el usuario jluis.test para la demo con PIN 123456
     // IMPORTANTE: Siempre resetear a pinActivated=false para que el flujo PIN esté disponible en pruebas
-    if (username_input === "jluis.test") {
+    if (username_input === "jluis.test" || username_input === "jluis.push") {
       const pinHash123456 = "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92";
+      const isPushTest = username_input === "jluis.push";
+      
       if (!foundUser) {
         const [newUser] = await db.insert(user).values({
-          id: "test-user-" + Date.now(),
-          name: "José Luis (Simulación)",
-          email: "jluis.test@aconvi.app",
-          corporateUsername: "jluis.test",
+          id: "test-user-" + username_input + "-" + Date.now(),
+          name: isPushTest ? "José Luis (Test Push)" : "José Luis (Test PIN)",
+          email: `${username_input}@aconvi.app`,
+          corporateUsername: username_input,
           role: "Administrador",
           initialPinHash: pinHash123456,
-          pinActivated: false,
+          pinActivated: isPushTest, // jluis.push ya está activado, jluis.test pide PIN
         }).returning();
         foundUser = newUser;
       } else {
-        // Siempre resetear PIN y desactivar para pruebas (para que siempre pida PIN)
+        // Siempre resetear el estado correcto
         await db.update(user)
-          .set({ initialPinHash: pinHash123456, pinActivated: false })
+          .set({ initialPinHash: pinHash123456, pinActivated: isPushTest })
           .where(eq(user.id, foundUser.id));
         foundUser.initialPinHash = pinHash123456;
-        foundUser.pinActivated = false;
+        foundUser.pinActivated = isPushTest;
       }
     }
 
