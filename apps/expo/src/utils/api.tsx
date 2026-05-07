@@ -49,4 +49,7 @@ export const trpc = createTRPCOptionsProxy<AppRouter>({
   queryClient,
 });
 
+// Alias for backward compatibility
+export const api = trpc;
+
 export type { RouterInputs, RouterOutputs } from "@acme/api";

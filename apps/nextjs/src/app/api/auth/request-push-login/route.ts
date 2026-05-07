@@ -1,8 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { db } from "@acme/db/client";
-import { pushLoginRequest } from "@acme/db/schema";
-import { user } from "@acme/db/schema";
-import { eq, and, gt } from "drizzle-orm";
+import { pushAuthSession, pushToken, user } from "@acme/db/schema";
+import { eq, and } from "drizzle-orm";
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,61 +12,42 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "Usuario requerido.", code: "MISSING_USERNAME" }, { status: 400 });
     }
 
+    // ── Dynamic migration: ensure new auth columns exist ────────────────────
     const { sql } = await import("drizzle-orm");
     try {
-      await db.execute(sql`
-        CREATE TABLE IF NOT EXISTS push_login_request (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          user_id TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
-          status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
-          request_ip TEXT,
-          request_user_agent TEXT,
-          session_token TEXT,
-          expires_at TIMESTAMPTZ NOT NULL,
-          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        );
-      `);
-      await db.execute(sql`CREATE INDEX IF NOT EXISTS push_login_request_user_id_idx ON push_login_request(user_id);`);
-      
-      // TEMPORARY MIGRATION: Ensure new auth columns exist in production DB
       await db.execute(sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS initial_pin_hash text;`);
       await db.execute(sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS pin_activated boolean DEFAULT false NOT NULL;`);
       await db.execute(sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS device_token text;`);
-      await db.execute(sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS device_activated_at timestamp;`);
-    } catch (e) {
-      console.log("Error creating table dynamically:", e);
-    }
+      await db.execute(sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS mobile_pin_hash text;`);
+    } catch { /* already exists */ }
 
-    // Look up the user by corporate username
+    // ── Look up user ─────────────────────────────────────────────────────────
     let foundUser = await db.query.user.findFirst({
       where: eq(user.corporateUsername, username_input),
     });
 
-    // SIMULACIÓN: Crear o actualizar el usuario jluis.test para la demo con PIN 123456
-    // IMPORTANTE: Siempre resetear a pinActivated=false para que el flujo PIN esté disponible en pruebas
+    // ── SIMULATION: jluis.test → always reset to PIN flow ───────────────────
+    // ── SIMULATION: jluis.push → always reset to push flow (already activated)
     if (username_input === "jluis.test" || username_input === "jluis.push") {
-      const pinHash123456 = "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92";
-      const isPushTest = username_input === "jluis.push";
-      
+      const pinHash = "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92"; // "123456"
+      const isPushUser = username_input === "jluis.push";
       if (!foundUser) {
         const [newUser] = await db.insert(user).values({
-          id: "test-user-" + username_input + "-" + Date.now(),
-          name: isPushTest ? "José Luis (Test Push)" : "José Luis (Test PIN)",
+          id: `test-${username_input}-${Date.now()}`,
+          name: isPushUser ? "José Luis (Test Push)" : "José Luis (Test PIN)",
           email: `${username_input}@aconvi.app`,
           corporateUsername: username_input,
           role: "Administrador",
-          initialPinHash: pinHash123456,
-          pinActivated: isPushTest, // jluis.push ya está activado, jluis.test pide PIN
+          initialPinHash: pinHash,
+          pinActivated: isPushUser,
         }).returning();
         foundUser = newUser;
       } else {
-        // Siempre resetear el estado correcto
         await db.update(user)
-          .set({ initialPinHash: pinHash123456, pinActivated: isPushTest })
+          .set({ initialPinHash: pinHash, pinActivated: isPushUser })
           .where(eq(user.id, foundUser.id));
-        foundUser.initialPinHash = pinHash123456;
-        foundUser.pinActivated = isPushTest;
+        foundUser.initialPinHash = pinHash;
+        foundUser.pinActivated = isPushUser;
       }
     }
 
@@ -75,54 +55,67 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "Usuario corporativo no encontrado.", code: "USER_NOT_FOUND" }, { status: 404 });
     }
 
-    // Account must be activated via PIN before push login is available
+    // ── PIN activation required? ──────────────────────────────────────────────
     if (!foundUser.pinActivated) {
       return NextResponse.json({
         ok: false,
-        error: "Esta cuenta aún no ha sido activada. Introduce tu usuario corporativo y el PIN inicial que te entregó Aconvi.",
-        code: "ACCOUNT_NOT_ACTIVATED"
+        error: "Esta cuenta aún no ha sido activada. Introduce el PIN inicial que te entregó Aconvi.",
+        code: "ACCOUNT_NOT_ACTIVATED",
       }, { status: 403 });
     }
 
-    // Expire any previous pending requests for this user
-    await db
-      .update(pushLoginRequest)
-      .set({ status: "EXPIRED" })
-      .where(and(
-        eq(pushLoginRequest.userId, foundUser.id),
-        eq(pushLoginRequest.status, "PENDING"),
-      ));
+    // ── Create push auth session (3 min expiry) ──────────────────────────────
+    const token = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 3 * 60 * 1000);
 
-    // Create a new push login request (expires in 5 minutes)
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
-    const [newRequest] = await db
-      .insert(pushLoginRequest)
-      .values({
-        userId: foundUser.id,
-        status: "PENDING",
-        requestIp: req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip") ?? null,
-        requestUserAgent: req.headers.get("user-agent") ?? null,
-        expiresAt,
-      })
-      .returning();
+    await db.insert(pushAuthSession).values({
+      id: crypto.randomUUID(),
+      userId: foundUser.id,
+      token,
+      status: "PENDING",
+      loginIp: req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip") ?? null,
+      loginUserAgent: req.headers.get("user-agent") ?? null,
+      expiresAt,
+    });
 
-    // TODO (Phase 2): Send actual push notification via Expo Push API to user's registered device
-    // For now, we log the request and allow the mobile app to poll/receive it via WebSocket
-    console.log(`[PUSH_LOGIN] User ${foundUser.corporateUsername} requested push login. Request ID: ${newRequest!.id}`);
+    // ── Send real push notification if device registered ─────────────────────
+    const userTokens = await db.query.pushToken.findMany({
+      where: eq(pushToken.userId, foundUser.id),
+    });
 
+    if (userTokens.length > 0) {
+      const { Expo } = await import("expo-server-sdk");
+      const expo = new Expo();
+      const messages = userTokens
+        .filter((t) => t.platform === "expo" && Expo.isExpoPushToken(t.token))
+        .map((t) => ({
+          to: t.token,
+          sound: "default" as const,
+          title: "🔐 Aconvi — Confirmar acceso",
+          body: `${foundUser!.name ?? foundUser!.corporateUsername} quiere iniciar sesión. Toca para confirmar.`,
+          data: { type: "auth_confirm", token },
+        }));
+      if (messages.length > 0) {
+        const chunks = expo.chunkPushNotifications(messages);
+        for (const chunk of chunks) {
+          await expo.sendPushNotificationsAsync(chunk).catch(console.error);
+        }
+        console.log(`[PUSH_LOGIN] Push sent to ${messages.length} device(s) for ${foundUser.corporateUsername}`);
+      }
+    } else {
+      // No device registered — demo/auto-approve will happen in check-push
+      console.log(`[PUSH_LOGIN] No device tokens for ${foundUser.corporateUsername}. Auto-confirm via poll.`);
+    }
+
+    // Return token as requestId for API compatibility with the web polling
     return NextResponse.json({
       ok: true,
-      requestId: newRequest!.id,
-      // Include user info for the push notification (sent to the app)
+      requestId: token,
       userDisplayName: foundUser.name,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Internal error";
     console.error("[API_REQUEST_PUSH_LOGIN]", error);
-    return NextResponse.json({ 
-      ok: false, 
-      error: error.message || "Internal error",
-      stack: error.stack,
-      details: JSON.stringify(error)
-    }, { status: 500 });
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }

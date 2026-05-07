@@ -1,87 +1,95 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { db } from "@acme/db/client";
-import { pushLoginRequest } from "@acme/db/schema";
-import { eq, and, gt } from "drizzle-orm";
+import { pushAuthSession, pushToken, session, user } from "@acme/db/schema";
+import { eq, and } from "drizzle-orm";
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const requestId = searchParams.get("requestId");
+    // requestId is actually the pushAuthSession token (for API compatibility)
+    const token = searchParams.get("requestId");
 
-    if (!requestId) {
+    if (!token) {
       return NextResponse.json({ status: "error", error: "requestId requerido." }, { status: 400 });
     }
 
-    const loginReq = await db.query.pushLoginRequest.findFirst({
-      where: eq(pushLoginRequest.id, requestId),
+    const pushSession = await db.query.pushAuthSession.findFirst({
+      where: eq(pushAuthSession.token, token),
     });
 
-    if (!loginReq) {
+    if (!pushSession) {
       return NextResponse.json({ status: "error", error: "Solicitud no encontrada." }, { status: 404 });
     }
 
     // Check expiry
-    if (new Date() > loginReq.expiresAt) {
-      // Mark as expired if still pending
-      if (loginReq.status === "PENDING") {
-        await db
-          .update(pushLoginRequest)
-          .set({ status: "EXPIRED" })
-          .where(eq(pushLoginRequest.id, requestId));
+    if (new Date() > pushSession.expiresAt && pushSession.status === "PENDING") {
+      await db.update(pushAuthSession).set({ status: "EXPIRED" }).where(eq(pushAuthSession.token, token));
+      return NextResponse.json({ status: "expired" });
+    }
+
+    if (pushSession.status === "EXPIRED" || pushSession.status === "CANCELLED") {
+      return NextResponse.json({ status: pushSession.status === "CANCELLED" ? "rejected" : "expired" });
+    }
+
+    // If already confirmed and session token stored → return it
+    if (pushSession.status === "CONFIRMED") {
+      // Look up an existing web session for this user to return
+      const webSession = await db.query.session.findFirst({
+        where: eq(session.userId, pushSession.userId),
+      });
+      if (webSession) {
+        return NextResponse.json({ status: "approved", sessionToken: webSession.token });
       }
-      return NextResponse.json({ status: "expired" });
     }
 
-    if (loginReq.status === "APPROVED" && loginReq.sessionToken) {
-      return NextResponse.json({ status: "approved", sessionToken: loginReq.sessionToken });
-    }
+    // ── Auto-approve for demo users without a registered device ───────────────
+    if (pushSession.status === "PENDING") {
+      const ageMs = Date.now() - pushSession.createdAt.getTime();
+      if (ageMs > 4000) {
+        const userTokens = await db.query.pushToken.findMany({
+          where: eq(pushToken.userId, pushSession.userId),
+        });
+        const foundUser = await db.query.user.findFirst({
+          where: eq(user.id, pushSession.userId),
+        });
+        const isTestUser = foundUser?.corporateUsername === "jluis.test" ||
+                           foundUser?.corporateUsername === "jluis.push";
 
-    if (loginReq.status === "REJECTED") {
-      return NextResponse.json({ status: "rejected" });
-    }
-
-    if (loginReq.status === "EXPIRED") {
-      return NextResponse.json({ status: "expired" });
-    }
-
-    // SIMULATION FOR TESTING (jluis.test / jluis.push)
-    if (loginReq.status === "PENDING") {
-      const { user } = await import("@acme/db/schema");
-      const userForReq = await db.query.user.findFirst({ where: eq(user.id, loginReq.userId) });
-      
-      if (userForReq?.corporateUsername === "jluis.test" || userForReq?.corporateUsername === "jluis.push") {
-        const timeElapsed = new Date().getTime() - loginReq.createdAt.getTime();
-        
-        // Auto-approve after 4 seconds to simulate waiting for mobile push
-        if (timeElapsed > 4000) {
-          
-          // Create a session directly via DB (Better Auth programmatic bypass)
-          const { session } = await import("@acme/db/schema");
-          const { randomUUID } = await import("crypto");
-          
-          const token = randomUUID();
-          const expiresAt = new Date();
-          expiresAt.setDate(expiresAt.getDate() + 30); // 30 days expiry
-          
-          const now = new Date();
-          await db.insert(session).values({
-            id: token,
-            token,
-            userId: userForReq.id,
-            expiresAt,
-            createdAt: now,
-            updatedAt: now,
-            ipAddress: req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip") ?? "127.0.0.1",
-            userAgent: req.headers.get("user-agent") ?? "Simulation",
-          });
-
-          await db.update(pushLoginRequest)
-            .set({ status: "APPROVED", sessionToken: token, updatedAt: new Date() })
-            .where(eq(pushLoginRequest.id, requestId));
-
-          return NextResponse.json({ status: "approved", sessionToken: token });
+        if (userTokens.length === 0 && isTestUser) {
+          // Mark confirmed (demo auto-approve)
+          await db.update(pushAuthSession)
+            .set({ status: "CONFIRMED" })
+            .where(eq(pushAuthSession.token, token));
+          pushSession.status = "CONFIRMED";
+          console.log(`[CHECK_PUSH] Demo auto-confirmed for ${foundUser?.corporateUsername}`);
         }
       }
+    }
+
+    // ── Create web session once confirmed ─────────────────────────────────────
+    if (pushSession.status === "CONFIRMED") {
+      const sessionToken = crypto.randomUUID();
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 45);
+      const now = new Date();
+
+      await db.insert(session).values({
+        id: sessionToken,
+        token: sessionToken,
+        userId: pushSession.userId,
+        expiresAt,
+        createdAt: now,
+        updatedAt: now,
+        ipAddress: pushSession.loginIp ?? "unknown",
+        userAgent: pushSession.loginUserAgent ?? "Web",
+      });
+
+      // Mark session as used (prevent double session creation)
+      await db.update(pushAuthSession)
+        .set({ status: "EXPIRED" })
+        .where(eq(pushAuthSession.token, token));
+
+      return NextResponse.json({ status: "approved", sessionToken });
     }
 
     // Still pending
