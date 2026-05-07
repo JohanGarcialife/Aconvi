@@ -98,9 +98,8 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// ── Helper: create session in DB + return token ──────────────────────────────
+// ── Helper: create session in DB + return token with proper Set-Cookie ─────────
 async function createMobileSession(userId: string, req: NextRequest) {
-  const { sql } = await import("drizzle-orm");
   const token = crypto.randomUUID();
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 45);
@@ -117,5 +116,15 @@ async function createMobileSession(userId: string, req: NextRequest) {
     userAgent: req.headers.get("user-agent") ?? "Expo",
   });
 
-  return NextResponse.json({ ok: true, sessionToken: token });
+  const res = NextResponse.json({ ok: true, sessionToken: token });
+
+  // Set cookie in Better Auth format so the Expo client can capture it
+  res.cookies.set("better-auth.session_token", token, {
+    httpOnly: false, // expo client reads it from response headers
+    maxAge: 45 * 24 * 60 * 60,
+    path: "/",
+    sameSite: "lax",
+  });
+
+  return res;
 }

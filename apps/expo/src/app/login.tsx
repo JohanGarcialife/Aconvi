@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { getBaseUrl } from "~/utils/base-url";
-import { setToken } from "~/utils/session-store";
+import { authClient } from "~/utils/auth";
 
 const TEAL = "#00BDA5";
 const DARK = "#0F1B2B";
@@ -61,21 +61,23 @@ export default function LoginScreen() {
     setProStep("loading");
     setErrorMsg("");
     try {
-      const res = await fetch(`${getBaseUrl()}/api/auth/mobile-login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: username.trim().toLowerCase(), pin: pin.trim() }),
-      });
-      const data = await res.json() as { ok: boolean; sessionToken?: string; error?: string };
-      if (!res.ok || !data.ok || !data.sessionToken) {
+      // Use authClient.$fetch so the expo plugin captures Set-Cookie response
+      // and authClient.useSession() can read the session automatically
+      const data = await authClient.$fetch<{ ok: boolean; sessionToken?: string; error?: string }>(
+        "/api/auth/mobile-login",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: username.trim().toLowerCase(), pin: pin.trim() }),
+        }
+      );
+      if (!data.data?.ok || !data.data?.sessionToken) {
         setProStep("error");
-        setErrorMsg(data.error ?? "Error de autenticación.");
+        setErrorMsg(data.data?.error ?? data.error?.message ?? "Error de autenticación.");
         return;
       }
-      // Store session token → authClient reads it from SecureStore
-      setToken(data.sessionToken);
       setProStep("done");
-      // Navigate to home; the layout will pick up the session
+      // Navigate directly to home — index.tsx will redirect by role
       router.replace("/");
     } catch (e: any) {
       setProStep("error");

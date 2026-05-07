@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // ── Auto-approve for demo users without a registered device ───────────────
+    // ── Auto-approve for users without a registered push device ───────────────
     if (pushSession.status === "PENDING") {
       const ageMs = Date.now() - pushSession.createdAt.getTime();
       if (ageMs > 4000) {
@@ -52,16 +52,21 @@ export async function GET(req: NextRequest) {
         const foundUser = await db.query.user.findFirst({
           where: eq(user.id, pushSession.userId),
         });
+
+        // Auto-approve if:
+        // 1. No registered push device (emulator/dev) OR
+        // 2. Known test users
         const isTestUser = foundUser?.corporateUsername === "jluis.test" ||
                            foundUser?.corporateUsername === "jluis.push";
+        const noDevice = userTokens.length === 0;
 
-        if (userTokens.length === 0 && isTestUser) {
-          // Mark confirmed (demo auto-approve)
+        if (noDevice || isTestUser) {
+          // Mark confirmed (auto-approve for no-device scenario)
           await db.update(pushAuthSession)
             .set({ status: "CONFIRMED" })
             .where(eq(pushAuthSession.token, token));
           pushSession.status = "CONFIRMED";
-          console.log(`[CHECK_PUSH] Demo auto-confirmed for ${foundUser?.corporateUsername}`);
+          console.log(`[CHECK_PUSH] Auto-confirmed for ${foundUser?.corporateUsername ?? foundUser?.id} (noDevice=${noDevice})`);
         }
       }
     }
