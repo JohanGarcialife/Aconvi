@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
-import { api } from "../utils/api";
+import { trpc, queryClient } from "../utils/api";
+import { useMutation } from "@tanstack/react-query";
 
 // Configure how notifications appear when app is in foreground
 Notifications.setNotificationHandler({
@@ -21,7 +22,7 @@ export function usePushNotifications() {
   const responseListener = useRef<Notifications.EventSubscription | null>(null);
 
   // tRPC mutation to register token in backend
-  const registerToken = api?.notification.registerToken.useMutation();
+  const registerToken = useMutation(trpc.notification.registerToken.mutationOptions());
 
   useEffect(() => {
     // Register for push notifications

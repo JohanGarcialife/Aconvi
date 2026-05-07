@@ -15,15 +15,17 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { trpc } from "../utils/api";
 import { getBaseUrl } from "~/utils/base-url";
+
 
 export default function ConfirmAccessScreen() {
   const { token } = useLocalSearchParams<{ token: string }>();
   const router = useRouter();
   const [state, setState] = useState<"idle" | "confirming" | "rejecting" | "done" | "rejected">("idle");
 
-  const confirmAccess = trpc.auth.confirmPushAccess.useMutation({
+  const confirmAccess = useMutation(trpc.auth.confirmPushAccess.mutationOptions({
     onSuccess: () => {
       setState("done");
       setTimeout(() => router.replace("/"), 1800);
@@ -32,9 +34,9 @@ export default function ConfirmAccessScreen() {
       Alert.alert("Error", err.message || "No se pudo confirmar el acceso.");
       setState("idle");
     },
-  });
+  }));
 
-  const cancelAccess = trpc.auth.cancelPushAccess.useMutation({
+  const cancelAccess = useMutation(trpc.auth.cancelPushAccess.mutationOptions({
     onSuccess: () => {
       setState("rejected");
       setTimeout(() => router.replace("/"), 1800);
@@ -42,7 +44,7 @@ export default function ConfirmAccessScreen() {
     onError: () => {
       router.back();
     },
-  });
+  }));
 
   const handleConfirm = () => {
     if (!token) return;
