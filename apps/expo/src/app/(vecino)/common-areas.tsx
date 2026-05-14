@@ -11,11 +11,12 @@ import {
   FlatList,
 } from "react-native";
 import { useState } from "react";
-import { api } from "~/utils/api";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { api, queryClient } from "~/utils/api";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const PRIMARY = "#4aa19b";
-const TENANT_ID = "org_123"; // TODO: replace with session context
+const TENANT_ID = "org_aconvi_demo"; // TODO: replace with session context
 
 // Helper: generate next 14 days
 function getNext14Days(): { label: string; value: string; dayLabel: string }[] {
@@ -85,23 +86,26 @@ function BookingModal({
 }) {
   const [notes, setNotes] = useState("");
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
-  const utils = api.useUtils();
+  const { data, isLoading } = useQuery({
+    ...api.commonArea.availability.queryOptions({
+      tenantId: TENANT_ID,
+      areaId: area?.id as string,
+      date: selectedDate,
+    }),
+    enabled: !!area && !!selectedDate && visible,
+  });
 
-  const { data, isLoading } = api.commonArea.availability.useQuery(
-    { tenantId: TENANT_ID, areaId: area?.id, date: selectedDate },
-    { enabled: !!area && !!selectedDate && visible },
-  );
-
-  const bookMutation = api.commonArea.book.useMutation({
+  const bookMutation = useMutation({
+    ...api.commonArea.book.mutationOptions(),
     onSuccess: () => {
-      void utils.commonArea.availability.invalidate();
-      void utils.commonArea.myBookings.invalidate();
+      void queryClient.invalidateQueries(api.commonArea.availability.queryFilter());
+      void queryClient.invalidateQueries(api.commonArea.myBookings.queryFilter());
       Alert.alert("✅ Reserva confirmada", `Has reservado ${area?.name} a las ${selectedSlot}`);
       setSelectedSlot(null);
       setNotes("");
       onClose();
     },
-    onError: (e) => Alert.alert("Error", e.message),
+    onError: (e: any) => Alert.alert("Error", e.message),
   });
 
   const handleConfirm = () => {
@@ -112,7 +116,7 @@ function BookingModal({
       date: selectedDate,
       startTime: selectedSlot,
       notes: notes.trim() || undefined,
-    });
+    } as any);
   };
 
   return (
@@ -158,7 +162,7 @@ function BookingModal({
               <ActivityIndicator color={PRIMARY} style={{ marginTop: 24 }} />
             ) : (
               <View style={styles.slotsGrid}>
-                {data?.slots.map(({ time, available, booking }) => (
+                {(data as any)?.slots.map(({ time, available, booking }: any) => (
                   <TouchableOpacity
                     key={time}
                     disabled={!available}
@@ -233,12 +237,12 @@ function BookingModal({
 
 // ─── My Bookings Tab ──────────────────────────────────────────────────────────
 function MyBookings() {
-  const utils = api.useUtils();
-  const { data: bookings, isLoading } = api.commonArea.myBookings.useQuery();
+  const { data: bookings, isLoading } = useQuery(api.commonArea.myBookings.queryOptions());
 
-  const cancelMutation = api.commonArea.cancel.useMutation({
-    onSuccess: () => void utils.commonArea.myBookings.invalidate(),
-    onError: (e) => Alert.alert("Error", e.message),
+  const cancelMutation = useMutation({
+    ...api.commonArea.cancel.mutationOptions(),
+    onSuccess: () => void queryClient.invalidateQueries(api.commonArea.myBookings.queryFilter()),
+    onError: (e: any) => Alert.alert("Error", e.message),
   });
 
   const handleCancel = (bookingId: string, area: string, time: string) => {
@@ -250,7 +254,7 @@ function MyBookings() {
         {
           text: "Sí, cancelar",
           style: "destructive",
-          onPress: () => cancelMutation.mutate({ bookingId }),
+          onPress: () => cancelMutation.mutate({ bookingId } as any),
         },
       ],
     );
@@ -258,7 +262,7 @@ function MyBookings() {
 
   if (isLoading) return <ActivityIndicator color={PRIMARY} style={{ marginTop: 40 }} />;
 
-  if (!bookings?.length) {
+  if (!(bookings as any[])?.length) {
     return (
       <View style={styles.emptyState}>
         <Text style={styles.emptyEmoji}>📅</Text>
@@ -270,7 +274,7 @@ function MyBookings() {
 
   return (
     <FlatList
-      data={bookings}
+      data={bookings as any[]}
       keyExtractor={(b) => b.id}
       contentContainerStyle={{ padding: 16, gap: 10 }}
       renderItem={({ item: b }) => (
@@ -300,9 +304,9 @@ export default function CommonAreasScreen() {
   const [selectedArea, setSelectedArea] = useState<any>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
-  const { data: areas, isLoading } = api.commonArea.all.useQuery({
+  const { data: areas, isLoading } = useQuery(api.commonArea.all.queryOptions({
     tenantId: TENANT_ID,
-  });
+  }));
 
   const openArea = (area: any) => {
     setSelectedArea(area);
@@ -373,7 +377,7 @@ export default function CommonAreasScreen() {
           {/* Area list */}
           {isLoading ? (
             <ActivityIndicator color={PRIMARY} style={{ marginTop: 40 }} />
-          ) : !areas?.length ? (
+          ) : !(areas as any[])?.length ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyEmoji}>🏗️</Text>
               <Text style={styles.emptyTitle}>Sin zonas configuradas</Text>
@@ -383,7 +387,7 @@ export default function CommonAreasScreen() {
             </View>
           ) : (
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 12 }}>
-              {areas.map((area: any) => (
+              {(areas as any[]).map((area: any) => (
                 <AreaCard key={area.id} area={area} onPress={() => openArea(area)} />
               ))}
             </ScrollView>

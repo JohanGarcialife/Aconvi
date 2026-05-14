@@ -265,15 +265,25 @@ function SessionCard({
       )[0]
     : null;
 
-  const downloadMinute = () => {
-    if (!session.minute?.content) return;
-    const blob = new Blob([session.minute.content], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `acta-${session.title.toLowerCase().replace(/\s+/g, "-")}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const downloadPdf = async () => {
+    if (!session.minute) return;
+    setIsDownloading(true);
+    try {
+      const res = await fetch(`/api/votes/${session.id}/pdf`);
+      if (!res.ok) throw new Error("Error al generar el PDF");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `acta-${session.title.toLowerCase().replace(/\s+/g, "-")}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert("No se pudo generar el acta en PDF. Inténtalo de nuevo.");
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   return (
@@ -337,9 +347,9 @@ function SessionCard({
 
         <div className="flex items-center gap-2">
           {session.status === "CLOSED" && session.minute && (
-            <Button variant="outline" size="sm" onClick={downloadMinute}>
+            <Button variant="outline" size="sm" onClick={downloadPdf} disabled={isDownloading}>
               <Download className="h-3.5 w-3.5 mr-1.5" />
-              Acta
+              {isDownloading ? "Generando..." : "Acta PDF"}
             </Button>
           )}
           {session.status === "DRAFT" && (

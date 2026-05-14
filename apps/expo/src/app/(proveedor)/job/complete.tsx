@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, Stack, useLocalSearchParams } from "expo-router";
-import { useTRPC } from "~/utils/api";
+import { api } from "~/utils/api";
 import { useMutation } from "@tanstack/react-query";
 
 const PRIMARY = "#4aa19b";
@@ -51,7 +51,6 @@ async function tryUploadQueue(onSuccess: () => void) {
 // ─── Main screen ──────────────────────────────────────────────────────────────
 export default function CompleteJobScreen() {
   const router = useRouter();
-  const trpc = useTRPC();
   const params = useLocalSearchParams<{ incidentId?: string; providerId?: string }>();
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
@@ -61,14 +60,13 @@ export default function CompleteJobScreen() {
 
   const DEMO_TENANT_ID = "org_aconvi_demo";
 
-  const completeMutation = useMutation(
-    trpc.incident.providerComplete.mutationOptions({
-      onSuccess: () => {
-        router.push("/(proveedor)/job/done");
-      },
-      onError: (e) => Alert.alert("Error al cerrar", e.message),
-    }),
-  );
+  const completeMutation = useMutation({
+    ...api.incident.providerComplete.mutationOptions(),
+    onSuccess: () => {
+      router.push("/(proveedor)/job/done");
+    },
+    onError: (e: any) => Alert.alert("Error al cerrar", e.message),
+  });
 
   // Listen for app coming back to foreground → drain offline queue
   useEffect(() => {
@@ -122,8 +120,7 @@ export default function CompleteJobScreen() {
       tenantId: DEMO_TENANT_ID,
       providerId,
       completionNote: notes || "Trabajo completado satisfactoriamente",
-      // In production: upload photo and pass the URL here
-    });
+    } as any);
   };
 
   return (

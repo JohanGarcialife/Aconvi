@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, Stack, useLocalSearchParams } from "expo-router";
-import { useTRPC } from "~/utils/api";
+import { api } from "~/utils/api";
 import { useQuery, useMutation } from "@tanstack/react-query";
 
 const PRIMARY = "#4aa19b";
@@ -47,7 +47,6 @@ function priorityLabel(p: string) {
 
 export default function ProveedorJobScreen() {
   const router = useRouter();
-  const trpc = useTRPC();
   const params = useLocalSearchParams<{ incidentId?: string; providerId?: string }>();
 
   // If incidentId and providerId are passed via params, use them; 
@@ -57,32 +56,31 @@ export default function ProveedorJobScreen() {
 
   // Fetch assigned incidents for this provider
   const { data: incidents, isLoading } = useQuery(
-    trpc.incident.all.queryOptions({
+    api.incident.all.queryOptions({
       tenantId: DEMO_TENANT_ID,
     }),
   );
 
   // Use the first active (EN_REVISION or RECIBIDA) incident assigned to this provider
-  const activeIncident = incidents?.find(
-    (i) =>
+  const activeIncident = (incidents as any[] | undefined)?.find(
+    (i: any) =>
       (incidentId ? i.id === incidentId : true) &&
       (i.status === "EN_REVISION" || i.status === "RECIBIDA" || i.status === "AGENDADA"),
-  ) ?? incidents?.[0] ?? null;
+  ) ?? (incidents as any[] | undefined)?.[0] ?? null;
 
-  const acceptMutation = useMutation(
-    trpc.incident.providerAccept.mutationOptions({
-      onSuccess: () => {
-        router.push({
-          pathname: "/(proveedor)/job/estimate",
-          params: {
-            incidentId: activeIncident?.id,
-            providerId,
-          },
-        });
-      },
-      onError: (e) => Alert.alert("Error", e.message),
-    }),
-  );
+  const acceptMutation = useMutation({
+    ...api.incident.providerAccept.mutationOptions(),
+    onSuccess: () => {
+      router.push({
+        pathname: "/(proveedor)/job/estimate",
+        params: {
+          incidentId: activeIncident?.id,
+          providerId,
+        },
+      });
+    },
+    onError: (e: any) => Alert.alert("Error", e.message),
+  });
 
   const countdown = useCountdown(1 * 3600 + 42 * 60 + 5);
 
@@ -90,10 +88,10 @@ export default function ProveedorJobScreen() {
     if (!activeIncident) return;
     acceptMutation.mutate({
       id: activeIncident.id,
-      tenantId: DEMO_TENANT_ID,
-      providerId: activeIncident.providerId ?? providerId ?? "",
+      tenantId: activeIncident.tenantId,
+      providerId,
       notes: "Trabajo aceptado por proveedor",
-    });
+    } as any);
   };
 
   const handleDecline = () => {

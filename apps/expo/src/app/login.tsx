@@ -9,78 +9,75 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Image,
 } from "react-native";
 import { useRouter } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 import { getBaseUrl } from "~/utils/base-url";
-import { authClient } from "~/utils/auth";
+
 
 const TEAL = "#00BDA5";
 const DARK = "#0F1B2B";
 const GRAY = "#6b7280";
 
-type Tab = "vecino" | "profesional";
 type Step = "idle" | "loading" | "done" | "error";
 
 export default function LoginScreen() {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>("vecino");
 
-  // ── Vecino state ─────────────────────────────────────────────────────────────
-  const [email, setEmail] = useState("");
-  const [magicSent, setMagicSent] = useState(false);
-  const [vecStep, setVecStep] = useState<Step>("idle");
-
-  // ── Profesional state ────────────────────────────────────────────────────────
+  // ── Unified Login state ──────────────────────────────────────────────────
   const [username, setUsername] = useState("");
   const [pin, setPin] = useState("");
-  const [proStep, setProStep] = useState<Step>("idle");
+  const [step, setStep] = useState<Step>("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
-  // ── Magic link (Vecino) ──────────────────────────────────────────────────────
-  const handleMagicLink = async () => {
-    if (!email.trim()) return;
-    setVecStep("loading");
-    try {
-      const res = await fetch(`${getBaseUrl()}/api/auth/sign-in/magic-link`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim() }),
-      });
-      if (!res.ok) throw new Error("Error al enviar enlace.");
-      setMagicSent(true);
-      setVecStep("done");
-    } catch (e: any) {
-      setVecStep("error");
-      setErrorMsg(e.message ?? "Error de red.");
-    }
-  };
-
-  // ── PIN login (Profesional) ──────────────────────────────────────────────────
+  // ── PIN login ────────────────────────────────────────────────────────────
   const handlePinLogin = async () => {
     if (!username.trim() || !pin.trim()) return;
-    setProStep("loading");
+    setStep("loading");
     setErrorMsg("");
     try {
-      // Use authClient.$fetch so the expo plugin captures Set-Cookie response
-      // and authClient.useSession() can read the session automatically
-      const data = await authClient.$fetch<{ ok: boolean; sessionToken?: string; error?: string }>(
-        "/api/auth/mobile-login",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username: username.trim().toLowerCase(), pin: pin.trim() }),
-        }
-      );
-      if (!data.data?.ok || !data.data?.sessionToken) {
-        setProStep("error");
-        setErrorMsg(data.data?.error ?? data.error?.message ?? "Error de autenticación.");
+      // 1. Obtener el token de sesión del endpoint mobile-login
+      const res = await fetch(`${getBaseUrl()}/api/auth/mobile-login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: username.trim().toLowerCase(), pin: pin.trim() }),
+      });
+      const data = await res.json() as { ok: boolean; sessionToken?: string; error?: string };
+
+      if (!data.ok || !data.sessionToken) {
+        setStep("error");
+        setErrorMsg(data.error ?? "Error de autenticación.");
         return;
       }
-      setProStep("done");
-      // Navigate directly to home — index.tsx will redirect by role
-      router.replace("/");
+
+      const token = data.sessionToken;
+
+      // 2. Guardar el token en SecureStore bajo la clave que usa el interceptor
+      await SecureStore.setItemAsync("expo_session_token", token);
+
+      // 3. Verificar sesión con Bearer para obtener el rol del usuario
+      const sessionRes = await fetch(`${getBaseUrl()}/api/auth/get-session`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const sessionData = await sessionRes.json() as {
+        session?: { userId: string };
+        user?: { role?: string };
+      } | null;
+
+      const role = sessionData?.user?.role ?? "Vecino";
+      const isProvider = role.toLowerCase().includes("proveedor") || role.toLowerCase() === "provider";
+
+      setStep("done");
+
+      // 4. Navegar DIRECTO a la pantalla correcta (sin pasar por index.tsx)
+      if (isProvider) {
+        router.replace("/(proveedor)/job");
+      } else {
+        router.replace("/(vecino)");
+      }
     } catch (e: any) {
-      setProStep("error");
+      setStep("error");
       setErrorMsg(e.message ?? "Error de red.");
     }
   };
@@ -90,112 +87,55 @@ export default function LoginScreen() {
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         {/* Logo */}
         <View style={styles.logoWrap}>
-          <Text style={styles.logo}>Aconvi</Text>
+          <Image
+            source={require("../../assets/logo.png")}
+            style={styles.logo}
+            resizeMode="contain"
+          />
           <Text style={styles.tagline}>Gestión inteligente de comunidades</Text>
         </View>
 
-        {/* Tab selector */}
-        <View style={styles.tabBar}>
+        {/* ── Unified Form ───────────────────────────────────────────────── */}
+        <View style={styles.form}>
+          <View style={styles.infoBox}>
+            <Text style={styles.infoText}>
+              🔐 Acceso mediante tu usuario corporativo y el PIN de 6 dígitos que te proporcionó Aconvi.
+            </Text>
+          </View>
+          <Text style={styles.label}>Usuario corporativo</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="af.garcia"
+            autoCapitalize="none"
+            autoCorrect={false}
+            value={username}
+            onChangeText={setUsername}
+            editable={step !== "loading"}
+          />
+          <Text style={styles.label}>PIN de acceso</Text>
+          <TextInput
+            style={[styles.input, styles.pinInput]}
+            placeholder="••••••"
+            keyboardType="number-pad"
+            secureTextEntry
+            maxLength={6}
+            value={pin}
+            onChangeText={(v) => setPin(v.replace(/\D/g, ""))}
+            editable={step !== "loading"}
+          />
+          {step === "error" && <Text style={styles.error}>{errorMsg}</Text>}
           <TouchableOpacity
-            style={[styles.tab, tab === "vecino" && styles.tabActive]}
-            onPress={() => setTab("vecino")}
+            style={[styles.btn, step === "loading" && styles.btnDisabled]}
+            onPress={handlePinLogin}
+            disabled={step === "loading"}
           >
-            <Text style={[styles.tabText, tab === "vecino" && styles.tabTextActive]}>Vecino</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, tab === "profesional" && styles.tabActive]}
-            onPress={() => setTab("profesional")}
-          >
-            <Text style={[styles.tabText, tab === "profesional" && styles.tabTextActive]}>Profesional</Text>
+            {step === "loading" ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.btnText}>Iniciar sesión</Text>
+            )}
           </TouchableOpacity>
         </View>
-
-        {/* ── Vecino Tab ─────────────────────────────────────────────────────── */}
-        {tab === "vecino" && (
-          <View style={styles.form}>
-            {magicSent ? (
-              <View style={styles.successBox}>
-                <Text style={styles.successIcon}>📩</Text>
-                <Text style={styles.successTitle}>Revisa tu correo</Text>
-                <Text style={styles.successText}>
-                  Hemos enviado un enlace de acceso a {email}. Tócalo desde tu móvil para entrar.
-                </Text>
-                <TouchableOpacity onPress={() => { setMagicSent(false); setVecStep("idle"); }}>
-                  <Text style={styles.link}>Usar otro correo</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <>
-                <Text style={styles.label}>Correo electrónico</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="vecino@micomunidad.com"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  value={email}
-                  onChangeText={setEmail}
-                  editable={vecStep !== "loading"}
-                />
-                {vecStep === "error" && <Text style={styles.error}>{errorMsg}</Text>}
-                <TouchableOpacity
-                  style={[styles.btn, vecStep === "loading" && styles.btnDisabled]}
-                  onPress={handleMagicLink}
-                  disabled={vecStep === "loading"}
-                >
-                  {vecStep === "loading" ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <Text style={styles.btnText}>Enviar enlace de acceso</Text>
-                  )}
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
-        )}
-
-        {/* ── Profesional Tab ───────────────────────────────────────────────── */}
-        {tab === "profesional" && (
-          <View style={styles.form}>
-            <View style={styles.infoBox}>
-              <Text style={styles.infoText}>
-                🔐  Acceso corporativo. Introduce tu usuario y el PIN que te proporcionó Aconvi.
-              </Text>
-            </View>
-            <Text style={styles.label}>Usuario corporativo</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="af.garcia"
-              autoCapitalize="none"
-              autoCorrect={false}
-              value={username}
-              onChangeText={setUsername}
-              editable={proStep !== "loading"}
-            />
-            <Text style={styles.label}>PIN de acceso</Text>
-            <TextInput
-              style={[styles.input, styles.pinInput]}
-              placeholder="••••••"
-              keyboardType="number-pad"
-              secureTextEntry
-              maxLength={6}
-              value={pin}
-              onChangeText={(v) => setPin(v.replace(/\D/g, ""))}
-              editable={proStep !== "loading"}
-            />
-            {proStep === "error" && <Text style={styles.error}>{errorMsg}</Text>}
-            <TouchableOpacity
-              style={[styles.btn, proStep === "loading" && styles.btnDisabled]}
-              onPress={handlePinLogin}
-              disabled={proStep === "loading"}
-            >
-              {proStep === "loading" ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.btnText}>Iniciar sesión</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -203,26 +143,10 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#fff" },
-  scroll: { flexGrow: 1, padding: 24, paddingTop: 64 },
-  logoWrap: { alignItems: "center", marginBottom: 36 },
-  logo: { fontSize: 34, fontWeight: "800", color: DARK, letterSpacing: -0.5 },
-  tagline: { fontSize: 14, color: GRAY, marginTop: 4 },
-  tabBar: {
-    flexDirection: "row",
-    backgroundColor: "#f3f4f6",
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 28,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignItems: "center",
-  },
-  tabActive: { backgroundColor: "#fff", shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
-  tabText: { fontSize: 14, fontWeight: "600", color: GRAY },
-  tabTextActive: { color: DARK },
+  scroll: { flexGrow: 1, padding: 24, paddingTop: 100 },
+  logoWrap: { alignItems: "center", marginBottom: 48 },
+  logo: { height: 48, width: 160, marginBottom: 8 },
+  tagline: { fontSize: 15, color: GRAY, marginTop: 6 },
   form: { flex: 1 },
   label: { fontSize: 13, fontWeight: "600", color: "#374151", marginBottom: 6 },
   input: {
@@ -232,7 +156,7 @@ const styles = StyleSheet.create({
     padding: 14,
     fontSize: 16,
     color: DARK,
-    marginBottom: 16,
+    marginBottom: 20,
     backgroundColor: "#fafafa",
   },
   pinInput: { fontSize: 24, letterSpacing: 6, textAlign: "center" },
@@ -241,7 +165,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 16,
     alignItems: "center",
-    marginTop: 4,
+    marginTop: 8,
   },
   btnDisabled: { opacity: 0.6 },
   btnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
@@ -249,23 +173,20 @@ const styles = StyleSheet.create({
     color: "#dc2626",
     fontSize: 13,
     textAlign: "center",
-    marginBottom: 12,
+    marginBottom: 16,
     backgroundColor: "#fef2f2",
     padding: 10,
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#fca5a5"
   },
-  link: { color: TEAL, fontWeight: "600", fontSize: 15, textAlign: "center", marginTop: 16 },
   infoBox: {
     backgroundColor: "#f0fdf9",
     borderRadius: 10,
-    padding: 12,
-    marginBottom: 20,
-    borderLeftWidth: 3,
+    padding: 16,
+    marginBottom: 28,
+    borderLeftWidth: 4,
     borderLeftColor: TEAL,
   },
-  infoText: { fontSize: 13, color: "#374151", lineHeight: 20 },
-  successBox: { alignItems: "center", paddingTop: 24 },
-  successIcon: { fontSize: 56, marginBottom: 16 },
-  successTitle: { fontSize: 22, fontWeight: "700", color: DARK, marginBottom: 8 },
-  successText: { fontSize: 14, color: GRAY, textAlign: "center", lineHeight: 22, marginBottom: 24, maxWidth: 300 },
+  infoText: { fontSize: 14, color: "#374151", lineHeight: 22 },
 });

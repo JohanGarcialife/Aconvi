@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
-import { api } from "~/utils/api";
+import { api, queryClient } from "~/utils/api";
+import { useQuery, useMutation } from "@tanstack/react-query";
+
+import { authClient } from "~/utils/auth";
 
 const TENANT_ID = "org_aconvi_demo";
-// Dummy user id for demonstration purposes (in a real app, this comes from auth context)
-const USER_ID = "00000000-0000-0000-0000-000000000000";
 
 const STATUS_UI = {
   DRAFT: { label: "Próximamente", color: "#64748b", bg: "#f1f5f9" },
@@ -14,16 +15,18 @@ const STATUS_UI = {
 
 export default function VotingScreen() {
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const { data: session } = authClient.useSession();
+  const USER_ID = session?.user?.id ?? "00000000-0000-0000-0000-000000000000";
   
-  const trpc = api.useContext();
-  const { data: sessions, isLoading } = api.voting.all.useQuery({ tenantId: TENANT_ID });
+  const { data: sessions, isLoading } = useQuery(api.voting.all.queryOptions({ tenantId: TENANT_ID }));
   
-  const castVoteMutation = api.voting.castVote.useMutation({
+  const castVoteMutation = useMutation({
+    ...api.voting.cast.mutationOptions(),
     onSuccess: () => {
       Alert.alert("Voto registrado", "Tu voto ha sido registrado correctamente.");
-      trpc.voting.all.invalidate();
+      void queryClient.invalidateQueries(api.voting.all.queryFilter({ tenantId: TENANT_ID }));
     },
-    onError: (err) => {
+    onError: (err: any) => {
       Alert.alert("Error", err.message || "No se pudo registrar el voto.");
     }
   });
@@ -41,7 +44,7 @@ export default function VotingScreen() {
             castVoteMutation.mutate({
               sessionId,
               optionId,
-              userId: USER_ID,
+              tenantId: TENANT_ID,
             });
           }
         }
@@ -76,7 +79,7 @@ export default function VotingScreen() {
                 style={styles.optionButton}
                 activeOpacity={0.7}
                 onPress={() => handleVote(item.id, opt.id)}
-                disabled={castVoteMutation.isLoading}
+                disabled={castVoteMutation.isPending}
               >
                 <Text style={styles.optionText}>{opt.label}</Text>
               </TouchableOpacity>
@@ -110,7 +113,7 @@ export default function VotingScreen() {
           <ActivityIndicator size="large" color="#00bda5" />
           <Text style={styles.loadingText}>Cargando votaciones...</Text>
         </View>
-      ) : !sessions?.length ? (
+      ) : !(sessions as any[])?.length ? (
         <View style={styles.center}>
           <Text style={styles.emoji}>🗳️</Text>
           <Text style={styles.emptyTitle}>Sin votaciones</Text>
@@ -118,7 +121,7 @@ export default function VotingScreen() {
         </View>
       ) : (
         <FlatList
-          data={sessions}
+          data={sessions as any[]}
           keyExtractor={(item) => item.id}
           renderItem={renderSession}
           contentContainerStyle={styles.listContainer}

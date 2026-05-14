@@ -1,5 +1,9 @@
 import { Tabs } from "expo-router";
-import { View, Text } from "react-native";
+import { View, Text, Platform } from "react-native";
+import { useQuery } from "@tanstack/react-query";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { api } from "~/utils/api";
+import { authClient } from "~/utils/auth";
 
 const PRIMARY = "#4aa19b";
 const INACTIVE = "#94a3b8";
@@ -58,6 +62,18 @@ function TabIcon({
 }
 
 export default function VecinoLayout() {
+  const { data: session } = authClient.useSession();
+  const userId = session?.user?.id;
+  const insets = useSafeAreaInsets();
+  const bottomPad = Math.max(insets.bottom, 8);
+  const { data: incidents } = useQuery(
+    api.incident.all.queryOptions({ tenantId: "org_aconvi_demo" })
+  );
+  
+  const activeIncidentsCount = (incidents as any[] | undefined)?.filter(
+    (i: any) => i.reporterId === userId && i.status !== "RESUELTA" && i.status !== "RECHAZADA"
+  )?.length ?? 0;
+
   return (
     <Tabs
       screenOptions={{
@@ -67,8 +83,8 @@ export default function VecinoLayout() {
           backgroundColor: "#fff",
           borderTopColor: "#e2e8f0",
           borderTopWidth: 1,
-          height: 72,
-          paddingBottom: 12,
+          height: 56 + bottomPad,
+          paddingBottom: bottomPad,
           paddingTop: 8,
         },
         tabBarLabelStyle: {
@@ -94,7 +110,7 @@ export default function VecinoLayout() {
         options={{
           title: "Incidencias",
           tabBarIcon: ({ focused }) => (
-            <TabIcon name="Incidencias" focused={focused} badge={1} />
+            <TabIcon name="Incidencias" focused={focused} badge={activeIncidentsCount} />
           ),
         }}
       />

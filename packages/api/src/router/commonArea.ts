@@ -2,6 +2,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod";
 import { commonArea, commonAreaBooking } from "@acme/db/schema";
 import { createTRPCRouter, tenantProcedure, protectedProcedure } from "../trpc";
+import { sendPushToUser } from "./notification";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function generateSlots(openTime: string, closeTime: string, slotMinutes: number): string[] {
@@ -110,6 +111,13 @@ export const commonAreaRouter = createTRPCRouter({
         })
         .returning();
 
+      // Push notification for confirmation
+      await sendPushToUser(ctx.db, ctx.session.user.id, {
+        title: "✅ Reserva confirmada",
+        body: `Has reservado ${area.name} para el ${input.date} a las ${input.startTime}`,
+        data: { type: "booking_confirmed" },
+      });
+
       return booking;
     }),
 
@@ -126,6 +134,13 @@ export const commonAreaRouter = createTRPCRouter({
             eq(commonAreaBooking.userId, ctx.session.user.id),
           ),
         );
+
+      await sendPushToUser(ctx.db, ctx.session.user.id, {
+        title: "❌ Reserva cancelada",
+        body: "Tu reserva ha sido cancelada correctamente.",
+        data: { type: "booking_cancelled" },
+      });
+
       return { ok: true };
     }),
 

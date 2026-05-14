@@ -170,6 +170,8 @@ export const notice = pgTable("notice", (t) => ({
   id: t.uuid().notNull().primaryKey().defaultRandom(),
   title: t.varchar({ length: 256 }).notNull(),
   content: t.text().notNull(),
+  type: t.varchar({ length: 32 }).notNull().default("COMUNICADO"), // COMUNICADO | AVISO | URGENTE
+  pinned: t.boolean().notNull().default(false),
   organizationId: t.text("organization_id")
     .notNull()
     .references(() => organization.id, { onDelete: "cascade" }),
@@ -405,3 +407,34 @@ export const agendaTaskRelations = relations(agendaTask, ({ one }) => ({
   }),
 }));
 
+// ─── Fee (Cuota) ─────────────────────────────────────────────────────────────
+export const fee = pgTable("fee", {
+  id: uuid().notNull().primaryKey().defaultRandom(),
+  organizationId: text("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  amount: real("amount").notNull(),
+  description: varchar("description", { length: 256 }).notNull(),
+  status: varchar("status", { length: 64 }).notNull().default("PENDING"), // PENDING, PAID, OVERDUE
+  dueDate: varchar("due_date", { length: 10 }), // ISO date YYYY-MM-DD
+  paidAt: timestamp("paid_at", { mode: "date", withTimezone: true }),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
+    .defaultNow()
+    .$onUpdate(() => new Date())
+    .notNull(),
+});
+
+export const feeRelations = relations(fee, ({ one }) => ({
+  organization: one(organization, {
+    fields: [fee.organizationId],
+    references: [organization.id],
+  }),
+  user: one(user, {
+    fields: [fee.userId],
+    references: [user.id],
+  }),
+}));

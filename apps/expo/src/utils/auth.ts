@@ -7,6 +7,18 @@ import { getBaseUrl } from "./base-url";
 
 export const authClient = createAuthClient({
   baseURL: getBaseUrl(),
+  fetchOptions: {
+    onRequest: async (ctx: any) => {
+      // Inyectar manualmente el token en todas las llamadas por seguridad
+      try {
+        const token = await SecureStore.getItemAsync("expo_session_token");
+        if (token) {
+          ctx.headers = { ...ctx.headers, Authorization: `Bearer ${token}` };
+        }
+      } catch (e) {}
+      return ctx;
+    }
+  },
   plugins: [
     expoClient({
       scheme: "expo",

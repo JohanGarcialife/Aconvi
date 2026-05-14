@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { format, isPast, isToday, differenceInDays } from "date-fns";
+import { format, isPast, isToday, differenceInDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import { useTRPC } from "~/trpc/react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -32,6 +32,10 @@ import {
   AlertCircle,
   Circle,
   RotateCcw,
+  Calendar as CalendarIcon,
+  List as ListIcon,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 const TENANT_ID = "org_aconvi_demo";
@@ -289,6 +293,110 @@ function TaskRow({
     </div>
   );
 }
+// ─── Calendar View ────────────────────────────────────────────────────────────
+function CalendarView({
+  year,
+  month,
+  onMonthChange,
+  events,
+}: {
+  year: number;
+  month: number;
+  onMonthChange: (y: number, m: number) => void;
+  events: any[];
+}) {
+  const currentMonth = new Date(year, month - 1, 1);
+  const monthStart = startOfMonth(currentMonth);
+  const monthEnd = endOfMonth(monthStart);
+  const startDate = startOfWeek(monthStart, { weekStartsOn: 1 });
+  const endDate = endOfWeek(monthEnd, { weekStartsOn: 1 });
+
+  const dateFormat = "d";
+  const days = eachDayOfInterval({ start: startDate, end: endDate });
+
+  const nextMonth = () => {
+    const next = addMonths(currentMonth, 1);
+    onMonthChange(next.getFullYear(), next.getMonth() + 1);
+  };
+  const prevMonth = () => {
+    const prev = subMonths(currentMonth, 1);
+    onMonthChange(prev.getFullYear(), prev.getMonth() + 1);
+  };
+
+  return (
+    <div className="flex flex-col rounded-xl border bg-card overflow-hidden">
+      {/* Calendar Header */}
+      <div className="flex items-center justify-between border-b px-6 py-4">
+        <h2 className="text-lg font-bold capitalize">
+          {format(currentMonth, "MMMM yyyy", { locale: es })}
+        </h2>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="icon" onClick={prevMonth} className="h-8 w-8">
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="icon" onClick={nextMonth} className="h-8 w-8">
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Days Header */}
+      <div className="grid grid-cols-7 border-b bg-muted/20">
+        {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((day) => (
+          <div key={day} className="py-2 text-center text-xs font-semibold text-muted-foreground">
+            {day}
+          </div>
+        ))}
+      </div>
+
+      {/* Grid */}
+      <div className="grid grid-cols-7">
+        {days.map((day, i) => {
+          const isCurrentMonth = isSameMonth(day, monthStart);
+          const isTodayDate = isSameDay(day, new Date());
+          const dateStr = format(day, "yyyy-MM-dd");
+
+          const dayEvents = events.filter((e) => e.date === dateStr);
+
+          return (
+            <div
+              key={day.toString()}
+              className={`min-h-[100px] border-b border-r p-2 transition-colors hover:bg-muted/10 ${
+                !isCurrentMonth ? "bg-muted/10 opacity-50" : ""
+              } ${i % 7 === 6 ? "border-r-0" : ""}`}
+            >
+              <div
+                className={`mb-1 flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium ${
+                  isTodayDate ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+                }`}
+              >
+                {format(day, dateFormat)}
+              </div>
+              <div className="flex flex-col gap-1">
+                {dayEvents.map((evt) => {
+                  let bg = "bg-slate-100 text-slate-700 border-slate-200";
+                  if (evt.type === "vote") bg = "bg-blue-50 text-blue-700 border-blue-200";
+                  if (evt.type === "incident") bg = "bg-orange-50 text-orange-700 border-orange-200";
+                  if (evt.type === "task" && evt.isDone) bg = "bg-emerald-50 text-emerald-700 border-emerald-200 opacity-60";
+
+                  return (
+                    <div
+                      key={evt.id}
+                      className={`truncate rounded border px-1.5 py-0.5 text-[10px] font-medium leading-tight ${bg}`}
+                      title={evt.label}
+                    >
+                      {evt.label}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function AgendaPage() {
@@ -296,12 +404,25 @@ export default function AgendaPage() {
   const queryClient = useQueryClient();
   const [showDone, setShowDone] = useState(false);
   const [catFilter, setCatFilter] = useState("ALL");
+  const [viewMode, setViewMode] = useState<"LIST" | "CALENDAR">("LIST");
+  const [calendarDate, setCalendarDate] = useState({
+    year: new Date().getFullYear(),
+    month: new Date().getMonth() + 1,
+  });
 
   const { data: tasks, isLoading } = useQuery(
     trpc.agenda.all.queryOptions({
       tenantId: TENANT_ID,
       showDone,
       category: catFilter === "ALL" ? undefined : catFilter,
+    }),
+  );
+
+  const { data: calendarEvents } = useQuery(
+    trpc.agenda.getCalendarEvents.queryOptions({
+      tenantId: TENANT_ID,
+      year: calendarDate.year,
+      month: calendarDate.month,
     }),
   );
 
@@ -373,60 +494,93 @@ export default function AgendaPage() {
         ))}
       </div>
 
-      {/* Filters */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex gap-2 flex-wrap">
-          {[{ key: "ALL", label: "Todas" }, ...CATEGORIES.map(c => ({ key: c.value, label: c.label }))].map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setCatFilter(key)}
-              className={`rounded-full border px-3 py-1 text-xs font-medium transition-all ${
-                catFilter === key
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "border-border text-muted-foreground hover:border-primary/40"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+      {/* View Toggle */}
+      <div className="flex items-center gap-2 bg-muted/30 p-1 rounded-lg self-start">
         <button
-          onClick={() => setShowDone(!showDone)}
-          className={`ml-auto flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-all ${
-            showDone
-              ? "bg-muted border-border"
-              : "border-border text-muted-foreground hover:border-primary/40"
+          onClick={() => setViewMode("LIST")}
+          className={`flex items-center gap-2 px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
+            viewMode === "LIST" ? "bg-white shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          <CheckCircle2 className="h-3 w-3" />
-          {showDone ? "Ocultar completadas" : "Mostrar completadas"}
+          <ListIcon className="h-4 w-4" />
+          Lista de tareas
+        </button>
+        <button
+          onClick={() => setViewMode("CALENDAR")}
+          className={`flex items-center gap-2 px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
+            viewMode === "CALENDAR" ? "bg-white shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <CalendarIcon className="h-4 w-4" />
+          Calendario Inteligente
         </button>
       </div>
 
-      {/* Task List */}
-      {isLoading ? (
-        <div className="text-muted-foreground text-sm">Cargando agenda...</div>
-      ) : !tasks?.length ? (
-        <div className="py-16 text-center border rounded-xl bg-muted/20">
-          <CalendarCheck className="mx-auto h-10 w-10 text-muted-foreground mb-3 opacity-40" />
-          <p className="text-muted-foreground text-sm">
-            No hay tareas pendientes. Crea la primera tarea.
-          </p>
-        </div>
+      {viewMode === "CALENDAR" ? (
+        <CalendarView
+          year={calendarDate.year}
+          month={calendarDate.month}
+          onMonthChange={(year, month) => setCalendarDate({ year, month })}
+          events={calendarEvents ?? []}
+        />
       ) : (
-        <div className="flex flex-col gap-2">
-          {tasks.map((task: any) => (
-            <TaskRow
-              key={task.id}
-              task={task}
-              onDone={(id) => doneMutation.mutate({ id })}
-              onReopen={(id) => reopenMutation.mutate({ id })}
-              onDelete={(id) => {
-                if (confirm("¿Eliminar esta tarea?")) deleteMutation.mutate({ id });
-              }}
-            />
-          ))}
-        </div>
+        <>
+          {/* Filters */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex gap-2 flex-wrap">
+              {[{ key: "ALL", label: "Todas" }, ...CATEGORIES.map(c => ({ key: c.value, label: c.label }))].map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setCatFilter(key)}
+                  className={`rounded-full border px-3 py-1 text-xs font-medium transition-all ${
+                    catFilter === key
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "border-border text-muted-foreground hover:border-primary/40"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowDone(!showDone)}
+              className={`ml-auto flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-all ${
+                showDone
+                  ? "bg-muted border-border"
+                  : "border-border text-muted-foreground hover:border-primary/40"
+              }`}
+            >
+              <CheckCircle2 className="h-3 w-3" />
+              {showDone ? "Ocultar completadas" : "Mostrar completadas"}
+            </button>
+          </div>
+
+          {/* Task List */}
+          {isLoading ? (
+            <div className="text-muted-foreground text-sm">Cargando agenda...</div>
+          ) : !tasks?.length ? (
+            <div className="py-16 text-center border rounded-xl bg-muted/20">
+              <CalendarCheck className="mx-auto h-10 w-10 text-muted-foreground mb-3 opacity-40" />
+              <p className="text-muted-foreground text-sm">
+                No hay tareas pendientes. Crea la primera tarea.
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {tasks.map((task: any) => (
+                <TaskRow
+                  key={task.id}
+                  task={task}
+                  onDone={(id) => doneMutation.mutate({ id })}
+                  onReopen={(id) => reopenMutation.mutate({ id })}
+                  onDelete={(id) => {
+                    if (confirm("¿Eliminar esta tarea?")) deleteMutation.mutate({ id });
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Linking } from "react-native";
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Linking } from "react-native";
+import { useQuery } from "@tanstack/react-query";
 import { api } from "~/utils/api";
 
 const CATEGORY_META = {
@@ -11,9 +12,9 @@ const CATEGORY_META = {
 } as const;
 
 export default function DocumentsScreen() {
-  const { data: documents, isLoading } = api.document.all.useQuery({
-    tenantId: "org_aconvi_demo",
-  });
+  const { data: documents, isLoading } = useQuery(
+    api.document.all.queryOptions({ tenantId: "org_aconvi_demo" })
+  );
 
   const renderItem = ({ item }: { item: any }) => {
     const meta = CATEGORY_META[item.category as keyof typeof CATEGORY_META] ?? CATEGORY_META.OTRO;
@@ -22,7 +23,10 @@ export default function DocumentsScreen() {
       <TouchableOpacity 
         style={styles.card}
         activeOpacity={0.7}
-        onPress={() => Linking.openURL(item.fileUrl).catch(() => alert("No se pudo abrir el enlace"))}
+        onPress={() => {
+          Alert.alert("Descargando...");
+          Linking.openURL(item.fileUrl).catch(() => Alert.alert("Error", "No se pudo abrir el enlace"));
+        }}
       >
         <View style={styles.iconContainer}>
           <Text style={styles.iconText}>{meta.icon}</Text>
@@ -47,7 +51,7 @@ export default function DocumentsScreen() {
           <ActivityIndicator size="large" color="#00bda5" />
           <Text style={styles.loadingText}>Cargando documentos...</Text>
         </View>
-      ) : !documents?.length ? (
+      ) : !(documents as any[] | undefined)?.length ? (
         <View style={styles.center}>
           <Text style={styles.emoji}>📂</Text>
           <Text style={styles.emptyTitle}>Sin documentos</Text>
@@ -57,7 +61,7 @@ export default function DocumentsScreen() {
         </View>
       ) : (
         <FlatList
-          data={documents}
+          data={(documents as any[] | undefined) || []}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={styles.listContainer}

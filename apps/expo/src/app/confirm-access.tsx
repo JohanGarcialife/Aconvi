@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Image,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
@@ -25,18 +26,20 @@ export default function ConfirmAccessScreen() {
   const router = useRouter();
   const [state, setState] = useState<"idle" | "confirming" | "rejecting" | "done" | "rejected">("idle");
 
-  const confirmAccess = useMutation(trpc.auth.confirmPushAccess.mutationOptions({
+  const confirmAccess = useMutation({
+    ...trpc.auth.confirmPushAccess.mutationOptions(),
     onSuccess: () => {
       setState("done");
       setTimeout(() => router.replace("/"), 1800);
     },
-    onError: (err) => {
+    onError: (err: any) => {
       Alert.alert("Error", err.message || "No se pudo confirmar el acceso.");
       setState("idle");
     },
-  }));
+  });
 
-  const cancelAccess = useMutation(trpc.auth.cancelPushAccess.mutationOptions({
+  const cancelAccess = useMutation({
+    ...trpc.auth.cancelPushAccess.mutationOptions(),
     onSuccess: () => {
       setState("rejected");
       setTimeout(() => router.replace("/"), 1800);
@@ -44,12 +47,12 @@ export default function ConfirmAccessScreen() {
     onError: () => {
       router.back();
     },
-  }));
+  });
 
   const handleConfirm = () => {
     if (!token) return;
     setState("confirming");
-    confirmAccess.mutate({ token });
+    confirmAccess.mutate({ token } as any);
   };
 
   const handleReject = () => {
@@ -63,7 +66,7 @@ export default function ConfirmAccessScreen() {
           style: "destructive",
           onPress: () => {
             setState("rejecting");
-            if (token) cancelAccess.mutate({ token });
+            if (token) cancelAccess.mutate({ token } as any);
             else router.back();
           },
         },
@@ -101,7 +104,11 @@ export default function ConfirmAccessScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.logoText}>Aconvi</Text>
+        <Image
+          source={require("../../assets/logo.png")}
+          style={{ width: 120, height: 36 }}
+          resizeMode="contain"
+        />
       </View>
 
       {/* Content */}
@@ -159,7 +166,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
   center: { justifyContent: "center", alignItems: "center", gap: 16 },
   header: { paddingTop: 60, paddingHorizontal: 32, paddingBottom: 16 },
-  logoText: { fontSize: 22, fontWeight: "800", color: "#0F1B2B" },
   content: { flex: 1, paddingHorizontal: 32, paddingTop: 32, alignItems: "center" },
   iconCircle: {
     width: 80, height: 80, borderRadius: 40,

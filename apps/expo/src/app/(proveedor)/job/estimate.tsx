@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, Stack, useLocalSearchParams } from "expo-router";
-import { useTRPC } from "~/utils/api";
+import { api } from "~/utils/api";
 import { useMutation } from "@tanstack/react-query";
 
 const PRIMARY = "#4aa19b";
@@ -150,7 +150,6 @@ function CostRow({ label, emoji, value, min, max, step, scaleMarks, onChange }: 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 export default function EstimateScreen() {
   const router = useRouter();
-  const trpc = useTRPC();
   const params = useLocalSearchParams<{ incidentId?: string; providerId?: string }>();
   const [departure, setDeparture] = useState(40);
   const [labor, setLabor] = useState(80);
@@ -161,21 +160,20 @@ export default function EstimateScreen() {
   const DEMO_TENANT_ID = "org_aconvi_demo";
   const total = departure + labor + materials;
 
-  const acceptMutation = useMutation(
-    trpc.incident.providerAccept.mutationOptions({
-      onSuccess: () => {
-        Alert.alert(
-          "Estimación enviada ✓",
-          `Presupuesto de ${total}€ guardado. El administrador será notificado.`,
-          [{ text: "OK", onPress: () => router.push({
-            pathname: "/(proveedor)/job/inprogress",
-            params: { incidentId: params.incidentId, providerId: params.providerId },
-          }) }]
-        );
-      },
-      onError: (e) => Alert.alert("Error", e.message),
-    }),
-  );
+  const acceptMutation = useMutation({
+    ...api.incident.providerAccept.mutationOptions(),
+    onSuccess: () => {
+      Alert.alert(
+        "Estimación enviada ✓",
+        `Presupuesto de ${total}€ guardado. El administrador será notificado.`,
+        [{ text: "OK", onPress: () => router.push({
+          pathname: "/(proveedor)/job/inprogress",
+          params: { incidentId: params.incidentId, providerId: params.providerId },
+        }) }]
+      );
+    },
+    onError: (e: Error) => Alert.alert("Error", e.message),
+  });
 
   const handleSend = () => {
     const incidentId = params.incidentId;
@@ -194,9 +192,9 @@ export default function EstimateScreen() {
       tenantId: DEMO_TENANT_ID,
       providerId,
       estimatedCost: total,
-      estimatedDays: days,
+      estimatedDays: goNow ? 0 : Number(days),
       notes: goNow ? "Salida inmediata" : "Salida programada",
-    });
+    } as any);
   };
 
   return (

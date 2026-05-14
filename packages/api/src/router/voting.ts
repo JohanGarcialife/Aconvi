@@ -9,6 +9,7 @@ import {
 } from "@acme/db/schema";
 import { createTRPCRouter, tenantProcedure, protectedProcedure } from "../trpc";
 import { emitWebSocketEvent } from "../utils/ws";
+import { sendPushToAllMembers } from "./notification";
 
 export const votingRouter = createTRPCRouter({
   // ── List all sessions for a community ────────────────────────────────────────
@@ -111,6 +112,13 @@ export const votingRouter = createTRPCRouter({
         .returning();
 
       await emitWebSocketEvent(input.tenantId, "voting-opened", updated);
+
+      // Notify all members that a new vote is open
+      await sendPushToAllMembers(ctx.db, input.tenantId, {
+        title: "🗳️ Nueva votación abierta",
+        body: session.title,
+        data: { type: "new_vote" },
+      });
 
       return { ok: true };
     }),

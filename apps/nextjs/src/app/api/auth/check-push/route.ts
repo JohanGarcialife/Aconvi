@@ -1,28 +1,43 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { db } from "@acme/db/client";
 import { pushAuthSession, pushToken, session, user } from "@acme/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    // requestId is actually the pushAuthSession token (for API compatibility)
     const token = searchParams.get("requestId");
 
     if (!token) {
       return NextResponse.json({ status: "error", error: "requestId requerido." }, { status: 400 });
     }
 
-    const pushSession = await db.query.pushAuthSession.findFirst({
-      where: eq(pushAuthSession.token, token),
-    });
+    // ── Fetch session with DB-side age calculation (avoids timezone mismatch) ──
+    const rows = await db
+      .select({
+        id: pushAuthSession.id,
+        token: pushAuthSession.token,
+        userId: pushAuthSession.userId,
+        status: pushAuthSession.status,
+        expiresAt: pushAuthSession.expiresAt,
+        loginIp: pushAuthSession.loginIp,
+        loginUserAgent: pushAuthSession.loginUserAgent,
+        // Age in ms computed by the DB (Neon is UTC, Node.js Date.now() may differ)
+        ageMs: sql<number>`EXTRACT(EPOCH FROM (NOW() - ${pushAuthSession.createdAt})) * 1000`,
+      })
+      .from(pushAuthSession)
+      .where(eq(pushAuthSession.token, token))
+      .limit(1);
+
+    const pushSession = rows[0];
 
     if (!pushSession) {
       return NextResponse.json({ status: "error", error: "Solicitud no encontrada." }, { status: 404 });
     }
 
-    // Check expiry
-    if (new Date() > pushSession.expiresAt && pushSession.status === "PENDING") {
+    // Check expiry (also DB-side: expiresAt is stored in UTC)
+    const isExpired = new Date(pushSession.expiresAt) < new Date();
+    if (isExpired && pushSession.status === "PENDING") {
       await db.update(pushAuthSession).set({ status: "EXPIRED" }).where(eq(pushAuthSession.token, token));
       return NextResponse.json({ status: "expired" });
     }
@@ -31,9 +46,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ status: pushSession.status === "CANCELLED" ? "rejected" : "expired" });
     }
 
-    // If already confirmed and session token stored → return it
+    // If already confirmed, look for an existing web session → return it
     if (pushSession.status === "CONFIRMED") {
-      // Look up an existing web session for this user to return
       const webSession = await db.query.session.findFirst({
         where: eq(session.userId, pushSession.userId),
       });
@@ -44,29 +58,27 @@ export async function GET(req: NextRequest) {
 
     // ── Auto-approve for users without a registered push device ───────────────
     if (pushSession.status === "PENDING") {
-      const ageMs = Date.now() - pushSession.createdAt.getTime();
-      if (ageMs > 4000) {
-        const userTokens = await db.query.pushToken.findMany({
-          where: eq(pushToken.userId, pushSession.userId),
-        });
-        const foundUser = await db.query.user.findFirst({
-          where: eq(user.id, pushSession.userId),
-        });
+      const ageMs = Number(pushSession.ageMs);
+      console.log(`[CHECK_PUSH] token=${token.slice(0,8)} ageMs=${Math.round(ageMs)}ms`);
 
-        // Auto-approve if:
-        // 1. No registered push device (emulator/dev) OR
-        // 2. Known test users
+      if (ageMs > 4000) {
+        const [userTokens, foundUser] = await Promise.all([
+          db.query.pushToken.findMany({ where: eq(pushToken.userId, pushSession.userId) }),
+          db.query.user.findFirst({ where: eq(user.id, pushSession.userId) }),
+        ]);
+
         const isTestUser = foundUser?.corporateUsername === "jluis.test" ||
                            foundUser?.corporateUsername === "jluis.push";
         const noDevice = userTokens.length === 0;
 
+        console.log(`[CHECK_PUSH] user=${foundUser?.corporateUsername} noDevice=${noDevice} isTestUser=${isTestUser}`);
+
         if (noDevice || isTestUser) {
-          // Mark confirmed (auto-approve for no-device scenario)
           await db.update(pushAuthSession)
             .set({ status: "CONFIRMED" })
             .where(eq(pushAuthSession.token, token));
           pushSession.status = "CONFIRMED";
-          console.log(`[CHECK_PUSH] Auto-confirmed for ${foundUser?.corporateUsername ?? foundUser?.id} (noDevice=${noDevice})`);
+          console.log(`[CHECK_PUSH] ✓ Auto-confirmed: ${foundUser?.corporateUsername ?? foundUser?.id}`);
         }
       }
     }
@@ -89,15 +101,14 @@ export async function GET(req: NextRequest) {
         userAgent: pushSession.loginUserAgent ?? "Web",
       });
 
-      // Mark session as used (prevent double session creation)
       await db.update(pushAuthSession)
         .set({ status: "EXPIRED" })
         .where(eq(pushAuthSession.token, token));
 
+      console.log(`[CHECK_PUSH] ✓ Web session created → ${sessionToken.slice(0,8)}`);
       return NextResponse.json({ status: "approved", sessionToken });
     }
 
-    // Still pending
     return NextResponse.json({ status: "pending" });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Internal error";

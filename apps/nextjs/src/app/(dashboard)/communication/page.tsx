@@ -19,7 +19,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@acme/ui/dialog";
-import { Megaphone, AlertTriangle, Info, Pin, Trash2, Plus } from "lucide-react";
+import { Megaphone, AlertTriangle, Info, Pin, PinOff, Trash2, Plus } from "lucide-react";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 // Use same tenant as incidents for consistent demo experience
@@ -169,15 +169,18 @@ function PublishNoticeDialog({ onSuccess }: { onSuccess: () => void }) {
 function NoticeCard({
   notice,
   onDelete,
+  onTogglePin,
 }: {
   notice: any;
   onDelete: (id: string) => void;
+  onTogglePin: (id: string, pinned: boolean) => void;
 }) {
   const meta = typeMeta(notice.type ?? "COMUNICADO");
   const Icon = meta.icon;
+  const isPinned = notice.pinned;
 
   return (
-    <div className="flex flex-col rounded-xl border bg-card p-5 shadow-xs hover:shadow-sm transition-shadow">
+    <div className={`flex flex-col rounded-xl border bg-card p-5 shadow-xs hover:shadow-sm transition-shadow ${isPinned ? "border-amber-200 bg-amber-50/30" : ""}`}>
       {/* Header */}
       <div className="flex items-start justify-between mb-3 gap-2">
         <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -187,6 +190,9 @@ function NoticeCard({
           <h3 className="font-semibold text-base leading-tight truncate">
             {notice.title}
           </h3>
+          {isPinned && (
+            <span className="text-amber-600" title="Fijado">📌</span>
+          )}
         </div>
         <div className="flex items-center gap-1 shrink-0">
           <Badge
@@ -195,6 +201,15 @@ function NoticeCard({
           >
             {meta.label}
           </Badge>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`h-7 w-7 ${isPinned ? "text-amber-500 hover:text-amber-700" : "text-muted-foreground hover:text-amber-500"} hover:bg-amber-50`}
+            title={isPinned ? "Desfijar" : "Fijar en el tablón"}
+            onClick={() => onTogglePin(notice.id, !isPinned)}
+          >
+            {isPinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
+          </Button>
           <Button
             variant="ghost"
             size="icon"
@@ -246,6 +261,15 @@ export default function NoticeBoardPage() {
     }),
   );
 
+  const pinMutation = useMutation(
+    trpc.notice.togglePin.mutationOptions({
+      onSuccess: () =>
+        queryClient.invalidateQueries(
+          trpc.notice.all.queryFilter({ tenantId: TENANT_ID }),
+        ),
+    }),
+  );
+
   const refresh = () =>
     queryClient.invalidateQueries(
       trpc.notice.all.queryFilter({ tenantId: TENANT_ID }),
@@ -255,6 +279,10 @@ export default function NoticeBoardPage() {
     if (confirm("¿Eliminar este comunicado?")) {
       deleteMutation.mutate({ tenantId: TENANT_ID, id });
     }
+  };
+
+  const handleTogglePin = (id: string, pinned: boolean) => {
+    pinMutation.mutate({ tenantId: TENANT_ID, id, pinned });
   };
 
   const filtered =
@@ -326,7 +354,7 @@ export default function NoticeBoardPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filtered?.map((notice: any) => (
-            <NoticeCard key={notice.id} notice={notice} onDelete={handleDelete} />
+            <NoticeCard key={notice.id} notice={notice} onDelete={handleDelete} onTogglePin={handleTogglePin} />
           ))}
         </div>
       )}

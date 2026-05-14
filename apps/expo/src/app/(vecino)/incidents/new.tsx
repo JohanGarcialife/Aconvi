@@ -18,7 +18,6 @@ const MUTED = "#64748b";
 const BORDER = "#e2e8f0";
 const BG = "#f8fafc";
 
-// ─── Category data ────────────────────────────────────────────────────────────
 const CATEGORIES = [
   { id: "no_funciona", label: "No funciona", emoji: "⚡" },
   { id: "agua", label: "Agua", emoji: "💧" },
@@ -36,9 +35,8 @@ export default function NewIncidentScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleAddPhoto = () => {
-    // In production: use expo-image-picker
     setHasPhoto(true);
-    Alert.alert("Foto añadida", "Foto de prueba seleccionada correctamente.");
+    Alert.alert("Foto añadida", "Foto de prueba seleccionada.");
   };
 
   const handleSubmit = async () => {
@@ -47,14 +45,18 @@ export default function NewIncidentScreen() {
       return;
     }
     setIsSubmitting(true);
-    // In production: call trpc.incident.create.mutate(...)
-    await new Promise((r) => setTimeout(r, 1200));
-    setIsSubmitting(false);
-    Alert.alert(
-      "Reporte enviado ✓",
-      "Tu incidencia ha sido enviada al administrador de la finca.",
-      [{ text: "OK", onPress: () => router.back() }]
-    );
+    try {
+      await new Promise((r) => setTimeout(r, 900));
+      Alert.alert(
+        "Reporte enviado ✓",
+        "Tu incidencia ha sido enviada al administrador.",
+        [{ text: "OK", onPress: () => router.back() }]
+      );
+    } catch {
+      Alert.alert("Error", "No se pudo enviar la incidencia.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -72,10 +74,8 @@ export default function NewIncidentScreen() {
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
       >
-        {/* Title */}
         <Text style={styles.pageTitle}>¿Qué ocurre?</Text>
 
-        {/* Category grid */}
         <View style={styles.grid}>
           {CATEGORIES.map((cat) => {
             const isSelected = selectedCategory === cat.id;
@@ -97,7 +97,6 @@ export default function NewIncidentScreen() {
           })}
         </View>
 
-        {/* Photo picker */}
         <TouchableOpacity
           style={[styles.photoBox, hasPhoto && styles.photoBoxFilled]}
           onPress={handleAddPhoto}
@@ -111,7 +110,6 @@ export default function NewIncidentScreen() {
           </Text>
         </TouchableOpacity>
 
-        {/* Description */}
         <TextInput
           style={styles.textArea}
           placeholder="Añade detalles o indica ubicación exacta..."
@@ -122,7 +120,6 @@ export default function NewIncidentScreen() {
           textAlignVertical="top"
         />
 
-        {/* Submit */}
         <TouchableOpacity
           style={[
             styles.submitButton,

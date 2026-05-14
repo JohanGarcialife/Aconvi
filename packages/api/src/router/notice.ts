@@ -1,4 +1,4 @@
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { notice, member } from "@acme/db/schema";
@@ -11,13 +11,17 @@ const DEMO_AUTHOR_ID = "test-user-jluis-1776971864823";
 export const NOTICE_TYPES = ["COMUNICADO", "AVISO", "URGENTE"] as const;
 
 export const noticeRouter = createTRPCRouter({
-  // ── List all notices for an org ───────────────────────────────────────────
+  // ── List all notices for an org (pinned first, then by date) ──────────────
   all: publicProcedure
     .input(z.object({ tenantId: z.string().min(1) }))
     .query(({ ctx, input }) => {
       return ctx.db.query.notice.findMany({
         where: eq(notice.organizationId, input.tenantId),
-        orderBy: desc(notice.createdAt),
+        orderBy: [
+          // pinned notices come first
+          sql`${notice.pinned} DESC`,
+          desc(notice.createdAt),
+        ],
         with: {
           author: {
             columns: { id: true, name: true },
@@ -64,6 +68,21 @@ export const noticeRouter = createTRPCRouter({
       }).catch(console.error);
 
       return { ...created, recipientCount };
+    }),
+
+  // ── Toggle pin on a notice ─────────────────────────────────────────────────
+  togglePin: publicProcedure
+    .input(z.object({ tenantId: z.string().min(1), id: z.string().uuid(), pinned: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      return ctx.db
+        .update(notice)
+        .set({ pinned: input.pinned })
+        .where(
+          and(
+            eq(notice.id, input.id),
+            eq(notice.organizationId, input.tenantId),
+          ),
+        );
     }),
 
   // ── Delete a notice ────────────────────────────────────────────────────────

@@ -10,6 +10,7 @@ import { documentRouter } from "./router/document";
 import { votingRouter } from "./router/voting";
 import { agendaRouter } from "./router/agenda";
 import { superadminRouter } from "./router/superadmin";
+import { feeRouter } from "./router/fee";
 import { createTRPCRouter } from "./trpc";
 
 export const appRouter = createTRPCRouter({
@@ -25,6 +26,7 @@ export const appRouter = createTRPCRouter({
   voting: votingRouter,
   agenda: agendaRouter,
   superadmin: superadminRouter,
+  fee: feeRouter,
 });
 
 

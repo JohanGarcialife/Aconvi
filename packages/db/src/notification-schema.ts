@@ -32,6 +32,8 @@ export const pushAuthSession = pgTable("push_auth_session", {
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
   token: text("token").notNull().unique(),
+  // Temporary 6-digit OTP code sent via push
+  otpCode: text("otp_code"),
   // PENDING | CONFIRMED | EXPIRED | CANCELLED
   status: text("status").notNull().default("PENDING"),
   // IP of the web login attempt

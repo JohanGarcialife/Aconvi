@@ -2,6 +2,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod";
 import { communityDocument } from "@acme/db/schema";
 import { createTRPCRouter, tenantProcedure, protectedProcedure } from "../trpc";
+import { sendPushToAllMembers } from "./notification";
 
 export const DOCUMENT_CATEGORIES = [
   "ACTA",
@@ -58,6 +59,14 @@ export const documentRouter = createTRPCRouter({
           mimeType: input.mimeType ?? null,
         })
         .returning();
+
+      // Notify all members that a new document is available
+      await sendPushToAllMembers(ctx.db, input.tenantId, {
+        title: "📄 Nuevo documento",
+        body: `Se ha publicado: ${input.title}`,
+        data: { type: "new_document", documentId: doc.id },
+      });
+
       return doc;
     }),
 

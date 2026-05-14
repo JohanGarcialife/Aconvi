@@ -156,6 +156,21 @@ export const incidentRouter = createTRPCRouter({
       // Notify provider user room
       await emitWebSocketEvent(input.providerId, "incident-assigned", updated);
 
+      // Push notification to provider with deep link data
+      if (updated.providerId) {
+        // Find the user linked to this provider
+        const prov = await ctx.db.query.provider.findFirst({
+          where: eq(provider.id, updated.providerId),
+        });
+        if (prov?.userId) {
+          await sendPushToUser(ctx.db, prov.userId, {
+            title: "📋 Nueva incidencia asignada",
+            body: `Se te ha asignado: ${updated.title}`,
+            data: { type: "job_assigned", incidentId: updated.id },
+          });
+        }
+      }
+
       // Emit realtime event to the tenant room
       await emitWebSocketEvent(input.tenantId, "incident-updated", updated);
 
@@ -322,6 +337,15 @@ export const incidentRouter = createTRPCRouter({
         authorId: input.providerId,
         content: noteContent,
       });
+
+      // Push notification to reporter (vecino) with deep link
+      if (updated.reporterId) {
+        await sendPushToUser(ctx.db, updated.reporterId, {
+          title: "✅ Tu incidencia ha sido resuelta",
+          body: `${updated.title} — El proveedor ha completado el trabajo.`,
+          data: { type: "new_incident", incidentId: updated.id },
+        });
+      }
 
       return updated;
     }),

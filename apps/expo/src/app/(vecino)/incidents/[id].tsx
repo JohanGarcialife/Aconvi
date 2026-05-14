@@ -5,50 +5,48 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "~/utils/api";
 
 const PRIMARY = "#4aa19b";
 const DARK = "#0f172a";
 const MUTED = "#64748b";
 const BORDER = "#e2e8f0";
 
-// ─── Mock — en producción vendrá de trpc.incident.byId ───────────────────────
-const MOCK: Record<string, {
-  title: string; community: string; address: string;
-  status: "PENDIENTE" | "ASIGNADA" | "EN_CURSO" | "RESUELTA";
-  category: string; description: string;
-  timeline: { label: string; date: string; done: boolean }[];
-}> = {
-  "1": {
-    title: "Filtración en Garaje P.2",
-    community: "Residencial Los Olivos",
-    address: "Av. de Andalucía, 105",
-    status: "RESUELTA",
-    category: "💧 Agua",
-    description: "Gotea agua del techo del garaje en la plaza P.2. El suelo está mojado.",
-    timeline: [
-      { label: "Reporte enviado", date: "Hoy, 10:20", done: true },
-      { label: "Asignado a Fontanería Pérez", date: "Hoy, 10:45", done: true },
-      { label: "Técnico en camino", date: "Hoy, 11:10", done: true },
-      { label: "Reparación finalizada", date: "Hoy, 12:30", done: true },
-      { label: "Validado por AF", date: "Hoy, 13:00", done: true },
-    ],
-  },
-};
-
-const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  PENDIENTE: { label: "Pendiente", color: "#92400e", bg: "#fef3c7" },
-  ASIGNADA: { label: "Asignada", color: "#1e40af", bg: "#dbeafe" },
-  EN_CURSO: { label: "En curso", color: "#7c3aed", bg: "#ede9fe" },
-  RESUELTA: { label: "Resuelta ✓", color: "#065f46", bg: "#d1fae5" },
+const STATUS_LABELS = {
+  NUEVA: { label: "Nueva", color: "#3b82f6", bg: "#eff6ff" },
+  EN_REVISION: { label: "En revisión", color: "#eab308", bg: "#fefce8" },
+  AGENDADA: { label: "Agendada", color: "#a855f7", bg: "#faf5ff" },
+  EN_PROCESO: { label: "En proceso", color: "#f97316", bg: "#fff7ed" },
+  RESUELTA: { label: "Resuelta", color: "#22c55e", bg: "#f0fdf4" },
+  CERRADA: { label: "Cerrada", color: "#64748b", bg: "#f8fafc" },
 };
 
 export default function IncidentDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const incident = MOCK[id ?? "1"];
+
+  const TENANT_ID = "org_aconvi_demo";
+
+  const { data: incident, isLoading } = useQuery({
+    ...api.incident.byId.queryOptions({ id: id as string, tenantId: TENANT_ID }),
+    enabled: !!id,
+  });
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={s.safe}>
+        <Stack.Screen options={{ title: "Incidencia" }} />
+        <View style={s.center}>
+          <ActivityIndicator size="large" color={PRIMARY} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!incident) {
     return (
@@ -65,7 +63,7 @@ export default function IncidentDetailScreen() {
     );
   }
 
-  const st = STATUS_LABELS[incident.status]!;
+  const st = STATUS_LABELS[incident.status as keyof typeof STATUS_LABELS] || { label: incident.status, color: "#92400e", bg: "#fef3c7" };
 
   return (
     <SafeAreaView style={s.safe} edges={["bottom"]}>
@@ -89,39 +87,59 @@ export default function IncidentDetailScreen() {
 
         {/* Meta info */}
         <View style={s.card}>
-          <Row label="Categoría" value={incident.category} />
+          <Row label="Prioridad" value={incident.priority ?? "NORMAL"} />
           <View style={s.divider} />
-          <Row label="Comunidad" value={incident.community} />
+          <Row label="Comunidad" value={incident.organizationId ?? ""} />
           <View style={s.divider} />
-          <Row label="Descripción" value={incident.description} />
+          <Row label="Descripción" value={incident.description ?? ""} />
         </View>
 
         {/* Timeline */}
         <Text style={s.sectionTitle}>Estado de la reparación</Text>
         <View style={s.card}>
-          {incident.timeline.map((step, i) => (
-            <View key={i} style={s.timelineRow}>
-              {/* Connector */}
-              <View style={s.timelineLeft}>
-                <View style={[s.timelineDot, step.done && s.timelineDotDone]}>
-                  {step.done && (
-                    <Text style={{ color: "#fff", fontSize: 10, fontWeight: "800" }}>✓</Text>
-                  )}
-                </View>
-                {i < incident.timeline.length - 1 && (
-                  <View style={[s.timelineLine, step.done && s.timelineLineDone]} />
-                )}
+          <View style={s.timelineRow}>
+            <View style={s.timelineLeft}>
+              <View style={[s.timelineDot, s.timelineDotDone]}>
+                <Text style={{ color: "#fff", fontSize: 10, fontWeight: "800" }}>✓</Text>
               </View>
-              <View style={s.timelineContent}>
-                <Text style={[s.timelineLabel, step.done && s.timelineLabelDone]}>
-                  {step.label}
-                </Text>
-                {step.done && (
-                  <Text style={s.timelineDate}>{step.date}</Text>
-                )}
+              <View style={[s.timelineLine, incident.assignedAt && s.timelineLineDone]} />
+            </View>
+            <View style={s.timelineContent}>
+              <Text style={[s.timelineLabel, s.timelineLabelDone]}>
+                Reporte enviado
+              </Text>
+              <Text style={s.timelineDate}>{incident.createdAt ? new Date(incident.createdAt).toLocaleDateString() : ""}</Text>
+            </View>
+          </View>
+          
+          <View style={s.timelineRow}>
+            <View style={s.timelineLeft}>
+              <View style={[s.timelineDot, incident.assignedAt && s.timelineDotDone]}>
+                {incident.assignedAt && <Text style={{ color: "#fff", fontSize: 10, fontWeight: "800" }}>✓</Text>}
+              </View>
+              <View style={[s.timelineLine, incident.resolvedAt && s.timelineLineDone]} />
+            </View>
+            <View style={s.timelineContent}>
+              <Text style={[s.timelineLabel, incident.assignedAt && s.timelineLabelDone]}>
+                Asignada
+              </Text>
+              {incident.assignedAt && <Text style={s.timelineDate}>{new Date(incident.assignedAt).toLocaleDateString()}</Text>}
+            </View>
+          </View>
+
+          <View style={s.timelineRow}>
+            <View style={s.timelineLeft}>
+              <View style={[s.timelineDot, incident.resolvedAt && s.timelineDotDone]}>
+                {incident.resolvedAt && <Text style={{ color: "#fff", fontSize: 10, fontWeight: "800" }}>✓</Text>}
               </View>
             </View>
-          ))}
+            <View style={s.timelineContent}>
+              <Text style={[s.timelineLabel, incident.resolvedAt && s.timelineLabelDone]}>
+                Resuelta
+              </Text>
+              {incident.resolvedAt && <Text style={s.timelineDate}>{new Date(incident.resolvedAt).toLocaleDateString()}</Text>}
+            </View>
+          </View>
         </View>
 
         {/* Rating CTA (only if resolved) */}
@@ -135,7 +153,7 @@ export default function IncidentDetailScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Report problem */}
+        {/* Report problem 
         <TouchableOpacity
           style={s.problemButton}
           onPress={() =>
@@ -151,6 +169,7 @@ export default function IncidentDetailScreen() {
         >
           <Text style={s.problemButtonText}>Informar de un problema</Text>
         </TouchableOpacity>
+        */}
       </ScrollView>
     </SafeAreaView>
   );

@@ -1,0 +1,67 @@
+src/app/(proveedor)/job/complete.tsx(82,17): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/app/(proveedor)/job/complete.tsx(89,42): error TS2345: Argument of type '{ id: string; tenantId: string; providerId: string; completionNote: string; }' is not assignable to parameter of type 'void'.
+src/app/(proveedor)/job/complete.tsx(188,29): error TS2345: Argument of type '{ id: string; tenantId: string; providerId: string; completionNote: string; }' is not assignable to parameter of type 'void'.
+src/app/(proveedor)/job/estimate.tsx(175,17): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/app/(proveedor)/job/estimate.tsx(191,27): error TS2345: Argument of type '{ id: string; tenantId: string; providerId: string; estimatedCost: number; estimatedDays: number; notes: string; }' is not assignable to parameter of type 'void'.
+src/app/(proveedor)/job/index.tsx(65,37): error TS2339: Property 'find' does not exist on type '{}'.
+src/app/(proveedor)/job/index.tsx(66,6): error TS7006: Parameter 'i' implicitly has an 'any' type.
+src/app/(proveedor)/job/index.tsx(69,8): error TS7053: Element implicitly has an 'any' type because expression of type '0' can't be used to index type '{}'.
+  Property '0' does not exist on type '{}'.
+src/app/(proveedor)/job/index.tsx(82,17): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/app/(proveedor)/job/index.tsx(90,27): error TS2345: Argument of type '{ id: any; tenantId: string; providerId: any; notes: string; }' is not assignable to parameter of type 'void'.
+src/app/(vecino)/common-areas.tsx(106,17): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/app/(vecino)/common-areas.tsx(112,25): error TS2345: Argument of type '{ tenantId: string; areaId: any; date: string; startTime: string; notes: string | undefined; }' is not assignable to parameter of type 'void'.
+src/app/(vecino)/common-areas.tsx(164,24): error TS2339: Property 'slots' does not exist on type '{}'.
+src/app/(vecino)/common-areas.tsx(164,37): error TS7031: Binding element 'time' implicitly has an 'any' type.
+src/app/(vecino)/common-areas.tsx(164,43): error TS7031: Binding element 'available' implicitly has an 'any' type.
+src/app/(vecino)/common-areas.tsx(164,54): error TS7031: Binding element 'booking' implicitly has an 'any' type.
+src/app/(vecino)/common-areas.tsx(247,17): error TS7006: Parameter 'e' implicitly has an 'any' type.
+src/app/(vecino)/common-areas.tsx(260,48): error TS2345: Argument of type '{ bookingId: string; }' is not assignable to parameter of type 'void'.
+src/app/(vecino)/common-areas.tsx(268,18): error TS2339: Property 'length' does not exist on type '{}'.
+src/app/(vecino)/common-areas.tsx(280,7): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: FlatListProps<any>): FlatList<any>', gave the following error.
+    Property 'length' is missing in type '{}' but required in type 'ArrayLike<any>'.
+  Overload 2 of 2, '(props: FlatListProps<any>, context: any): FlatList<any>', gave the following error.
+    Property 'length' is missing in type '{}' but required in type 'ArrayLike<any>'.
+src/app/(vecino)/common-areas.tsx(385,23): error TS2339: Property 'length' does not exist on type '{}'.
+src/app/(vecino)/common-areas.tsx(395,22): error TS2339: Property 'map' does not exist on type '{}'.
+src/app/(vecino)/communication.tsx(218,11): error TS2488: Type '{}' must have a '[Symbol.iterator]()' method that returns an iterator.
+src/app/(vecino)/communication.tsx(231,19): error TS2339: Property 'length' does not exist on type '{}'.
+src/app/(vecino)/communication.tsx(232,23): error TS2339: Property 'filter' does not exist on type '{}'.
+src/app/(vecino)/communication.tsx(233,21): error TS2339: Property 'filter' does not exist on type '{}'.
+src/app/(vecino)/communication.tsx(234,26): error TS2339: Property 'filter' does not exist on type '{}'.
+src/app/(vecino)/documents.tsx(26,66): error TS2304: Cannot find name 'alert'.
+src/app/(vecino)/documents.tsx(51,23): error TS2339: Property 'length' does not exist on type '{}'.
+src/app/(vecino)/documents.tsx(61,11): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: FlatListProps<any>): FlatList<any>', gave the following error.
+    Property 'length' is missing in type '{}' but required in type 'ArrayLike<any>'.
+  Overload 2 of 2, '(props: FlatListProps<any>, context: any): FlatList<any>', gave the following error.
+    Property 'length' is missing in type '{}' but required in type 'ArrayLike<any>'.
+src/app/(vecino)/index.tsx(89,7): error TS2339: Property 'filter' does not exist on type '{}'.
+src/app/(vecino)/index.tsx(89,15): error TS7006: Parameter 'v' implicitly has an 'any' type.
+src/app/(vecino)/index.tsx(90,13): error TS7006: Parameter 'a' implicitly has an 'any' type.
+src/app/(vecino)/index.tsx(90,16): error TS7006: Parameter 'b' implicitly has an 'any' type.
+src/app/(vecino)/index.tsx(93,24): error TS7053: Element implicitly has an 'any' type because expression of type '0' can't be used to index type '{}'.
+  Property '0' does not exist on type '{}'.
+src/app/(vecino)/index.tsx(96,34): error TS2339: Property 'filter' does not exist on type '{}'.
+src/app/(vecino)/index.tsx(96,42): error TS7006: Parameter 'i' implicitly has an 'any' type.
+src/app/(vecino)/index.tsx(100,33): error TS2339: Property 'filter' does not exist on type '{}'.
+src/app/(vecino)/index.tsx(100,41): error TS7006: Parameter 'b' implicitly has an 'any' type.
+src/app/(vecino)/voting.tsx(230,17): error TS7006: Parameter 'err' implicitly has an 'any' type.
+src/app/(vecino)/voting.tsx(251,25): error TS2345: Argument of type '{ sessionId: string; optionId: string; tenantId: string; }' is not assignable to parameter of type 'void'.
+src/app/(vecino)/voting.tsx(265,22): error TS2339: Property 'length' does not exist on type '{}'.
+src/app/(vecino)/voting.tsx(273,11): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: FlatListProps<any>): FlatList<any>', gave the following error.
+    Property 'length' is missing in type '{}' but required in type 'ArrayLike<any>'.
+  Overload 2 of 2, '(props: FlatListProps<any>, context: any): FlatList<any>', gave the following error.
+    Property 'length' is missing in type '{}' but required in type 'ArrayLike<any>'.
+src/app/confirm-access.tsx(33,15): error TS7006: Parameter 'err' implicitly has an 'any' type.
+src/app/confirm-access.tsx(52,26): error TS2345: Argument of type '{ token: string; }' is not assignable to parameter of type 'void'.
+src/app/confirm-access.tsx(66,44): error TS2345: Argument of type '{ token: string; }' is not assignable to parameter of type 'void'.
+src/app/post/[id].tsx(15,44): error TS2339: Property 'title' does not exist on type '{}'.
+src/app/post/[id].tsx(18,17): error TS2339: Property 'title' does not exist on type '{}'.
+src/app/post/[id].tsx(20,54): error TS2339: Property 'content' does not exist on type '{}'.
+src/utils/auth.ts(16,15): error TS2551: Property 'request' does not exist on type 'RequestContext<T>'. Did you mean 'onRequest'?
+src/utils/usePushNotifications.ts(10,35): error TS2322: Type 'Promise<{ shouldShowAlert: true; shouldPlaySound: true; shouldSetBadge: true; }>' is not assignable to type 'Promise<NotificationBehavior>'.
+  Type '{ shouldShowAlert: true; shouldPlaySound: true; shouldSetBadge: true; }' is missing the following properties from type 'NotificationBehavior': shouldShowBanner, shouldShowList
+src/utils/usePushNotifications.ts(33,28): error TS2345: Argument of type '{ token: string; platform: string; }' is not assignable to parameter of type 'void'.

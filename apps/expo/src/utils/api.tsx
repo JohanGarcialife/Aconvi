@@ -5,7 +5,7 @@ import superjson from "superjson";
 
 import type { AppRouter } from "@acme/api";
 
-import { authClient } from "./auth";
+import * as SecureStore from "expo-secure-store";
 import { getBaseUrl } from "./base-url";
 
 export const queryClient = new QueryClient({
@@ -33,14 +33,18 @@ export const trpc = createTRPCOptionsProxy<AppRouter>({
       httpBatchLink({
         transformer: superjson,
         url: `${getBaseUrl()}/api/trpc`,
-        headers() {
-          const headers = new Map<string, string>();
-          headers.set("x-trpc-source", "expo-react");
+        async headers() {
+          const headers: Record<string, string> = {
+            "x-trpc-source": "expo-react",
+          };
 
-          const cookies = authClient.getCookie();
-          if (cookies) {
-            headers.set("Cookie", cookies);
-          }
+          try {
+            const token = await SecureStore.getItemAsync("expo_session_token");
+            if (token) {
+              headers.Authorization = `Bearer ${token}`;
+            }
+          } catch (e) {}
+
           return headers;
         },
       }),

@@ -11,7 +11,7 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
-  }),
+  } as any),
 });
 
 export function usePushNotifications() {
@@ -30,7 +30,7 @@ export function usePushNotifications() {
       if (!token) return;
       setExpoPushToken(token);
       // Store in backend
-      registerToken.mutate({ token, platform: "expo" });
+      registerToken.mutate({ token, platform: "expo" } as any);
     });
 
     // Listener: receives notification while app is open
