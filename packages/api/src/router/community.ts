@@ -6,7 +6,7 @@ import { organization, member, user } from "@acme/db/schema";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 
 // Demo fallback user for operations that require an author
-const DEMO_OWNER_ID = "test-user-jluis-1776971864823";
+const DEMO_OWNER_ID = "user_admin";
 
 export const communityRouter = createTRPCRouter({
   // ── List all communities the demo AF manages ──────────────────────────────

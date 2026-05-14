@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 export const metadata = {
@@ -88,23 +89,7 @@ export default function LandingPage() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: 8,
-              background: "linear-gradient(135deg, #00bda5 0%, #0891b2 100%)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontWeight: 800,
-              fontSize: 14,
-              color: "#fff",
-            }}
-          >
-            A
-          </div>
-          <span style={{ fontWeight: 700, fontSize: 18, color: "#18181b" }}>Aconvi</span>
+          <Image src="/logo.png" alt="Aconvi" width={140} height={46} style={{ objectFit: 'contain' }} />
         </div>
         <Link
           href="/login"

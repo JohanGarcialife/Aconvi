@@ -45,55 +45,19 @@ export function AppSidebar() {
 
   return (
     <Sidebar className="border-r border-slate-200 bg-white">
-      <SidebarHeader className="px-2 py-1 border-b border-slate-100">
-        <Link href="/incidents" className="flex items-baseline no-underline select-none">
-          {/* <span
-            style={{
-              fontFamily: "'Inter', 'Geist', sans-serif",
-              fontWeight: 800,
-              fontSize: "1.6rem",
-              color: "#1a2332",
-              letterSpacing: "-0.04em",
-              lineHeight: 1,
-            }}
-          >
-            {"A"}
-          </span>
-          <span
-            style={{
-              width: "6px",
-              height: "6px",
-              borderRadius: "50%",
-              background: "#4aa19b",
-              display: "inline-block",
-              marginBottom: "0.55rem",
-              marginLeft: "1px",
-              marginRight: "1px",
-              flexShrink: 0,
-            }}
-          />
-          <span
-            style={{
-              fontFamily: "'Inter', 'Geist', sans-serif",
-              fontWeight: 800,
-              fontSize: "1.6rem",
-              color: "#1a2332",
-              letterSpacing: "-0.04em",
-              lineHeight: 1,
-            }}
-          >
-            convi
-          </span> */}
+      <SidebarHeader className="px-4 py-3 border-b border-slate-100 flex items-center justify-center">
+        <Link href="/incidents" className="flex items-center justify-center w-full no-underline select-none">
           <Image
             src="/logo.png"
             alt="Logo"
-            width={300}
-            height={100}
+            width={140}
+            height={46}
+            className="object-contain"
           />
         </Link>
       </SidebarHeader>
 
-      <SidebarContent className="px-3 py-4">
+      <SidebarContent className="px-3 py-3">
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu className="gap-0.5">

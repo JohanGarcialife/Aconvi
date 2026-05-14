@@ -278,7 +278,7 @@ export default function DocumentsPage() {
 
   const handleDelete = (id: string) => {
     if (confirm("¿Eliminar este documento?")) {
-      deleteMutation.mutate({ id });
+      deleteMutation.mutate({ tenantId: TENANT_ID, id });
     }
   };
 

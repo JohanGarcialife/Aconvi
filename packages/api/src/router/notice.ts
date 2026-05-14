@@ -6,7 +6,7 @@ import { sendPushToAllMembers } from "./notification";
 
 import { createTRPCRouter, publicProcedure } from "../trpc";
 
-const DEMO_AUTHOR_ID = "test-user-jluis-1776971864823";
+const DEMO_AUTHOR_ID = "user_admin";
 
 export const NOTICE_TYPES = ["COMUNICADO", "AVISO", "URGENTE"] as const;
 

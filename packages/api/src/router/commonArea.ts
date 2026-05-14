@@ -1,7 +1,7 @@
 import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod";
 import { commonArea, commonAreaBooking } from "@acme/db/schema";
-import { createTRPCRouter, tenantProcedure, protectedProcedure } from "../trpc";
+import { createTRPCRouter, publicProcedure, protectedProcedure } from "../trpc";
 import { sendPushToUser } from "./notification";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -20,22 +20,24 @@ function generateSlots(openTime: string, closeTime: string, slotMinutes: number)
   return slots;
 }
 
+const DEMO_USER_ID = "user_admin";
+
 // ─── Router ───────────────────────────────────────────────────────────────────
 export const commonAreaRouter = createTRPCRouter({
 
   // List all areas for a tenant
-  all: tenantProcedure.query(async ({ ctx, input }) => {
-    return ctx.db.query.commonArea.findMany({
-      where: and(
-        eq(commonArea.organizationId, input.tenantId),
-        eq(commonArea.isActive, true),
-      ),
-    });
-  }),
+  all: publicProcedure
+    .input(z.object({ tenantId: z.string().min(1) }))
+    .query(async ({ ctx, input }) => {
+      return ctx.db.query.commonArea.findMany({
+        where: eq(commonArea.organizationId, input.tenantId),
+        orderBy: [desc(commonArea.createdAt)],
+      });
+    }),
 
   // Get one area with its bookings for a given date
-  availability: tenantProcedure
-    .input(z.object({ areaId: z.string().uuid(), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }))
+  availability: publicProcedure
+    .input(z.object({ tenantId: z.string().min(1), areaId: z.string().uuid(), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }))
     .query(async ({ ctx, input }) => {
       const area = await ctx.db.query.commonArea.findFirst({
         where: eq(commonArea.id, input.areaId),
@@ -52,7 +54,6 @@ export const commonAreaRouter = createTRPCRouter({
       });
 
       const allSlots = generateSlots(area.openTime, area.closeTime, area.slotDurationMinutes);
-
       const bookedSlots = new Set(bookings.map((b) => b.startTime));
 
       return {
@@ -65,14 +66,16 @@ export const commonAreaRouter = createTRPCRouter({
       };
     }),
 
-  // Create a booking
-  book: tenantProcedure
+  // Create a booking (uses demo user if no session)
+  book: publicProcedure
     .input(
       z.object({
+        tenantId: z.string().min(1),
         areaId: z.string().uuid(),
         date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
         startTime: z.string().regex(/^\d{2}:\d{2}$/),
         notes: z.string().optional(),
+        userId: z.string().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -81,7 +84,6 @@ export const commonAreaRouter = createTRPCRouter({
       });
       if (!area) throw new Error("Zona no encontrada");
 
-      // Check slot is free
       const conflict = await ctx.db.query.commonAreaBooking.findFirst({
         where: and(
           eq(commonAreaBooking.commonAreaId, input.areaId),
@@ -92,17 +94,18 @@ export const commonAreaRouter = createTRPCRouter({
       });
       if (conflict) throw new Error("Este horario ya está reservado");
 
-      // Compute end time
       const [h = 0, m = 0] = input.startTime.split(":").map(Number);
       const endMinutes = h * 60 + m + area.slotDurationMinutes;
       const endTime = `${Math.floor(endMinutes / 60).toString().padStart(2, "0")}:${(endMinutes % 60).toString().padStart(2, "0")}`;
+
+      const userId = input.userId ?? DEMO_USER_ID;
 
       const [booking] = await ctx.db
         .insert(commonAreaBooking)
         .values({
           id: crypto.randomUUID(),
           commonAreaId: input.areaId,
-          userId: ctx.session.user.id,
+          userId,
           date: input.date,
           startTime: input.startTime,
           endTime,
@@ -111,55 +114,26 @@ export const commonAreaRouter = createTRPCRouter({
         })
         .returning();
 
-      // Push notification for confirmation
-      await sendPushToUser(ctx.db, ctx.session.user.id, {
-        title: "✅ Reserva confirmada",
-        body: `Has reservado ${area.name} para el ${input.date} a las ${input.startTime}`,
-        data: { type: "booking_confirmed" },
-      });
-
       return booking;
     }),
 
   // Cancel a booking
-  cancel: protectedProcedure
+  cancel: publicProcedure
     .input(z.object({ bookingId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       await ctx.db
         .update(commonAreaBooking)
         .set({ status: "CANCELADA" })
-        .where(
-          and(
-            eq(commonAreaBooking.id, input.bookingId),
-            eq(commonAreaBooking.userId, ctx.session.user.id),
-          ),
-        );
-
-      await sendPushToUser(ctx.db, ctx.session.user.id, {
-        title: "❌ Reserva cancelada",
-        body: "Tu reserva ha sido cancelada correctamente.",
-        data: { type: "booking_cancelled" },
-      });
+        .where(eq(commonAreaBooking.id, input.bookingId));
 
       return { ok: true };
     }),
 
-  // My upcoming bookings
-  myBookings: protectedProcedure.query(async ({ ctx }) => {
-    return ctx.db.query.commonAreaBooking.findMany({
-      where: and(
-        eq(commonAreaBooking.userId, ctx.session.user.id),
-        eq(commonAreaBooking.status, "CONFIRMADA"),
-      ),
-      with: { commonArea: true },
-      orderBy: (t, { asc }) => [asc(t.date), asc(t.startTime)],
-    });
-  }),
-
   // ── AF: create a new common area ─────────────────────────────────────────
-  create: tenantProcedure
+  create: publicProcedure
     .input(
       z.object({
+        tenantId: z.string().min(1),
         name: z.string().min(1).max(256),
         description: z.string().optional(),
         openTime: z.string().regex(/^\d{2}:\d{2}$/).default("08:00"),
@@ -185,27 +159,30 @@ export const commonAreaRouter = createTRPCRouter({
     }),
 
   // ── AF: toggle active/inactive ────────────────────────────────────────────
-  toggleArea: tenantProcedure
-    .input(z.object({ areaId: z.string().uuid(), isActive: z.boolean() }))
+  toggleArea: publicProcedure
+    .input(z.object({ tenantId: z.string().min(1), areaId: z.string().uuid(), isActive: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       await ctx.db
         .update(commonArea)
         .set({ isActive: input.isActive })
-        .where(eq(commonArea.id, input.areaId));
+        .where(and(
+          eq(commonArea.id, input.areaId),
+          eq(commonArea.organizationId, input.tenantId),
+        ));
       return { ok: true };
     }),
 
   // ── AF: view all bookings for the community ───────────────────────────────
-  allBookings: tenantProcedure
+  allBookings: publicProcedure
     .input(
       z.object({
+        tenantId: z.string().min(1),
         areaId: z.string().uuid().optional(),
         date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
       }),
     )
     .query(async ({ ctx, input }) => {
-      // Build where conditions dynamically
-      const conditions = [];
+      const conditions: any[] = [];
       if (input.areaId) conditions.push(eq(commonAreaBooking.commonAreaId, input.areaId));
       if (input.date) conditions.push(eq(commonAreaBooking.date, input.date));
 
@@ -215,7 +192,7 @@ export const commonAreaRouter = createTRPCRouter({
           commonArea: {
             columns: { id: true, name: true, organizationId: true },
           },
-          user: { columns: { id: true, name: true, phoneNumber: true } },
+          user: { columns: { id: true, name: true } },
         },
         orderBy: [desc(commonAreaBooking.date), desc(commonAreaBooking.startTime)],
       });
