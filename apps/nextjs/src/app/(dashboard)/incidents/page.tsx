@@ -673,10 +673,24 @@ export default function IncidentsPage() {
                   </div>
                   <StatusBadge status={incident.priority === "URGENTE" ? "URGENTE" : incident.status} />
                 </div>
-                <p style={{ fontSize: 11, color: "#9ca3af", margin: "4px 0 0 14px" }}>
-                  Residencial Los Olivos
-                  <br />
-                  Av. de Andalucía, 105
+                {/* Categoría */}
+                {(incident as any).category && (
+                  <span style={{
+                    display: "inline-block",
+                    fontSize: 10,
+                    fontWeight: 600,
+                    color: "#6366f1",
+                    background: "#eef2ff",
+                    borderRadius: 4,
+                    padding: "1px 6px",
+                    margin: "4px 0 2px 14px",
+                    textTransform: "capitalize",
+                  }}>
+                    {(incident as any).category}
+                  </span>
+                )}
+                <p style={{ fontSize: 11, color: "#9ca3af", margin: "2px 0 0 14px" }}>
+                  {incident.reporter?.name ?? "Vecino"}
                 </p>
               </li>
             ))}
@@ -708,7 +722,24 @@ export default function IncidentsPage() {
               {/* Timeline */}
               <StatusTimeline currentStatus={selected.status} />
 
-              {/* Photo */}
+              {/* Categoría */}
+              {(selected as any).category && (
+                <span style={{
+                  display: "inline-block",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: "#6366f1",
+                  background: "#eef2ff",
+                  borderRadius: 6,
+                  padding: "2px 10px",
+                  marginBottom: 16,
+                  textTransform: "capitalize",
+                }}>
+                  📂 {(selected as any).category}
+                </span>
+              )}
+
+              {/* Photo inicial */}
               <div
                 style={{
                   borderRadius: 12,
@@ -726,9 +757,36 @@ export default function IncidentsPage() {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={selected.photoUrl} alt="Incidencia" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 ) : (
-                  <span style={{ color: "#d1d5db", fontSize: 13 }}>Sin fotografía</span>
+                  <span style={{ color: "#d1d5db", fontSize: 13 }}>Sin fotografía inicial</span>
                 )}
               </div>
+
+              {/* Foto final del proveedor (solo si RESUELTA) */}
+              {selected.status === "RESUELTA" && (selected as any).finalPhotoUrl && (
+                <section style={{ marginBottom: 24 }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 700, color: "#0F1B2B", marginBottom: 8 }}>
+                    ✅ Foto de cierre (proveedor)
+                  </h3>
+                  <div style={{
+                    borderRadius: 12,
+                    overflow: "hidden",
+                    background: "#f0fdf4",
+                    border: "2px solid #bbf7d0",
+                    aspectRatio: "16/7",
+                    maxWidth: 520,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={(selected as any).finalPhotoUrl}
+                      alt="Foto final"
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    />
+                  </div>
+                </section>
+              )}
 
               {/* Description */}
               <section style={{ marginBottom: 24 }}>
@@ -786,6 +844,62 @@ export default function IncidentsPage() {
                 </div>
 
                 <AddNoteForm incidentId={selected.id} onAdded={() => refetch()} />
+              </section>
+
+              {/* Historial de actividad (Timeline) */}
+              <section style={{ marginTop: 32 }}>
+                <h3 style={{ fontSize: 14, fontWeight: 700, color: "#0F1B2B", marginBottom: 16 }}>
+                  Historial de actividad (Trazabilidad)
+                </h3>
+
+                {(selected.history ?? []).length === 0 && (
+                  <p style={{ fontSize: 13, color: "#9ca3af", marginBottom: 8 }}>Sin historial registrado.</p>
+                )}
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 0, position: "relative", paddingLeft: 6 }}>
+                  {/* Vertical line connecting timeline events */}
+                  {(selected.history ?? []).length > 1 && (
+                    <div style={{ position: "absolute", left: 12, top: 10, bottom: 20, width: 2, background: "#e5e7eb" }} />
+                  )}
+                  
+                  {(selected.history ?? []).map((entry: any, index: number) => {
+                    let actionColor = "#00BDA5";
+                    if (entry.action === "CREATED") { actionColor = "#3b82f6"; }
+                    if (entry.action === "ASSIGNED") { actionColor = "#8b5cf6"; }
+                    if (entry.action === "COMPLETED") { actionColor = "#10b981"; }
+                    if (entry.action === "STATUS_CHANGED" && entry.newStatus === "RECHAZADA") { actionColor = "#ef4444"; }
+
+                    return (
+                      <div key={entry.id} style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 20, position: "relative" }}>
+                        <div style={{ 
+                          width: 14, height: 14, borderRadius: "50%", background: actionColor, 
+                          flexShrink: 0, marginTop: 4, zIndex: 1, border: "2px solid #fff",
+                          boxShadow: "0 0 0 1px #e5e7eb"
+                        }} />
+                        <div style={{ flex: 1 }}>
+                          <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#0F1B2B" }}>
+                            {entry.actorName} 
+                            {entry.action === "CREATED" ? (
+                              <span style={{ fontWeight: 400, color: "#6b7280" }}> reportó la incidencia</span>
+                            ) : (
+                              <span style={{ fontWeight: 400, color: "#6b7280" }}> cambió el estado a <span style={{ fontWeight: 700, color: "#111827" }}>{entry.newStatus}</span></span>
+                            )}
+                          </p>
+                          {entry.comment && (
+                            <p style={{ margin: "6px 0 0", fontSize: 13, color: "#4b5563", background: "#f9fafb", padding: "8px 12px", borderRadius: 8, border: "1px solid #f3f4f6", display: "inline-block" }}>
+                              {entry.comment}
+                            </p>
+                          )}
+                          <p style={{ margin: "4px 0 0", fontSize: 11, color: "#9ca3af" }}>
+                            {new Date(entry.createdAt).toLocaleString("es-ES", {
+                              day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit"
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </section>
             </div>
 

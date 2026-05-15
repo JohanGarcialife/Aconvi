@@ -95,51 +95,49 @@ export default function IncidentDetailScreen() {
         </View>
 
         {/* Timeline */}
-        <Text style={s.sectionTitle}>Estado de la reparación</Text>
+        <Text style={s.sectionTitle}>Historial de la reparación</Text>
         <View style={s.card}>
-          <View style={s.timelineRow}>
-            <View style={s.timelineLeft}>
-              <View style={[s.timelineDot, s.timelineDotDone]}>
-                <Text style={{ color: "#fff", fontSize: 10, fontWeight: "800" }}>✓</Text>
-              </View>
-              <View style={[s.timelineLine, incident.assignedAt && s.timelineLineDone]} />
-            </View>
-            <View style={s.timelineContent}>
-              <Text style={[s.timelineLabel, s.timelineLabelDone]}>
-                Reporte enviado
-              </Text>
-              <Text style={s.timelineDate}>{incident.createdAt ? new Date(incident.createdAt).toLocaleDateString() : ""}</Text>
-            </View>
-          </View>
-          
-          <View style={s.timelineRow}>
-            <View style={s.timelineLeft}>
-              <View style={[s.timelineDot, incident.assignedAt && s.timelineDotDone]}>
-                {incident.assignedAt && <Text style={{ color: "#fff", fontSize: 10, fontWeight: "800" }}>✓</Text>}
-              </View>
-              <View style={[s.timelineLine, incident.resolvedAt && s.timelineLineDone]} />
-            </View>
-            <View style={s.timelineContent}>
-              <Text style={[s.timelineLabel, incident.assignedAt && s.timelineLabelDone]}>
-                Asignada
-              </Text>
-              {incident.assignedAt && <Text style={s.timelineDate}>{new Date(incident.assignedAt).toLocaleDateString()}</Text>}
-            </View>
-          </View>
+          {incident.history && incident.history.length > 0 ? (
+            incident.history.map((entry: any, index: number) => {
+              const isLast = index === incident.history.length - 1;
+              let actionColor = PRIMARY;
+              if (entry.action === "CREATED") { actionColor = "#3b82f6"; }
+              if (entry.action === "ASSIGNED") { actionColor = "#a855f7"; }
+              if (entry.action === "COMPLETED") { actionColor = "#22c55e"; }
+              if (entry.action === "STATUS_CHANGED" && entry.newStatus === "RECHAZADA") { actionColor = "#ef4444"; }
 
-          <View style={s.timelineRow}>
-            <View style={s.timelineLeft}>
-              <View style={[s.timelineDot, incident.resolvedAt && s.timelineDotDone]}>
-                {incident.resolvedAt && <Text style={{ color: "#fff", fontSize: 10, fontWeight: "800" }}>✓</Text>}
-              </View>
-            </View>
-            <View style={s.timelineContent}>
-              <Text style={[s.timelineLabel, incident.resolvedAt && s.timelineLabelDone]}>
-                Resuelta
-              </Text>
-              {incident.resolvedAt && <Text style={s.timelineDate}>{new Date(incident.resolvedAt).toLocaleDateString()}</Text>}
-            </View>
-          </View>
+              return (
+                <View key={entry.id} style={s.timelineRow}>
+                  <View style={s.timelineLeft}>
+                    <View style={[s.timelineDot, { borderColor: actionColor, backgroundColor: actionColor }]}>
+                      <Text style={{ color: "#fff", fontSize: 10, fontWeight: "800" }}>✓</Text>
+                    </View>
+                    {!isLast && <View style={[s.timelineLine, { backgroundColor: `${actionColor}50` }]} />}
+                  </View>
+                  <View style={s.timelineContent}>
+                    <Text style={s.timelineLabelDone}>
+                      {entry.action === "CREATED" ? "Reporte enviado" :
+                       entry.action === "ASSIGNED" ? "Asignada a especialista" :
+                       entry.action === "COMPLETED" ? "Resuelta" :
+                       entry.newStatus}
+                    </Text>
+                    {entry.comment && (
+                      <Text style={{ fontSize: 13, color: "#475569", marginTop: 4, fontStyle: "italic" }}>
+                        "{entry.comment}"
+                      </Text>
+                    )}
+                    <Text style={s.timelineDate}>
+                      {new Date(entry.createdAt).toLocaleString("es-ES", {
+                        day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit"
+                      })}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })
+          ) : (
+            <Text style={{ fontSize: 13, color: MUTED }}>Sin historial</Text>
+          )}
         </View>
 
         {/* Rating CTA (only if resolved) */}

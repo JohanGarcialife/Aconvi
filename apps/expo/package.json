@@ -30,6 +30,7 @@
     "expo-constants": "~18.0.10",
     "expo-dev-client": "~6.0.16",
     "expo-device": "~8.0.10",
+    "expo-image-picker": "^55.0.20",
     "expo-linking": "~8.0.8",
     "expo-notifications": "~0.32.16",
     "expo-router": "~6.0.13",
@@ -62,7 +63,7 @@
     "eslint": "catalog:",
     "metro-cache": "^0.84.2",
     "prettier": "catalog:",
-    "tailwindcss": "catalog:",
+    "tailwindcss": "^3.4.19",
     "typescript": "catalog:"
   },
   "prettier": "@acme/prettier-config"

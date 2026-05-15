@@ -34,6 +34,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     reactCanary: true,
     reactCompiler: true,
   },
+  extra: {
+    eas: {
+      projectId: "1713543a-27cf-4db0-9da2-64ddf821d5d7",
+    },
+  },
   plugins: [
     "expo-router",
     "expo-secure-store",

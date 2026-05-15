@@ -91,7 +91,10 @@ export const incident = pgTable("incident", (t) => ({
   id: t.uuid().notNull().primaryKey().defaultRandom(),
   title: t.varchar({ length: 256 }).notNull(),
   description: t.text().notNull(),
-  photoUrl: t.varchar({ length: 1024 }),
+  category: t.varchar({ length: 64 }).notNull().default("otro"),
+  photoUrl: t.text("photo_url"),
+  // Foto final subida por el proveedor al cerrar el trabajo
+  finalPhotoUrl: t.text("final_photo_url"),
   status: t.varchar({ length: 64 }).notNull().default("RECIBIDA"),
   priority: t.varchar({ length: 64 }).notNull().default("MEDIA"), // BAJA, MEDIA, ALTA, URGENTE
   organizationId: t.text("organization_id")
@@ -139,6 +142,7 @@ export const incidentRelations = relations(incident, ({ one, many }) => ({
     references: [provider.id],
   }),
   notes: many(incidentNote),
+  history: many(incidentHistory),
 }));
 
 // ─── Incident Note ────────────────────────────────────────────────────────────
@@ -164,6 +168,28 @@ export const incidentNoteRelations = relations(incidentNote, ({ one }) => ({
     references: [user.id],
   }),
 }));
+
+// ─── Incident History (Trazabilidad) ──────────────────────────────────────────
+export const incidentHistory = pgTable("incident_history", (t) => ({
+  id: t.uuid().notNull().primaryKey().defaultRandom(),
+  incidentId: t.uuid("incident_id")
+    .notNull()
+    .references(() => incident.id, { onDelete: "cascade" }),
+  actorName: t.varchar("actor_name", { length: 128 }).notNull(),
+  action: t.varchar({ length: 64 }).notNull(), // CREATED, STATUS_CHANGED, ASSIGNED, COMPLETED, COMMENT
+  previousStatus: t.varchar("previous_status", { length: 64 }),
+  newStatus: t.varchar("new_status", { length: 64 }),
+  comment: t.text(),
+  createdAt: t.timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+}));
+
+export const incidentHistoryRelations = relations(incidentHistory, ({ one }) => ({
+  incident: one(incident, {
+    fields: [incidentHistory.incidentId],
+    references: [incident.id],
+  }),
+}));
+
 
 // ─── Notice ───────────────────────────────────────────────────────────────────
 export const notice = pgTable("notice", (t) => ({
