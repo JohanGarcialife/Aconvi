@@ -1,172 +1,57 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTRPC } from "~/trpc/react";
-import {
-  Search,
-  Filter,
-  Check,
-  Star,
-  Clock,
-  Briefcase,
-  ChevronRight,
-  Plus,
-  UserRound,
-  XCircle,
-  CheckCircle2,
-} from "lucide-react";
+import { Check, Star, Briefcase, Clock, Search, Plus, AlertTriangle, CheckCircle2, XCircle, ChevronDown, ChevronUp, ArrowRight } from "lucide-react";
+import Link from "next/link";
 
-// ─── Tenant (stub — replace with session org) ─────────────────────────────────
 const TENANT_ID = "org_aconvi_demo";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-type IncidentStatus =
-  | "RECIBIDA"
-  | "EN_REVISION"
-  | "AGENDADA"
-  | "EN_CURSO"
-  | "RESUELTA"
-  | "RECHAZADA";
+type Status = "RECIBIDA" | "EN_REVISION" | "AGENDADA" | "EN_CURSO" | "RESUELTA" | "RECHAZADA";
 
-const TIMELINE_STEPS: { key: IncidentStatus; label: string }[] = [
-  { key: "RECIBIDA", label: "Recibida" },
-  { key: "EN_REVISION", label: "En revisión" },
-  { key: "AGENDADA", label: "Agendada" },
-  { key: "EN_CURSO", label: "En curso" },
-  { key: "RESUELTA", label: "Resuelta" },
-];
-
-const STATUS_STEP_INDEX: Record<string, number> = {
-  RECIBIDA: 0,
-  EN_REVISION: 1,
-  AGENDADA: 2,
-  EN_CURSO: 3,
-  RESUELTA: 4,
-  RECHAZADA: -1,
+const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
+  RECIBIDA:    { label: "Sin asignar",  cls: "bg-amber-50 text-amber-700 border border-amber-200" },
+  EN_REVISION: { label: "En revisión",  cls: "bg-blue-50 text-blue-700 border border-blue-200" },
+  AGENDADA:    { label: "Agendada",     cls: "bg-violet-50 text-violet-700 border border-violet-200" },
+  EN_CURSO:    { label: "En curso",     cls: "bg-cyan-50 text-cyan-700 border border-cyan-200" },
+  RESUELTA:    { label: "Resuelta",     cls: "bg-emerald-50 text-emerald-700 border border-emerald-200" },
+  RECHAZADA:   { label: "No procede",   cls: "bg-red-50 text-red-700 border border-red-200" },
 };
 
-// ─── Status Badge ─────────────────────────────────────────────────────────────
+const PRIORITY_COLOR: Record<string, string> = {
+  URGENTE: "bg-red-500",
+  ALTA: "bg-orange-400",
+  MEDIA: "bg-blue-400",
+  BAJA: "bg-slate-300",
+};
+
+const STEPS = ["RECIBIDA", "EN_REVISION", "AGENDADA", "EN_CURSO", "RESUELTA"];
+
 function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { label: string; color: string; bg: string }> = {
-    RECIBIDA:    { label: "Pendiente",   color: "#92400e", bg: "#fef3c7" },
-    EN_REVISION: { label: "En revisión", color: "#1e40af", bg: "#dbeafe" },
-    AGENDADA:    { label: "Agendada",    color: "#5b21b6", bg: "#ede9fe" },
-    EN_CURSO:    { label: "En curso",    color: "#065f46", bg: "#d1fae5" },
-    RESUELTA:    { label: "Resuelta",    color: "#065f46", bg: "#d1fae5" },
-    RECHAZADA:   { label: "Rechazada",   color: "#991b1b", bg: "#fee2e2" },
-    URGENTE:     { label: "Urgente",     color: "#991b1b", bg: "#fee2e2" },
-  };
-  const s = map[status] ?? { label: status, color: "#374151", bg: "#f3f4f6" };
-  return (
-    <span
-      style={{
-        background: s.bg,
-        color: s.color,
-        borderRadius: "999px",
-        padding: "2px 10px",
-        fontSize: "12px",
-        fontWeight: 600,
-        whiteSpace: "nowrap",
-      }}
-    >
-      {s.label}
-    </span>
-  );
+  const s = STATUS_LABEL[status] ?? { label: status, cls: "bg-slate-100 text-slate-600" };
+  return <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${s.cls}`}>{s.label}</span>;
 }
 
-// ─── Priority Dot ─────────────────────────────────────────────────────────────
-function PriorityDot({ priority }: { priority: string }) {
-  const colors: Record<string, string> = {
-    URGENTE: "#ef4444",
-    ALTA: "#f97316",
-    MEDIA: "#3b82f6",
-    BAJA: "#9ca3af",
-  };
+function Timeline({ status }: { status: string }) {
+  const idx = STEPS.indexOf(status);
   return (
-    <span
-      style={{
-        width: 8,
-        height: 8,
-        borderRadius: "50%",
-        background: colors[priority] ?? "#9ca3af",
-        display: "inline-block",
-        flexShrink: 0,
-      }}
-    />
-  );
-}
-
-// ─── Status Timeline ──────────────────────────────────────────────────────────
-function StatusTimeline({
-  currentStatus,
-}: {
-  currentStatus: string;
-}) {
-  const activeIdx = STATUS_STEP_INDEX[currentStatus] ?? 0;
-  const rejected = currentStatus === "RECHAZADA";
-
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 0, margin: "20px 0" }}>
-      {TIMELINE_STEPS.map((step, idx) => {
-        const done = activeIdx > idx;
-        const active = activeIdx === idx && !rejected;
-        const future = activeIdx < idx;
-
+    <div className="flex items-center gap-0 my-5">
+      {STEPS.map((step, i) => {
+        const done = idx > i;
+        const active = idx === i;
+        const label = STATUS_LABEL[step]?.label ?? step;
         return (
-          <div
-            key={step.key}
-            style={{ display: "flex", alignItems: "center", flex: idx < 4 ? 1 : 0 }}
-          >
-            {/* Step circle */}
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-              <div
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: "50%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 11,
-                  fontWeight: 700,
-                  border: active ? "2.5px solid #00BDA5" : done ? "none" : "2px solid #d1d5db",
-                  background: done ? "#00BDA5" : active ? "#fff" : "#f9fafb",
-                  color: done ? "#fff" : active ? "#00BDA5" : "#9ca3af",
-                  flexShrink: 0,
-                  transition: "all 0.2s",
-                }}
-              >
-                {done ? (
-                  <Check size={14} strokeWidth={3} />
-                ) : (
-                  <span>{idx + 1}</span>
-                )}
+          <div key={step} className="flex items-center flex-1 last:flex-none">
+            <div className="flex flex-col items-center gap-1">
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all
+                ${done ? "bg-teal-500 border-teal-500 text-white" : active ? "border-teal-500 text-teal-600 bg-white" : "border-slate-200 text-slate-400 bg-slate-50"}`}>
+                {done ? <Check size={13} strokeWidth={3} /> : i + 1}
               </div>
-              <span
-                style={{
-                  fontSize: 10,
-                  color: done || active ? "#0F1B2B" : "#9ca3af",
-                  fontWeight: active ? 700 : 400,
-                  textAlign: "center",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {step.label}
-              </span>
+              <span className={`text-[10px] whitespace-nowrap ${done || active ? "text-slate-800 font-semibold" : "text-slate-400"}`}>{label}</span>
             </div>
-
-            {/* Connector line */}
-            {idx < TIMELINE_STEPS.length - 1 && (
-              <div
-                style={{
-                  flex: 1,
-                  height: 2,
-                  background: done ? "#00BDA5" : "#e5e7eb",
-                  marginBottom: 18,
-                  transition: "background 0.2s",
-                }}
-              />
+            {i < STEPS.length - 1 && (
+              <div className={`flex-1 h-0.5 mb-4 mx-1 ${done ? "bg-teal-500" : "bg-slate-200"}`} />
             )}
           </div>
         );
@@ -175,344 +60,87 @@ function StatusTimeline({
   );
 }
 
-// ─── Provider Panel ───────────────────────────────────────────────────────────
-function ProviderPanel({
-  providers,
-  selectedProviderId,
-  onSelect,
-  onAssign,
-  isAssigning,
-  currentProviderId,
-}: {
-  providers: any[];
-  selectedProviderId: string | null;
-  onSelect: (id: string) => void;
-  onAssign: () => void;
-  isAssigning: boolean;
-  currentProviderId?: string | null;
-}) {
-  const recommended = providers[0];
-  const others = providers.slice(1);
-  const selected =
-    providers.find((p) => p.id === selectedProviderId) ?? recommended;
-
-  return (
-    <div
-      style={{
-        width: 300,
-        flexShrink: 0,
-        borderLeft: "1px solid #f0f0f0",
-        background: "#fff",
-        display: "flex",
-        flexDirection: "column",
-        overflowY: "auto",
-      }}
-    >
-      {/* Recommended */}
-      {recommended && (
-        <div style={{ padding: "20px 20px 16px", borderBottom: "1px solid #f0f0f0" }}>
-          <p style={{ fontSize: 12, fontWeight: 700, color: "#9ca3af", marginBottom: 14, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-            Proveedor recomendado
-          </p>
-          <div style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: 14 }}>
-            <div
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: "50%",
-                background: "#0F1B2B",
-                color: "#fff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontWeight: 700,
-                fontSize: 14,
-                flexShrink: 0,
-              }}
-            >
-              {recommended.avatarInitials}
-            </div>
-            <div>
-              <p style={{ fontWeight: 700, fontSize: 14, color: "#0F1B2B", margin: 0 }}>
-                {recommended.name}
-              </p>
-              <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
-                <Star size={12} fill="#f59e0b" color="#f59e0b" />
-                <span style={{ fontSize: 13, fontWeight: 700, color: "#0F1B2B" }}>
-                  {recommended.rating.toFixed(1)}
-                </span>
-              </div>
-              {recommended.isTrusted && (
-                <p style={{ fontSize: 11, color: "#00BDA5", margin: "2px 0 0" }}>
-                  Proveedor de confianza
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Stats */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Briefcase size={13} color="#9ca3af" />
-              <span style={{ fontSize: 13, color: "#374151" }}>
-                <strong>{recommended.completedJobs}</strong>{" "}
-                <span style={{ color: "#9ca3af" }}>Intervenciones realizadas</span>
-              </span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Clock size={13} color="#9ca3af" />
-              <span style={{ fontSize: 13, color: "#374151" }}>
-                <strong>{recommended.avgDaysToResolve} días</strong>{" "}
-                <span style={{ color: "#9ca3af" }}>Tiempo medio</span>
-              </span>
-            </div>
-            {recommended.priceRangeMin != null && (
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 13, color: "#9ca3af" }}>€</span>
-                <span style={{ fontSize: 13, color: "#374151" }}>
-                  <strong>
-                    {recommended.priceRangeMin}€ – {recommended.priceRangeMax}€
-                  </strong>{" "}
-                  <span style={{ color: "#9ca3af" }}>Coste estimado</span>
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Others */}
-      {others.length > 0 && (
-        <div style={{ padding: "16px 20px", borderBottom: "1px solid #f0f0f0", flex: 1 }}>
-          <p style={{ fontSize: 12, fontWeight: 700, color: "#9ca3af", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-            Elegir otro proveedor
-          </p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {others.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => onSelect(p.id)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  padding: "4px 0",
-                  width: "100%",
-                  textAlign: "left",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div
-                    style={{
-                      width: 18,
-                      height: 18,
-                      borderRadius: "50%",
-                      border: `2px solid ${selectedProviderId === p.id ? "#00BDA5" : "#d1d5db"}`,
-                      background: selectedProviderId === p.id ? "#00BDA5" : "#fff",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {selectedProviderId === p.id && <Check size={10} color="#fff" strokeWidth={3} />}
-                  </div>
-                  <span style={{ fontSize: 13, color: "#0F1B2B", fontWeight: 500 }}>
-                    {p.name}
-                  </span>
-                </div>
-                {p.priceRangeMin != null && (
-                  <span style={{ fontSize: 12, color: "#9ca3af" }}>
-                    {p.priceRangeMin}€ – {p.priceRangeMax}€
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Assign button */}
-      <div style={{ padding: "16px 20px" }}>
-        <button
-          onClick={onAssign}
-          disabled={isAssigning || !selectedProviderId}
-          style={{
-            width: "100%",
-            background: isAssigning || !selectedProviderId ? "#9ca3af" : "#00BDA5",
-            color: "#fff",
-            border: "none",
-            borderRadius: 10,
-            padding: "13px 0",
-            fontWeight: 700,
-            fontSize: 14,
-            cursor: isAssigning || !selectedProviderId ? "not-allowed" : "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8,
-          }}
-        >
-          <UserRound size={15} />
-          {isAssigning ? "Asignando..." : "Asignar proveedor"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Add Note Form ────────────────────────────────────────────────────────────
-function AddNoteForm({
-  incidentId,
-  onAdded,
-}: {
-  incidentId: string;
-  onAdded: () => void;
-}) {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-  const [text, setText] = useState("");
-  const addNote = useMutation(trpc.incident.addNote.mutationOptions());
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!text.trim()) return;
-    await addNote.mutateAsync({
-      tenantId: TENANT_ID,
-      incidentId,
-      content: text.trim(),
-    });
-    setText("");
-    onAdded();
-  };
-
-  return (
-    <form onSubmit={handleSubmit} style={{ marginTop: 12, display: "flex", gap: 8 }}>
-      <input
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder="Añadir nota interna..."
-        style={{
-          flex: 1,
-          border: "1px solid #e5e7eb",
-          borderRadius: 8,
-          padding: "8px 12px",
-          fontSize: 13,
-          color: "#0F1B2B",
-          outline: "none",
-        }}
-      />
-      <button
-        type="submit"
-        disabled={!text.trim() || addNote.isPending}
-        style={{
-          background: "#00BDA5",
-          color: "#fff",
-          border: "none",
-          borderRadius: 8,
-          padding: "8px 14px",
-          cursor: text.trim() ? "pointer" : "not-allowed",
-          opacity: text.trim() ? 1 : 0.5,
-        }}
-      >
-        <Plus size={16} />
-      </button>
-    </form>
-  );
-}
-
-// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function IncidentsPage() {
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [checked, setChecked] = useState<Set<string>>(new Set());
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
+  const [providerOpen, setProviderOpen] = useState(false);
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ msg: string; type: "ok" | "err" } | null>(null);
+  const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+  const [noteText, setNoteText] = useState("");
 
-  const showToast = (msg: string, type: "ok" | "err" = "ok") => {
-    setToast({ msg, type });
+  const showToast = (msg: string, ok = true) => {
+    setToast({ msg, ok });
     setTimeout(() => setToast(null), 3000);
   };
 
-  // Queries
-  const { data: incidents = [], refetch } = useQuery(
-    trpc.incident.all.queryOptions({ tenantId: TENANT_ID }),
+  const { data: incidentsRaw, refetch } = useQuery(trpc.incident.all.queryOptions({ tenantId: TENANT_ID }));
+  const { data: providersRaw } = useQuery(trpc.provider.listByOrg.queryOptions({ tenantId: TENANT_ID }));
+  const incidents = (incidentsRaw ?? []) as any[];
+  const providers = (providersRaw ?? []) as any[];
+
+  const assignProvider = useMutation(
+    trpc.incident.assignProvider.mutationOptions({ onSuccess: () => { refetch().catch(() => null); } })
   );
-  const { data: providers = [] } = useQuery(
-    trpc.provider.listByOrg.queryOptions({ tenantId: TENANT_ID }),
+  const updateStatus = useMutation(
+    trpc.incident.updateStatus.mutationOptions({ onSuccess: () => { refetch().catch(() => null); } })
   );
-
-  // Auto-select first incident on load
-  useEffect(() => {
-    if (!selectedId && incidents.length > 0 && incidents[0]) {
-      setSelectedId(incidents[0].id);
-    }
-  }, [incidents, selectedId]);
-
-  // Auto-select recommended provider on load
-  useEffect(() => {
-    if (!selectedProviderId && providers.length > 0 && providers[0]) {
-      setSelectedProviderId(providers[0].id);
-    }
-  }, [providers, selectedProviderId]);
-
-  const selected = incidents.find((i) => i.id === selectedId) ?? null;
-
-  // Mutations
-  const assignProvider = useMutation(trpc.incident.assignProvider.mutationOptions());
-  const updateStatus = useMutation(trpc.incident.updateStatus.mutationOptions());
-  const rejectIncident = useMutation(trpc.incident.reject.mutationOptions());
-
-  const filtered = incidents.filter((i) =>
-    filterStatus === "ALL" ? true : i.status === filterStatus,
+  const rejectMut = useMutation(
+    trpc.incident.reject.mutationOptions({ onSuccess: () => { refetch().catch(() => null); } })
+  );
+  const addNote = useMutation(
+    trpc.incident.addNote.mutationOptions({ onSuccess: () => { refetch().catch(() => null); } })
   );
 
-  const handleAssign = async () => {
-    if (!selected || !selectedProviderId) return;
-    try {
-      await assignProvider.mutateAsync({
-        tenantId: TENANT_ID,
-        id: selected.id,
-        providerId: selectedProviderId,
-      });
-      await refetch();
-      showToast("✅ Proveedor asignado correctamente");
-    } catch (e) {
-      showToast("❌ Error al asignar proveedor", "err");
-    }
+  const filtered = incidents.filter((i: any) => filterStatus === "ALL" || i.status === filterStatus);
+  const selected = incidents.find((i: any) => i.id === selectedId) ?? null;
+  const selectedProvider = providers.find((p: any) => p.id === selectedProviderId) ?? providers[0] ?? null;
+
+  const toggleCheck = (id: string) => {
+    setChecked(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   };
 
-  const handleResolve = async () => {
-    if (!selected) return;
+  const handleAssign = async () => {
+    if (!selected || !selectedProvider) return;
     try {
-      await updateStatus.mutateAsync({
-        tenantId: TENANT_ID,
-        id: selected.id,
-        status: "RESUELTA",
-      });
-      await refetch();
-      showToast("✅ Incidencia marcada como resuelta");
-    } catch (e) {
-      showToast("❌ Error al actualizar estado", "err");
-    }
+      // @ts-ignore – tRPC mutateAsync types lag
+      await assignProvider.mutateAsync({ tenantId: TENANT_ID, id: selected.id, providerId: selectedProvider.id });
+      showToast("✅ Proveedor asignado y vecino notificado");
+    } catch { showToast("❌ Error al asignar", false); }
+  };
+
+  const handleBulkAssign = async () => {
+    if (!selectedProvider || checked.size === 0) return;
+    const count = checked.size;
+    try {
+      // @ts-ignore – tRPC mutateAsync types lag
+      await Promise.all([...checked].map((id: string) => assignProvider.mutateAsync({ tenantId: TENANT_ID, id, providerId: selectedProvider.id })));
+      setChecked(new Set());
+      showToast(`✅ ${count} incidencias asignadas`);
+    } catch { showToast("❌ Error en asignación múltiple", false); }
   };
 
   const handleReject = async () => {
     if (!selected) return;
     try {
-      await rejectIncident.mutateAsync({ tenantId: TENANT_ID, id: selected.id });
-      await refetch();
-      showToast("✅ Incidencia marcada como no procede");
-    } catch (e) {
-      showToast("❌ Error al rechazar", "err");
-    }
+      // @ts-ignore – tRPC mutateAsync types lag
+      await rejectMut.mutateAsync({ tenantId: TENANT_ID, id: selected.id });
+      showToast("Incidencia marcada como no procede");
+    } catch { showToast("❌ Error", false); }
   };
 
-  const FILTER_TABS = [
+  const handleAddNote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selected || !noteText.trim()) return;
+    // @ts-ignore – tRPC mutateAsync types lag
+    await addNote.mutateAsync({ tenantId: TENANT_ID, incidentId: selected.id, content: noteText.trim() });
+    setNoteText("");
+  };
+
+  const FILTERS = [
     { key: "ALL", label: "Todas" },
     { key: "RECIBIDA", label: "Pendientes" },
     { key: "EN_REVISION", label: "En revisión" },
@@ -521,465 +149,322 @@ export default function IncidentsPage() {
   ];
 
   return (
-    <div style={{ display: "flex", height: "100vh", flexDirection: "column", background: "#f9fafb", position: "relative" }}>
-
-      {/* Toast notification */}
+    <div className="flex h-screen flex-col bg-slate-50 -m-4 md:-m-8 overflow-hidden">
+      {/* Toast */}
       {toast && (
-        <div style={{
-          position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
-          background: toast.type === "ok" ? "#0F1B2B" : "#dc2626",
-          color: "#fff", padding: "10px 20px", borderRadius: 10,
-          fontSize: 13, fontWeight: 600, zIndex: 9999,
-          boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
-          transition: "opacity 0.3s",
-        }}>
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-xl px-5 py-3 text-sm font-semibold text-white shadow-lg transition-all
+          ${toast.ok ? "bg-slate-900" : "bg-red-600"}`}>
           {toast.msg}
         </div>
       )}
-      {/* ── Top bar ───────────────────────────────────────────────────────────── */}
-      <header
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          borderBottom: "1px solid #e5e7eb",
-          background: "#fff",
-          padding: "12px 24px",
-          flexShrink: 0,
-        }}
-      >
-        <h1 style={{ fontSize: 20, fontWeight: 700, color: "#0F1B2B", margin: 0 }}>
-          Incidencias
-        </h1>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              border: "1px solid #e5e7eb",
-              borderRadius: 999,
-              background: "#f9fafb",
-              padding: "8px 16px",
-              width: 280,
-            }}
-          >
-            <Search size={15} color="#9ca3af" />
-            <input
-              placeholder="Buscar comunidad, avería, vecino..."
-              style={{ border: "none", background: "none", outline: "none", fontSize: 13, color: "#6b7280", width: "100%" }}
-            />
+
+      {/* Top bar */}
+      <header className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-6 py-3">
+        <h1 className="text-xl font-bold text-slate-900">Incidencias</h1>
+        <div className="flex items-center gap-3">
+          <div className="flex w-72 items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-400">
+            <Search size={15} />
+            <span>Buscar comunidad, avería, vecino...</span>
           </div>
-          <div
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: "50%",
-              background: "#0F1B2B",
-              color: "#fff",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 12,
-              fontWeight: 700,
-            }}
-          >
-            JL
-          </div>
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-800 text-xs font-bold text-white">JL</div>
         </div>
       </header>
 
-      {/* ── Body ─────────────────────────────────────────────────────────────── */}
-      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+      {/* Body */}
+      <div className="flex flex-1 overflow-hidden">
 
-        {/* ── Column 1: Incident list ────────────────────────────────────────── */}
-        <div
-          style={{
-            width: 280,
-            flexShrink: 0,
-            borderRight: "1px solid #e5e7eb",
-            background: "#fff",
-            display: "flex",
-            flexDirection: "column",
-          }}
-        >
-          {/* Filter row */}
-          <div
-            style={{
-              padding: "12px 16px 0",
-              borderBottom: "1px solid #f3f4f6",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-              <Filter size={14} color="#9ca3af" />
-              <span style={{ fontSize: 12, fontWeight: 600, color: "#9ca3af" }}>FILTROS</span>
+        {/* Column 1: List */}
+        <div className="flex w-72 shrink-0 flex-col border-r border-slate-200 bg-white">
+          {/* Bulk action bar */}
+          {checked.size > 0 ? (
+            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+              <button onClick={() => setChecked(new Set())} className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700">
+                <span className="text-slate-400">‹</span> {checked.size} seleccionadas
+              </button>
+              <div className="flex items-center gap-2">
+                <button onClick={handleBulkAssign} className="rounded-lg bg-teal-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-teal-600">Asignar</button>
+                <button className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-slate-500 hover:bg-slate-50">—</button>
+              </div>
             </div>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", paddingBottom: 10 }}>
-              {FILTER_TABS.map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => setFilterStatus(tab.key)}
-                  style={{
-                    border: "none",
-                    borderRadius: 999,
-                    padding: "4px 10px",
-                    fontSize: 11,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    background: filterStatus === tab.key ? "#00BDA5" : "#f3f4f6",
-                    color: filterStatus === tab.key ? "#fff" : "#6b7280",
-                  }}
-                >
-                  {tab.label}
+          ) : (
+            <div className="flex flex-wrap gap-1.5 border-b border-slate-100 px-4 py-3">
+              {FILTERS.map(f => (
+                <button key={f.key} onClick={() => setFilterStatus(f.key)}
+                  className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors
+                    ${filterStatus === f.key ? "bg-teal-500 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
+                  {f.label}
                 </button>
               ))}
             </div>
-          </div>
+          )}
 
-          {/* List */}
-          <ul
-            style={{
-              flex: 1,
-              overflowY: "auto",
-              listStyle: "none",
-              padding: 0,
-              margin: 0,
-            }}
-          >
+          {/* Incident list */}
+          <ul className="flex-1 overflow-y-auto">
             {filtered.length === 0 && (
-              <li style={{ padding: 24, textAlign: "center", color: "#9ca3af", fontSize: 13 }}>
-                Sin incidencias
-              </li>
+              <li className="px-4 py-8 text-center text-sm text-slate-400">Sin incidencias</li>
             )}
-            {filtered.map((incident) => (
-              <li
-                key={incident.id}
-                onClick={() => setSelectedId(incident.id)}
-                style={{
-                  padding: "14px 16px",
-                  borderBottom: "1px solid #f3f4f6",
-                  cursor: "pointer",
-                  background: selectedId === incident.id ? "#f0fdfa" : "#fff",
-                  borderLeft: selectedId === incident.id ? "3px solid #00BDA5" : "3px solid transparent",
-                  transition: "background 0.15s",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <PriorityDot priority={incident.priority} />
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "#0F1B2B", lineHeight: 1.3 }}>
-                      {incident.title}
-                    </span>
-                  </div>
-                  <StatusBadge status={incident.priority === "URGENTE" ? "URGENTE" : incident.status} />
+            {filtered.map((inc: any) => (
+              <li key={inc.id}
+                onClick={() => { setSelectedId(inc.id); setProviderOpen(false); }}
+                className={`flex cursor-pointer items-start gap-3 border-b border-slate-100 px-4 py-3.5 transition-colors hover:bg-slate-50
+                  ${selectedId === inc.id ? "border-l-2 border-l-teal-500 bg-teal-50/40" : "border-l-2 border-l-transparent"}`}>
+                {/* Checkbox */}
+                <div onClick={e => { e.stopPropagation(); toggleCheck(inc.id); }}
+                  className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 transition-all
+                    ${checked.has(inc.id) ? "border-teal-500 bg-teal-500" : "border-slate-300 bg-white"}`}>
+                  {checked.has(inc.id) && <Check size={10} strokeWidth={3} className="text-white" />}
                 </div>
-                {/* Categoría */}
-                {(incident as any).category && (
-                  <span style={{
-                    display: "inline-block",
-                    fontSize: 10,
-                    fontWeight: 600,
-                    color: "#6366f1",
-                    background: "#eef2ff",
-                    borderRadius: 4,
-                    padding: "1px 6px",
-                    margin: "4px 0 2px 14px",
-                    textTransform: "capitalize",
-                  }}>
-                    {(incident as any).category}
-                  </span>
-                )}
-                <p style={{ fontSize: 11, color: "#9ca3af", margin: "2px 0 0 14px" }}>
-                  {incident.reporter?.name ?? "Vecino"}
-                </p>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <div className={`mt-1 h-2 w-2 shrink-0 rounded-full ${PRIORITY_COLOR[inc.priority] ?? "bg-slate-300"}`} />
+                      <p className="truncate text-sm font-semibold text-slate-900">{inc.title}</p>
+                    </div>
+                    <StatusBadge status={inc.status} />
+                  </div>
+                  {(inc as any).category && (
+                    <span className="ml-3.5 mt-1 inline-block rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold capitalize text-indigo-600">
+                      {(inc as any).category}
+                    </span>
+                  )}
+                  <p className="ml-3.5 mt-0.5 text-xs text-slate-400">{inc.reporter?.name ?? "Vecino"}</p>
+                </div>
               </li>
             ))}
           </ul>
         </div>
 
-        {/* ── Column 2: Incident detail ──────────────────────────────────────── */}
+        {/* Column 2: Detail */}
         {selected ? (
-          <div
-            style={{
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              overflow: "hidden",
-            }}
-          >
-            <div style={{ flex: 1, overflowY: "auto", padding: "24px 32px" }}>
+          <div className="flex flex-1 flex-col overflow-hidden">
+            <div className="flex-1 overflow-y-auto px-8 py-6">
+
               {/* Header */}
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 4 }}>
-                <h2 style={{ fontSize: 24, fontWeight: 800, color: "#0F1B2B", margin: 0 }}>
-                  {selected.title}
-                </h2>
-                <StatusBadge status={selected.status} />
+              <div className="mb-1 flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900">{selected.title}</h2>
+                  <p className="mt-0.5 text-sm text-slate-400">Residencial Los Olivos · Av. de Andalucía, 105</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <StatusBadge status={selected.status} />
+                  {selected.status === "RESUELTA" && (
+                    <Link href={`/incidents/validate?id=${selected.id}`}
+                      className="flex items-center gap-1 rounded-lg bg-teal-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-teal-600">
+                      Validar <ArrowRight size={12} />
+                    </Link>
+                  )}
+                </div>
               </div>
-              <p style={{ fontSize: 13, color: "#9ca3af", margin: "4px 0 0" }}>
-                Residencial Los Olivos · Av. de Andalucía, 105
-              </p>
 
               {/* Timeline */}
-              <StatusTimeline currentStatus={selected.status} />
+              <Timeline status={selected.status} />
 
-              {/* Categoría */}
+              {/* Category */}
               {(selected as any).category && (
-                <span style={{
-                  display: "inline-block",
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: "#6366f1",
-                  background: "#eef2ff",
-                  borderRadius: 6,
-                  padding: "2px 10px",
-                  marginBottom: 16,
-                  textTransform: "capitalize",
-                }}>
+                <span className="mb-4 inline-block rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-semibold capitalize text-indigo-600">
                   📂 {(selected as any).category}
                 </span>
               )}
 
-              {/* Photo inicial */}
-              <div
-                style={{
-                  borderRadius: 12,
-                  overflow: "hidden",
-                  background: "#f3f4f6",
-                  aspectRatio: "16/7",
-                  maxWidth: 520,
-                  marginBottom: 24,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
+              {/* Photo */}
+              <div className="mb-6 aspect-video max-w-lg overflow-hidden rounded-2xl bg-slate-100">
                 {selected.photoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={selected.photoUrl} alt="Incidencia" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  <img src={selected.photoUrl} alt="Incidencia" className="h-full w-full object-cover" />
                 ) : (
-                  <span style={{ color: "#d1d5db", fontSize: 13 }}>Sin fotografía inicial</span>
+                  <div className="flex h-full items-center justify-center text-sm text-slate-400">Sin fotografía</div>
                 )}
               </div>
 
-              {/* Foto final del proveedor (solo si RESUELTA) */}
+              {/* Final photo (resolved) */}
               {selected.status === "RESUELTA" && (selected as any).finalPhotoUrl && (
-                <section style={{ marginBottom: 24 }}>
-                  <h3 style={{ fontSize: 14, fontWeight: 700, color: "#0F1B2B", marginBottom: 8 }}>
-                    ✅ Foto de cierre (proveedor)
-                  </h3>
-                  <div style={{
-                    borderRadius: 12,
-                    overflow: "hidden",
-                    background: "#f0fdf4",
-                    border: "2px solid #bbf7d0",
-                    aspectRatio: "16/7",
-                    maxWidth: 520,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}>
+                <div className="mb-6 max-w-lg">
+                  <h3 className="mb-2 text-sm font-bold text-slate-800">✅ Foto de cierre (proveedor)</h3>
+                  <div className="overflow-hidden rounded-2xl border-2 border-emerald-200 bg-emerald-50 aspect-video">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={(selected as any).finalPhotoUrl}
-                      alt="Foto final"
-                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                    />
+                    <img src={(selected as any).finalPhotoUrl} alt="Foto final" className="h-full w-full object-cover" />
                   </div>
-                </section>
+                </div>
               )}
 
               {/* Description */}
-              <section style={{ marginBottom: 24 }}>
-                <h3 style={{ fontSize: 14, fontWeight: 700, color: "#0F1B2B", marginBottom: 8 }}>
-                  Descripción
-                </h3>
-                <p style={{ fontSize: 14, color: "#4b5563", lineHeight: 1.6, margin: 0 }}>
-                  {selected.description}
-                </p>
-              </section>
+              <div className="mb-6">
+                <h3 className="mb-2 text-sm font-bold text-slate-800">Descripción</h3>
+                <p className="text-sm leading-relaxed text-slate-600">{selected.description}</p>
+              </div>
 
-              {/* Internal Notes */}
-              <section>
-                <h3 style={{ fontSize: 14, fontWeight: 700, color: "#0F1B2B", marginBottom: 10 }}>
-                  Notas internas
-                </h3>
-
-                {(selected.notes ?? []).length === 0 && (
-                  <p style={{ fontSize: 13, color: "#9ca3af", marginBottom: 8 }}>Sin notas aún.</p>
-                )}
-
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {(selected.notes ?? []).map((note: any) => (
-                    <div
-                      key={note.id}
-                      style={{
-                        display: "flex",
-                        alignItems: "flex-start",
-                        justifyContent: "space-between",
-                        background: "#f9fafb",
-                        border: "1px solid #f0f0f0",
-                        borderRadius: 8,
-                        padding: "10px 14px",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-                        <span style={{ fontSize: 14, color: "#00BDA5", marginTop: 1 }}>✎</span>
-                        <div>
-                          <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#0F1B2B" }}>
-                            {note.content}
-                          </p>
-                          <p style={{ margin: "2px 0 0", fontSize: 11, color: "#9ca3af" }}>
-                            – {note.author?.name ?? "AF"},{" "}
-                            {new Date(note.createdAt).toLocaleDateString("es-ES", {
-                              day: "2-digit",
-                              month: "2-digit",
-                              year: "numeric",
-                            })}
-                          </p>
-                        </div>
-                      </div>
-                      <ChevronRight size={14} color="#d1d5db" />
+              {/* Notes */}
+              <div className="mb-6">
+                <h3 className="mb-3 text-sm font-bold text-slate-800">Notas internas</h3>
+                <div className="space-y-2">
+                  {(selected.notes ?? []).map((n: any) => (
+                    <div key={n.id} className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                      <p className="text-sm font-medium text-slate-800">{n.content}</p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        {n.author?.name ?? "AF"} · {new Date(n.createdAt).toLocaleDateString("es-ES")}
+                      </p>
                     </div>
                   ))}
                 </div>
+                <form onSubmit={handleAddNote} className="mt-3 flex gap-2">
+                  <input value={noteText} onChange={e => setNoteText(e.target.value)}
+                    placeholder="Añadir nota interna..."
+                    className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-teal-400" />
+                  <button type="submit" disabled={!noteText.trim() || addNote.isPending}
+                    className="rounded-xl bg-teal-500 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-600 disabled:opacity-40">
+                    <Plus size={15} />
+                  </button>
+                </form>
+              </div>
 
-                <AddNoteForm incidentId={selected.id} onAdded={() => refetch()} />
-              </section>
-
-              {/* Historial de actividad (Timeline) */}
-              <section style={{ marginTop: 32 }}>
-                <h3 style={{ fontSize: 14, fontWeight: 700, color: "#0F1B2B", marginBottom: 16 }}>
-                  Historial de actividad (Trazabilidad)
-                </h3>
-
-                {(selected.history ?? []).length === 0 && (
-                  <p style={{ fontSize: 13, color: "#9ca3af", marginBottom: 8 }}>Sin historial registrado.</p>
-                )}
-
-                <div style={{ display: "flex", flexDirection: "column", gap: 0, position: "relative", paddingLeft: 6 }}>
-                  {/* Vertical line connecting timeline events */}
+              {/* Activity history */}
+              <div>
+                <h3 className="mb-3 text-sm font-bold text-slate-800">Historial de actividad</h3>
+                <div className="relative space-y-4 pl-5">
                   {(selected.history ?? []).length > 1 && (
-                    <div style={{ position: "absolute", left: 12, top: 10, bottom: 20, width: 2, background: "#e5e7eb" }} />
+                    <div className="absolute left-2 top-2 bottom-4 w-0.5 bg-slate-200" />
                   )}
-                  
-                  {(selected.history ?? []).map((entry: any, index: number) => {
-                    let actionColor = "#00BDA5";
-                    if (entry.action === "CREATED") { actionColor = "#3b82f6"; }
-                    if (entry.action === "ASSIGNED") { actionColor = "#8b5cf6"; }
-                    if (entry.action === "COMPLETED") { actionColor = "#10b981"; }
-                    if (entry.action === "STATUS_CHANGED" && entry.newStatus === "RECHAZADA") { actionColor = "#ef4444"; }
-
-                    return (
-                      <div key={entry.id} style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 20, position: "relative" }}>
-                        <div style={{ 
-                          width: 14, height: 14, borderRadius: "50%", background: actionColor, 
-                          flexShrink: 0, marginTop: 4, zIndex: 1, border: "2px solid #fff",
-                          boxShadow: "0 0 0 1px #e5e7eb"
-                        }} />
-                        <div style={{ flex: 1 }}>
-                          <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#0F1B2B" }}>
-                            {entry.actorName} 
-                            {entry.action === "CREATED" ? (
-                              <span style={{ fontWeight: 400, color: "#6b7280" }}> reportó la incidencia</span>
-                            ) : (
-                              <span style={{ fontWeight: 400, color: "#6b7280" }}> cambió el estado a <span style={{ fontWeight: 700, color: "#111827" }}>{entry.newStatus}</span></span>
-                            )}
-                          </p>
-                          {entry.comment && (
-                            <p style={{ margin: "6px 0 0", fontSize: 13, color: "#4b5563", background: "#f9fafb", padding: "8px 12px", borderRadius: 8, border: "1px solid #f3f4f6", display: "inline-block" }}>
-                              {entry.comment}
-                            </p>
-                          )}
-                          <p style={{ margin: "4px 0 0", fontSize: 11, color: "#9ca3af" }}>
-                            {new Date(entry.createdAt).toLocaleString("es-ES", {
-                              day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit"
-                            })}
-                          </p>
-                        </div>
+                  {(selected.history ?? []).map((h: any) => (
+                    <div key={h.id} className="relative flex gap-3">
+                      <div className={`absolute -left-3 top-1 h-3 w-3 rounded-full border-2 border-white z-10
+                        ${h.action === "CREATED" ? "bg-blue-500" : h.action === "ASSIGNED" ? "bg-violet-500" : h.action === "COMPLETED" ? "bg-emerald-500" : "bg-teal-500"}`} />
+                      <div>
+                        <p className="text-sm font-semibold text-slate-800">
+                          {h.actorName}{" "}
+                          <span className="font-normal text-slate-500">
+                            {h.action === "CREATED" ? "reportó la incidencia" : `→ ${h.newStatus}`}
+                          </span>
+                        </p>
+                        {h.comment && (
+                          <p className="mt-1 inline-block rounded-lg border border-slate-100 bg-slate-50 px-3 py-1.5 text-xs text-slate-600">{h.comment}</p>
+                        )}
+                        <p className="mt-0.5 text-xs text-slate-400">
+                          {new Date(h.createdAt).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                        </p>
                       </div>
-                    );
-                  })}
+                    </div>
+                  ))}
                 </div>
-              </section>
+              </div>
             </div>
 
-            {/* ── Bottom action bar ─────────────────────────────────────────── */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 12,
-                padding: "14px 32px",
-                borderTop: "1px solid #e5e7eb",
-                background: "#fff",
-                flexShrink: 0,
-              }}
-            >
-              <button
-                onClick={handleAssign}
-                disabled={assignProvider.isPending || !selectedProviderId}
-                style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  border: "1px solid #e5e7eb", borderRadius: 8,
-                  padding: "10px 20px", background: "#fff",
-                  color: "#374151", fontSize: 13, fontWeight: 600, cursor: "pointer",
-                  opacity: assignProvider.isPending ? 0.6 : 1,
-                }}
-              >
-                <UserRound size={14} />
-                {assignProvider.isPending ? "Asignando..." : "Asignar"}
-              </button>
-
-              <button
-                onClick={handleReject}
-                disabled={rejectIncident.isPending || selected.status === "RECHAZADA"}
-                style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  border: "1px solid #e5e7eb", borderRadius: 8,
-                  padding: "10px 20px", background: "#fff",
-                  color: "#374151", fontSize: 13, fontWeight: 600,
-                  cursor: selected.status === "RECHAZADA" ? "not-allowed" : "pointer",
-                  opacity: selected.status === "RECHAZADA" ? 0.4 : 1,
-                }}
-              >
-                <XCircle size={14} />
-                No procede
-              </button>
-
-              <button
-                onClick={handleResolve}
-                disabled={updateStatus.isPending || selected.status === "RESUELTA"}
-                style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  border: "none", borderRadius: 8,
-                  padding: "10px 24px",
-                  background: selected.status === "RESUELTA" ? "#9ca3af" : "#00BDA5",
-                  color: "#fff", fontSize: 13, fontWeight: 700,
-                  cursor: selected.status === "RESUELTA" ? "not-allowed" : "pointer",
-                }}
-              >
-                <CheckCircle2 size={14} />
-                Marcar como resuelta
+            {/* Action bar */}
+            <div className="flex shrink-0 items-center justify-between border-t border-slate-200 bg-white px-8 py-4">
+              <div className="flex gap-3">
+                <button onClick={handleReject} disabled={selected.status === "RECHAZADA"}
+                  className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors">
+                  <XCircle size={15} /> No procede
+                </button>
+                <button onClick={() => {
+                    // @ts-ignore – tRPC mutateAsync types lag
+                    void updateStatus.mutateAsync({ tenantId: TENANT_ID, id: selected.id, status: "EN_REVISION" as const });
+                  }}
+                  disabled={selected.status !== "RECIBIDA"}
+                  className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors">
+                  <AlertTriangle size={15} /> En revisión
+                </button>
+              </div>
+              <button onClick={handleAssign} disabled={!selectedProvider || assignProvider.isPending}
+                className="flex items-center gap-2 rounded-xl bg-teal-500 px-6 py-2.5 text-sm font-bold text-white hover:bg-teal-600 disabled:opacity-40 transition-colors shadow-sm">
+                <CheckCircle2 size={15} />
+                {assignProvider.isPending ? "Asignando..." : "Asignar y Notificar Vecino"}
               </button>
             </div>
           </div>
         ) : (
-          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af" }}>
+          <div className="flex flex-1 items-center justify-center text-slate-400 text-sm">
             Selecciona una incidencia
           </div>
         )}
 
-        {/* ── Column 3: Provider panel ───────────────────────────────────────── */}
+        {/* Column 3: Provider panel */}
         {selected && (
-          <ProviderPanel
-            providers={providers}
-            selectedProviderId={selectedProviderId}
-            onSelect={setSelectedProviderId}
-            onAssign={handleAssign}
-            isAssigning={assignProvider.isPending}
-            currentProviderId={selected.providerId}
-          />
+          <div className="flex w-72 shrink-0 flex-col border-l border-slate-200 bg-white overflow-y-auto">
+            <div className="p-5">
+              <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-slate-400">Proveedor</h3>
+
+              {/* Dropdown trigger */}
+              <button onClick={() => setProviderOpen(v => !v)}
+                className="flex w-full items-center justify-between rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-semibold text-teal-800 transition hover:bg-teal-100">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-teal-500 text-white">
+                    <Check size={12} strokeWidth={3} />
+                  </div>
+                  {selectedProvider?.name ?? "Seleccionar proveedor"}
+                </div>
+                {providerOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+              </button>
+
+              {/* Dropdown options */}
+              {providerOpen && (
+                <div className="mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                  {providers.map((p: any, i: number) => (
+                    <button key={p.id} onClick={() => { setSelectedProviderId(p.id); setProviderOpen(false); }}
+                      className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50
+                        ${i < providers.length - 1 ? "border-b border-slate-100" : ""}`}>
+                      <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all
+                        ${(selectedProvider?.id === p.id) ? "border-teal-500 bg-teal-500" : "border-slate-300"}`}>
+                        {(selectedProvider?.id === p.id) && <Check size={10} strokeWidth={3} className="text-white" />}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-slate-800">{p.name}</p>
+                        <p className="text-xs text-slate-400">
+                          {p.isTrusted ? "✓ Historial positivo" : `${p.completedJobs} incidencias resueltas`}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Selected provider card */}
+              {selectedProvider && !providerOpen && (
+                <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-4">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-800 text-sm font-bold text-white">
+                      {selectedProvider.avatarInitials ?? "??"}
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-900">{selectedProvider.name}</p>
+                      <div className="flex items-center gap-1">
+                        <Star size={12} fill="#f59e0b" color="#f59e0b" />
+                        <span className="text-sm font-bold text-slate-700">{selectedProvider.rating?.toFixed(1)}</span>
+                      </div>
+                      {selectedProvider.isTrusted && (
+                        <p className="text-xs text-teal-600 font-medium">Proveedor de confianza</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="space-y-2 text-sm text-slate-600">
+                    <div className="flex items-center gap-2">
+                      <Briefcase size={13} className="text-slate-400" />
+                      <strong>{selectedProvider.completedJobs}</strong>
+                      <span className="text-slate-400">Intervenciones</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Clock size={13} className="text-slate-400" />
+                      <strong>{selectedProvider.avgDaysToResolve} días</strong>
+                      <span className="text-slate-400">Tiempo medio</span>
+                    </div>
+                    {selectedProvider.priceRangeMin != null && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-400">€</span>
+                        <strong>{selectedProvider.priceRangeMin}€ – {selectedProvider.priceRangeMax}€</strong>
+                        <span className="text-slate-400">Coste est.</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Assign CTA */}
+              <button onClick={handleAssign} disabled={!selectedProvider || assignProvider.isPending}
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-teal-500 py-3 text-sm font-bold text-white hover:bg-teal-600 disabled:opacity-40 transition-colors shadow-sm">
+                <CheckCircle2 size={15} />
+                {assignProvider.isPending ? "Asignando..." : "Asignar y Notificar Vecino"}
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>
