@@ -106,9 +106,33 @@ export async function GET() {
     try {
       await db.execute(sql`ALTER TABLE incident ADD COLUMN IF NOT EXISTS category varchar(64) NOT NULL DEFAULT 'otro'`);
       await db.execute(sql`ALTER TABLE incident ADD COLUMN IF NOT EXISTS final_photo_url text`);
-      console.log("Patched category and final_photo_url columns in incident table");
+      
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS "incident_note" (
+          "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+          "incident_id" uuid NOT NULL REFERENCES incident(id) ON DELETE cascade,
+          "author_id" text NOT NULL REFERENCES "user"(id) ON DELETE cascade,
+          "content" text NOT NULL,
+          "created_at" timestamp with time zone DEFAULT now() NOT NULL
+        )
+      `);
+
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS "incident_history" (
+          "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+          "incident_id" uuid NOT NULL REFERENCES incident(id) ON DELETE cascade,
+          "actor_name" varchar(128) NOT NULL,
+          "action" varchar(64) NOT NULL,
+          "previous_status" varchar(64),
+          "new_status" varchar(64),
+          "comment" text,
+          "created_at" timestamp with time zone DEFAULT now() NOT NULL
+        )
+      `);
+
+      console.log("Patched missing tables and columns in production DB");
     } catch (e) {
-      console.error("Could not patch columns:", e);
+      console.error("Could not patch DB schema:", e);
     }
 
     const newIncidents = await db.insert(incident).values(demoIncidents).returning({ id: incident.id });
@@ -119,57 +143,60 @@ export async function GET() {
     if (newIncidents[0]) {
       historyData.push({
         incidentId: newIncidents[0].id,
-        changedBy: reporters[0],
+        actorName: "Vecino Demo 1",
         action: "CREACIÓN",
-        details: "El vecino ha reportado la incidencia con prioridad ALTA.",
+        comment: "El vecino ha reportado la incidencia con prioridad ALTA.",
         createdAt: daysAgo(0)
       });
     }
     if (newIncidents[1]) {
       historyData.push({
         incidentId: newIncidents[1].id,
-        changedBy: reporters[1],
+        actorName: "Vecino Demo 2",
         action: "CREACIÓN",
-        details: "El vecino ha reportado la incidencia.",
+        comment: "El vecino ha reportado la incidencia.",
         createdAt: daysAgo(1)
       });
       historyData.push({
         incidentId: newIncidents[1].id,
-        changedBy: reporters[1],
+        actorName: "Admin",
         action: "CAMBIO_ESTADO",
-        details: "El estado ha cambiado a ASIGNADA. Se ha notificado al proveedor.",
+        comment: "El estado ha cambiado a ASIGNADA. Se ha notificado al proveedor.",
+        newStatus: "ASIGNADA",
         createdAt: new Date(daysAgo(1).getTime() + 2 * 3600000)
       });
     }
     if (newIncidents[2]) {
       historyData.push({
         incidentId: newIncidents[2].id,
-        changedBy: reporters[0],
+        actorName: "Vecino Demo 1",
         action: "CREACIÓN",
-        details: "El vecino ha reportado la incidencia.",
+        comment: "El vecino ha reportado la incidencia.",
         createdAt: daysAgo(2)
       });
       historyData.push({
         incidentId: newIncidents[2].id,
-        changedBy: reporters[0],
+        actorName: "Proveedor",
         action: "CAMBIO_ESTADO",
-        details: "El estado ha cambiado a EN_PROCESO. El proveedor está trabajando en ello.",
+        comment: "El estado ha cambiado a EN_PROCESO. El proveedor está trabajando en ello.",
+        newStatus: "EN_PROCESO",
         createdAt: new Date(daysAgo(2).getTime() + 24 * 3600000)
       });
     }
     if (newIncidents[3]) {
       historyData.push({
         incidentId: newIncidents[3].id,
-        changedBy: reporters[2],
+        actorName: "Vecino Demo 3",
         action: "CREACIÓN",
-        details: "El vecino ha reportado la incidencia.",
+        comment: "El vecino ha reportado la incidencia.",
         createdAt: daysAgo(3)
       });
       historyData.push({
         incidentId: newIncidents[3].id,
-        changedBy: reporters[2],
+        actorName: "Proveedor",
         action: "RESOLUCIÓN",
-        details: "El proveedor ha marcado la incidencia como RESUELTA.",
+        comment: "El proveedor ha marcado la incidencia como RESUELTA.",
+        newStatus: "RESUELTA",
         createdAt: new Date(daysAgo(3).getTime() + 48 * 3600000)
       });
     }
