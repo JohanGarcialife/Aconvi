@@ -12,12 +12,12 @@ export async function GET() {
   try {
     const DEMO_REPORTER_ID = crypto.randomUUID();
     
-    await db.insert(organization).values({
-      id: TENANT_ID,
-      name: "Comunidad Demo",
-      plan: "pro",
-      updatedAt: new Date()
-    }).onConflictDoNothing();
+    const { sql } = await import("drizzle-orm");
+    await db.execute(sql`
+      INSERT INTO organization (id, name, slug, created_at) 
+      VALUES (${TENANT_ID}, 'Aconvi Demo', 'aconvi-demo', now())
+      ON CONFLICT (id) DO NOTHING;
+    `);
 
     await db.delete(incident).where(eq(incident.organizationId, TENANT_ID));
 
