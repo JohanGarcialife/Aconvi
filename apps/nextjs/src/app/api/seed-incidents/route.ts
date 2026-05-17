@@ -23,12 +23,24 @@ export async function GET() {
     // 2. Create a specific Demo User to ensure foreign keys work 100% of the time
     // We use a random UUID so that every request gets a unique user and bypasses ANY Next.js fetch caching.
     const DEMO_REPORTER_ID = crypto.randomUUID();
-    await db.insert(user).values({
+    const insertedUsers = await db.insert(user).values({
       id: DEMO_REPORTER_ID,
       name: "Vecino Demo",
       role: "Vecino",
       updatedAt: new Date()
+    }).returning({ id: user.id });
+
+    if (!insertedUsers || insertedUsers.length === 0) {
+      throw new Error(`CRITICAL DB ANOMALY: insert into user succeeded but returned no rows!`);
+    }
+
+    const verifyUser = await db.query.user.findFirst({
+      where: eq(user.id, DEMO_REPORTER_ID)
     });
+
+    if (!verifyUser) {
+      throw new Error(`CRITICAL DB ANOMALY: user ${DEMO_REPORTER_ID} was returned by INSERT but cannot be found by SELECT! Database might be using aggressive read replicas or rolling back implicitly!`);
+    }
 
     const reporters = [DEMO_REPORTER_ID, DEMO_REPORTER_ID, DEMO_REPORTER_ID];
 
