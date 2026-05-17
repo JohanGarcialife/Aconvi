@@ -100,8 +100,7 @@ export async function GET() {
       }
     ];
 
-    const { sql } = await import("drizzle-orm");
-    
+
     // TEMPORARY FIX: The Coolify production database is missing the 'category' column 
     // because drizzle-kit push was not run there. We patch it directly.
     try {
