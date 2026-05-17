@@ -20,22 +20,16 @@ export async function GET() {
     // 1. Delete existing demo incidents for this tenant
     await db.delete(incident).where(eq(incident.organizationId, TENANT_ID));
 
-    // 2. Fetch existing users to use as reporters
-    let users = await db.query.user.findMany({ limit: 3 });
-    if (users.length === 0) {
-      // Create a fallback user if none exist to ensure foreign keys work
-      const [fallbackUser] = await db.insert(user).values({
-        id: "demo-reporter",
-        name: "Demo Reporter",
-        role: "Vecino"
-      }).returning();
-      users = [fallbackUser!];
-    }
+    // 2. Create a specific Demo User to ensure foreign keys work 100% of the time
+    // This avoids any Next.js caching issues with findMany()
+    const DEMO_REPORTER_ID = "demo-reporter-id";
+    await db.execute(sql`
+      INSERT INTO "user" (id, name, role, created_at, updated_at) 
+      VALUES (${DEMO_REPORTER_ID}, 'Vecino Demo', 'Vecino', now(), now())
+      ON CONFLICT (id) DO NOTHING;
+    `);
 
-    const reporter1 = users[0]!.id;
-    const reporter2 = users[1]?.id ?? users[0]!.id;
-    const reporter3 = users[2]?.id ?? users[0]!.id;
-    const reporters = [reporter1, reporter2, reporter3];
+    const reporters = [DEMO_REPORTER_ID, DEMO_REPORTER_ID, DEMO_REPORTER_ID];
 
     // 3. Fetch existing providers to assign
     const providersList = await db.query.provider.findMany({ 
