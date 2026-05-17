@@ -214,6 +214,38 @@ export async function GET() {
 
     return NextResponse.json({ success: true, message: `Created ${createdCount} demo incidents` });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    // GATHER DIAGNOSTICS BEFORE RETURNING
+    let diagnostics = {};
+    try {
+      const dbUrl = process.env.POSTGRES_URL || "UNDEFINED";
+      const maskedUrl = dbUrl.replace(/:[^:@]*@/, ":***@");
+      
+      const { sql } = await import("drizzle-orm");
+      const res = await db.execute(sql`
+        SELECT
+          tc.constraint_name, 
+          kcu.column_name, 
+          ccu.table_schema AS foreign_table_schema,
+          ccu.table_name AS foreign_table_name,
+          ccu.column_name AS foreign_column_name 
+        FROM 
+          information_schema.table_constraints AS tc 
+          JOIN information_schema.key_column_usage AS kcu ON tc.constraint_name = kcu.constraint_name
+          JOIN information_schema.constraint_column_usage AS ccu ON ccu.constraint_name = tc.constraint_name
+        WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_name='incident';
+      `);
+      
+      diagnostics = {
+        database_host: maskedUrl.split('@')[1] || maskedUrl,
+        foreign_keys: res.rows
+      };
+    } catch (diagError: any) {
+      diagnostics = { error: diagError.message };
+    }
+
+    return NextResponse.json({ 
+      error: error.message, 
+      diagnostics 
+    }, { status: 500 });
   }
 }
