@@ -7,6 +7,14 @@ const TENANT_ID = "org_aconvi_demo";
 
 export async function GET() {
   try {
+    // 0. Ensure organization exists
+    const { sql } = await import("drizzle-orm");
+    await db.execute(sql`
+      INSERT INTO organization (id, name, slug, created_at) 
+      VALUES (${TENANT_ID}, 'Aconvi Demo', 'aconvi-demo', now())
+      ON CONFLICT (id) DO NOTHING;
+    `);
+
     // 1. Delete existing demo incidents for this tenant
     await db.delete(incident).where(eq(incident.organizationId, TENANT_ID));
 

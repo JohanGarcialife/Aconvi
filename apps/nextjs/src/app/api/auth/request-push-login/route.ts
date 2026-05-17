@@ -21,19 +21,11 @@ export async function POST(req: NextRequest) {
       await db.execute(sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS mobile_pin_hash text;`);
       
       await db.execute(sql`
-        DO $$ BEGIN
-            CREATE TYPE push_platform AS ENUM ('web', 'expo');
-        EXCEPTION
-            WHEN duplicate_object THEN null;
-        END $$;
-      `);
-
-      await db.execute(sql`
         CREATE TABLE IF NOT EXISTS push_token (
             id text PRIMARY KEY,
             user_id text NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
             token text NOT NULL,
-            platform push_platform NOT NULL,
+            platform text NOT NULL,
             created_at timestamp with time zone DEFAULT now() NOT NULL,
             updated_at timestamp with time zone DEFAULT now() NOT NULL
         );
