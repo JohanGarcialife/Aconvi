@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { db } from "@acme/db/client";
-import { incident, incidentHistory } from "@acme/db/schema";
+import { incident, incidentHistory, user } from "@acme/db/schema";
 import { eq } from "drizzle-orm";
+
+export const dynamic = "force-dynamic";
 
 const TENANT_ID = "org_aconvi_demo";
 
@@ -19,10 +21,17 @@ export async function GET() {
     await db.delete(incident).where(eq(incident.organizationId, TENANT_ID));
 
     // 2. Fetch existing users to use as reporters
-    const users = await db.query.user.findMany({ limit: 3 });
+    let users = await db.query.user.findMany({ limit: 3 });
     if (users.length === 0) {
-      return NextResponse.json({ error: "No users found in the database to act as reporters." }, { status: 400 });
+      // Create a fallback user if none exist to ensure foreign keys work
+      const [fallbackUser] = await db.insert(user).values({
+        id: "demo-reporter",
+        name: "Demo Reporter",
+        role: "Vecino"
+      }).returning();
+      users = [fallbackUser!];
     }
+
     const reporter1 = users[0]!.id;
     const reporter2 = users[1]?.id ?? users[0]!.id;
     const reporter3 = users[2]?.id ?? users[0]!.id;

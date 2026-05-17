@@ -22,6 +22,8 @@ export const user = pgTable("user", {
   // Generado por el administrador al crear el usuario. SHA-256 hash.
   initialPinHash: text("initial_pin_hash"),
   pinActivated: boolean("pin_activated").default(false).notNull(),
+  // ─── PIN hash used for push authentication confirmation
+  mobilePinHash: text("mobile_pin_hash"),
   // ─── Device token del móvil vinculado (Expo / FCM / APNs)
   deviceToken: text("device_token"),
   deviceActivatedAt: timestamp("device_activated_at", { mode: "date", withTimezone: true }),
