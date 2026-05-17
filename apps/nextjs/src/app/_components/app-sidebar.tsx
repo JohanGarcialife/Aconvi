@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTRPC } from "~/trpc/react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Home,
   Building2,
@@ -40,6 +42,16 @@ const items = [
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const trpc = useTRPC();
+
+  // Fetch pending incidents count for the sidebar badge
+  const { data: incidents } = useQuery(
+    trpc.incident.all.queryOptions({ tenantId: "org_aconvi_demo" }),
+  );
+  
+  const activeCount = incidents?.filter(
+    (i: any) => !["RESUELTA", "RECHAZADA"].includes(i.status)
+  ).length ?? 0;
 
   const { permission, isRegistering, requestPermissionAndSubscribe } = useWebPush();
 
@@ -84,7 +96,17 @@ export function AppSidebar() {
                           <item.icon className="h-4 w-4 shrink-0" />
                           <span>{item.title}</span>
                         </div>
-                        {item.badge && (
+                        {item.title === "Incidencias" && activeCount > 0 ? (
+                          <span
+                            className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                              isActive
+                                ? "bg-white/25 text-white"
+                                : "bg-primary/15 text-primary"
+                            }`}
+                          >
+                            {activeCount}
+                          </span>
+                        ) : item.badge && item.title !== "Incidencias" ? (
                           <span
                             className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
                               isActive
@@ -94,7 +116,7 @@ export function AppSidebar() {
                           >
                             {item.badge}
                           </span>
-                        )}
+                        ) : null}
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
