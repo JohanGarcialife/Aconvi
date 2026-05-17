@@ -21,13 +21,14 @@ export async function GET() {
     await db.delete(incident).where(eq(incident.organizationId, TENANT_ID));
 
     // 2. Create a specific Demo User to ensure foreign keys work 100% of the time
-    // This avoids any Next.js caching issues with findMany()
-    const DEMO_REPORTER_ID = "demo-reporter-id";
-    await db.execute(sql`
-      INSERT INTO "user" (id, name, role, created_at, updated_at) 
-      VALUES (${DEMO_REPORTER_ID}, 'Vecino Demo', 'Vecino', now(), now())
-      ON CONFLICT (id) DO NOTHING;
-    `);
+    // We use a random UUID so that every request gets a unique user and bypasses ANY Next.js fetch caching.
+    const DEMO_REPORTER_ID = crypto.randomUUID();
+    await db.insert(user).values({
+      id: DEMO_REPORTER_ID,
+      name: "Vecino Demo",
+      role: "Vecino",
+      updatedAt: new Date()
+    });
 
     const reporters = [DEMO_REPORTER_ID, DEMO_REPORTER_ID, DEMO_REPORTER_ID];
 
