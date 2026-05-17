@@ -107,6 +107,15 @@ export async function GET() {
       await db.execute(sql`ALTER TABLE incident ADD COLUMN IF NOT EXISTS category varchar(64) NOT NULL DEFAULT 'otro'`);
       await db.execute(sql`ALTER TABLE incident ADD COLUMN IF NOT EXISTS final_photo_url text`);
       
+      // Patch missing user columns from recent migrations
+      await db.execute(sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS phone_number text`);
+      await db.execute(sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS phone_number_verified boolean NOT NULL DEFAULT false`);
+      await db.execute(sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS corporate_username text`);
+      await db.execute(sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS initial_pin_hash text`);
+      await db.execute(sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS pin_activated boolean NOT NULL DEFAULT false`);
+      await db.execute(sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS device_token text`);
+      await db.execute(sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS device_activated_at timestamp with time zone`);
+
       await db.execute(sql`
         CREATE TABLE IF NOT EXISTS "incident_note" (
           "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
@@ -126,6 +135,38 @@ export async function GET() {
           "previous_status" varchar(64),
           "new_status" varchar(64),
           "comment" text,
+          "created_at" timestamp with time zone DEFAULT now() NOT NULL
+        )
+      `);
+
+      // Push Login missing schema
+      try {
+        await db.execute(sql`CREATE TYPE "push_platform" AS ENUM ('web', 'expo')`);
+      } catch (e) {
+        // ENUM might already exist, ignore error
+      }
+
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS "push_token" (
+          "id" text PRIMARY KEY NOT NULL,
+          "user_id" text NOT NULL REFERENCES "user"(id) ON DELETE cascade,
+          "token" text NOT NULL,
+          "platform" "push_platform" NOT NULL,
+          "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+          "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+        )
+      `);
+
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS "push_auth_session" (
+          "id" text PRIMARY KEY NOT NULL,
+          "user_id" text NOT NULL REFERENCES "user"(id) ON DELETE cascade,
+          "token" text NOT NULL UNIQUE,
+          "otp_code" text,
+          "status" text DEFAULT 'PENDING' NOT NULL,
+          "login_ip" text,
+          "login_user_agent" text,
+          "expires_at" timestamp with time zone NOT NULL,
           "created_at" timestamp with time zone DEFAULT now() NOT NULL
         )
       `);
