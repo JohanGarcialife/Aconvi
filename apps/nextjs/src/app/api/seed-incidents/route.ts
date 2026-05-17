@@ -94,8 +94,13 @@ export async function GET() {
 
     return NextResponse.json({ 
       error_message: error.message, 
+      error_cause_message: error.cause ? (error.cause as any).message : "No cause",
+      error_name: error.name,
+      error_code: error.code || (error.cause && (error.cause as any).code),
       error_detail: error.detail || (error.cause && (error.cause as any).detail) || "No detail",
       error_constraint: error.constraint || (error.cause && (error.cause as any).constraint) || "No constraint",
+      error_routine: error.routine || (error.cause && (error.cause as any).routine),
+      error_stack: error.stack,
       diagnostics 
     }, { status: 500 });
   }
