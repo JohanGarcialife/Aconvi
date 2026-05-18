@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTRPC } from "~/trpc/react";
-import { Check, Star, Briefcase, Clock, Search, Plus, AlertTriangle, CheckCircle2, XCircle, ChevronDown, ChevronUp, ArrowRight } from "lucide-react";
+import { Check, Star, Briefcase, Clock, Search, Plus, AlertTriangle, CheckCircle2, XCircle, ChevronDown, ChevronUp, ArrowRight, LogOut, User } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { authClient } from "~/auth/client";
 
 const TENANT_ID = "org_aconvi_demo";
 
@@ -71,6 +73,11 @@ export default function IncidentsPage() {
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [noteText, setNoteText] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  const { data: session } = authClient.useSession();
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok });
@@ -95,7 +102,40 @@ export default function IncidentsPage() {
     trpc.incident.addNote.mutationOptions({ onSuccess: () => { refetch().catch(() => null); } })
   );
 
-  const filtered = incidents.filter((i: any) => filterStatus === "ALL" || i.status === filterStatus);
+  // Close user menu on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const handleSignOut = async () => {
+    await authClient.signOut();
+    router.push("/login");
+  };
+
+  const filtered = incidents.filter((i: any) => {
+    const matchesStatus = filterStatus === "ALL" || i.status === filterStatus;
+    const q = searchQuery.trim().toLowerCase();
+    const matchesSearch =
+      !q ||
+      i.title?.toLowerCase().includes(q) ||
+      i.category?.toLowerCase().includes(q) ||
+      i.reporter?.name?.toLowerCase().includes(q) ||
+      i.description?.toLowerCase().includes(q);
+    return matchesStatus && matchesSearch;
+  });
+
+  const userName = session?.user?.name ?? "Usuario";
+  const userInitials = userName
+    .split(" ")
+    .slice(0, 2)
+    .map((n: string) => n[0]?.toUpperCase() ?? "")
+    .join("");
   const selected = incidents.find((i: any) => i.id === selectedId) ?? null;
   const selectedProvider = providers.find((p: any) => p.id === selectedProviderId) ?? providers[0] ?? null;
 
@@ -162,11 +202,69 @@ export default function IncidentsPage() {
       <header className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-6 py-3">
         <h1 className="text-xl font-bold text-slate-900">Incidencias</h1>
         <div className="flex items-center gap-3">
-          <div className="flex w-72 items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-400">
-            <Search size={15} />
-            <span>Buscar comunidad, avería, vecino...</span>
+          {/* Search bar - fully functional */}
+          <div className="flex w-72 items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-500 focus-within:border-teal-400 focus-within:ring-2 focus-within:ring-teal-100 transition-all">
+            <Search size={15} className="shrink-0 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Buscar comunidad, avería, vecino..."
+              className="flex-1 bg-transparent outline-none text-slate-700 placeholder:text-slate-400 text-sm"
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery("")} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <XCircle size={14} />
+              </button>
+            )}
           </div>
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-800 text-xs font-bold text-white">JL</div>
+
+          {/* User avatar with dropdown */}
+          <div className="relative" ref={userMenuRef}>
+            <button
+              onClick={() => setUserMenuOpen(v => !v)}
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-800 text-xs font-bold text-white hover:bg-slate-700 transition-colors cursor-pointer"
+              title={userName}
+            >
+              {userInitials || "JL"}
+            </button>
+
+            {/* Dropdown menu */}
+            {userMenuOpen && (
+              <div className="absolute right-0 top-11 z-50 w-56 rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden">
+                {/* User info */}
+                <div className="px-4 py-3 border-b border-slate-100">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-800 text-xs font-bold text-white shrink-0">
+                      {userInitials || "JL"}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-900 truncate">{userName}</p>
+                      <p className="text-xs text-slate-400 truncate">{session?.user?.email ?? ""}</p>
+                    </div>
+                  </div>
+                </div>
+                {/* Menu items */}
+                <div className="py-1">
+                  <button
+                    onClick={() => { setUserMenuOpen(false); router.push("/profile"); }}
+                    className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+                  >
+                    <User size={15} className="text-slate-400" />
+                    Mi perfil
+                  </button>
+                  <div className="my-1 border-t border-slate-100" />
+                  <button
+                    onClick={() => void handleSignOut()}
+                    className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                  >
+                    <LogOut size={15} />
+                    Cerrar sesión
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 

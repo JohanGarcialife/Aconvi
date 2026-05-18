@@ -101,79 +101,81 @@ export async function GET() {
     ];
 
 
-    // TEMPORARY FIX: The Coolify production database is missing the 'category' column 
-    // because drizzle-kit push was not run there. We patch it directly.
-    try {
-      await db.execute(sql`ALTER TABLE incident ADD COLUMN IF NOT EXISTS category varchar(64) NOT NULL DEFAULT 'otro'`);
-      await db.execute(sql`ALTER TABLE incident ADD COLUMN IF NOT EXISTS final_photo_url text`);
-      
-      // Patch missing user columns from recent migrations
-      await db.execute(sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS phone_number text`);
-      await db.execute(sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS phone_number_verified boolean NOT NULL DEFAULT false`);
-      await db.execute(sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS corporate_username text`);
-      await db.execute(sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS initial_pin_hash text`);
-      await db.execute(sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS pin_activated boolean NOT NULL DEFAULT false`);
-      await db.execute(sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS device_token text`);
-      await db.execute(sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS device_activated_at timestamp with time zone`);
+    // TEMPORARY FIX: Patch the DB schema incrementally.
+    const patchErrors: string[] = [];
 
-      await db.execute(sql`
-        CREATE TABLE IF NOT EXISTS "incident_note" (
-          "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-          "incident_id" uuid NOT NULL REFERENCES incident(id) ON DELETE cascade,
-          "author_id" text NOT NULL REFERENCES "user"(id) ON DELETE cascade,
-          "content" text NOT NULL,
-          "created_at" timestamp with time zone DEFAULT now() NOT NULL
-        )
-      `);
-
-      await db.execute(sql`
-        CREATE TABLE IF NOT EXISTS "incident_history" (
-          "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-          "incident_id" uuid NOT NULL REFERENCES incident(id) ON DELETE cascade,
-          "actor_name" varchar(128) NOT NULL,
-          "action" varchar(64) NOT NULL,
-          "previous_status" varchar(64),
-          "new_status" varchar(64),
-          "comment" text,
-          "created_at" timestamp with time zone DEFAULT now() NOT NULL
-        )
-      `);
-
-      // Push Login missing schema
+    const runPatch = async (query: any, name: string) => {
       try {
-        await db.execute(sql`CREATE TYPE "push_platform" AS ENUM ('web', 'expo')`);
-      } catch (e) {
-        // ENUM might already exist, ignore error
+        await db.execute(query);
+      } catch (e: any) {
+        console.error(`Error patching ${name}:`, e.message || e);
+        patchErrors.push(`Failed on ${name}: ${e.message || e}`);
       }
+    };
 
-      await db.execute(sql`
-        CREATE TABLE IF NOT EXISTS "push_token" (
-          "id" text PRIMARY KEY NOT NULL,
-          "user_id" text NOT NULL REFERENCES "user"(id) ON DELETE cascade,
-          "token" text NOT NULL,
-          "platform" "push_platform" NOT NULL,
-          "created_at" timestamp with time zone DEFAULT now() NOT NULL,
-          "updated_at" timestamp with time zone DEFAULT now() NOT NULL
-        )
-      `);
+    await runPatch(sql`ALTER TABLE incident ADD COLUMN IF NOT EXISTS category varchar(64) NOT NULL DEFAULT 'otro'`, 'incident.category');
+    await runPatch(sql`ALTER TABLE incident ADD COLUMN IF NOT EXISTS final_photo_url text`, 'incident.final_photo_url');
+    
+    await runPatch(sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS phone_number text`, 'user.phone_number');
+    await runPatch(sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS phone_number_verified boolean DEFAULT false`, 'user.phone_number_verified');
+    await runPatch(sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS corporate_username text`, 'user.corporate_username');
+    await runPatch(sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS initial_pin_hash text`, 'user.initial_pin_hash');
+    await runPatch(sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS pin_activated boolean DEFAULT false`, 'user.pin_activated');
+    await runPatch(sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS device_token text`, 'user.device_token');
+    await runPatch(sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS device_activated_at timestamp with time zone`, 'user.device_activated_at');
 
-      await db.execute(sql`
-        CREATE TABLE IF NOT EXISTS "push_auth_session" (
-          "id" text PRIMARY KEY NOT NULL,
-          "user_id" text NOT NULL REFERENCES "user"(id) ON DELETE cascade,
-          "token" text NOT NULL UNIQUE,
-          "otp_code" text,
-          "status" text DEFAULT 'PENDING' NOT NULL,
-          "login_ip" text,
-          "login_user_agent" text,
-          "expires_at" timestamp with time zone NOT NULL,
-          "created_at" timestamp with time zone DEFAULT now() NOT NULL
-        )
-      `);
+    await runPatch(sql`
+      CREATE TABLE IF NOT EXISTS "incident_note" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+        "incident_id" uuid NOT NULL REFERENCES incident(id) ON DELETE cascade,
+        "author_id" text NOT NULL REFERENCES "user"(id) ON DELETE cascade,
+        "content" text NOT NULL,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL
+      )
+    `, 'incident_note table');
 
-      console.log("Patched missing tables and columns in production DB");
-    } catch (e) {
-      console.error("Could not patch DB schema:", e);
+    await runPatch(sql`
+      CREATE TABLE IF NOT EXISTS "incident_history" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+        "incident_id" uuid NOT NULL REFERENCES incident(id) ON DELETE cascade,
+        "actor_name" varchar(128) NOT NULL,
+        "action" varchar(64) NOT NULL,
+        "previous_status" varchar(64),
+        "new_status" varchar(64),
+        "comment" text,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL
+      )
+    `, 'incident_history table');
+
+    await runPatch(sql`CREATE TYPE "push_platform" AS ENUM ('web', 'expo')`, 'push_platform enum');
+
+    await runPatch(sql`
+      CREATE TABLE IF NOT EXISTS "push_token" (
+        "id" text PRIMARY KEY NOT NULL,
+        "user_id" text NOT NULL REFERENCES "user"(id) ON DELETE cascade,
+        "token" text NOT NULL,
+        "platform" "push_platform" NOT NULL,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+      )
+    `, 'push_token table');
+
+    await runPatch(sql`
+      CREATE TABLE IF NOT EXISTS "push_auth_session" (
+        "id" text PRIMARY KEY NOT NULL,
+        "user_id" text NOT NULL REFERENCES "user"(id) ON DELETE cascade,
+        "token" text NOT NULL UNIQUE,
+        "otp_code" text,
+        "status" text DEFAULT 'PENDING' NOT NULL,
+        "login_ip" text,
+        "login_user_agent" text,
+        "expires_at" timestamp with time zone NOT NULL,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL
+      )
+    `, 'push_auth_session table');
+
+    if (patchErrors.length > 0) {
+      console.warn("Some patches failed:", patchErrors);
     }
 
     const newIncidents = await db.insert(incident).values(demoIncidents).returning({ id: incident.id });

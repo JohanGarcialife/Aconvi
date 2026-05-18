@@ -49,9 +49,9 @@ export function AppSidebar() {
     trpc.incident.all.queryOptions({ tenantId: "org_aconvi_demo" }),
   );
   
-  const activeCount = incidents?.filter(
-    (i: any) => !["RESUELTA", "RECHAZADA"].includes(i.status)
-  ).length ?? 0;
+  // Show total incidents count in badge
+  const totalCount = incidents?.length ?? 0;
+
 
   const { permission, isRegistering, requestPermissionAndSubscribe } = useWebPush();
 
@@ -96,7 +96,7 @@ export function AppSidebar() {
                           <item.icon className="h-4 w-4 shrink-0" />
                           <span>{item.title}</span>
                         </div>
-                        {item.title === "Incidencias" && activeCount > 0 ? (
+                        {item.title === "Incidencias" && totalCount > 0 ? (
                           <span
                             className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
                               isActive
@@ -104,7 +104,7 @@ export function AppSidebar() {
                                 : "bg-primary/15 text-primary"
                             }`}
                           >
-                            {activeCount}
+                            {totalCount}
                           </span>
                         ) : item.badge && item.title !== "Incidencias" ? (
                           <span
