@@ -101,6 +101,12 @@ export default function IncidentsPage() {
   const addNote = useMutation(
     trpc.incident.addNote.mutationOptions({ onSuccess: () => { refetch().catch(() => null); } })
   );
+  const providerAccept = useMutation(
+    trpc.incident.providerAccept.mutationOptions({ onSuccess: () => { refetch().catch(() => null); } })
+  );
+  const providerComplete = useMutation(
+    trpc.incident.providerComplete.mutationOptions({ onSuccess: () => { refetch().catch(() => null); } })
+  );
 
   // Close user menu on outside click
   useEffect(() => {
@@ -170,6 +176,24 @@ export default function IncidentsPage() {
       await rejectMut.mutateAsync({ tenantId: TENANT_ID, id: selected.id });
       showToast("Incidencia marcada como no procede");
     } catch { showToast("❌ Error", false); }
+  };
+
+  const handleSimulateAccept = async () => {
+    if (!selected || !selected.providerId) return;
+    try {
+      // @ts-ignore
+      await providerAccept.mutateAsync({ tenantId: TENANT_ID, id: selected.id, providerId: selected.providerId, notes: "Simulación: Aceptado desde panel de pruebas" });
+      showToast("✅ Simulación: El proveedor aceptó el trabajo");
+    } catch { showToast("❌ Error al simular", false); }
+  };
+
+  const handleSimulateComplete = async () => {
+    if (!selected || !selected.providerId) return;
+    try {
+      // @ts-ignore
+      await providerComplete.mutateAsync({ tenantId: TENANT_ID, id: selected.id, providerId: selected.providerId, completionNote: "Simulación: Reparación finalizada correctamente." });
+      showToast("✅ Simulación: El proveedor finalizó el trabajo");
+    } catch { showToast("❌ Error al simular", false); }
   };
 
   const handleAddNote = async (e: React.FormEvent) => {
@@ -449,24 +473,38 @@ export default function IncidentsPage() {
             {/* Action bar */}
             <div className="flex shrink-0 items-center justify-between border-t border-slate-200 bg-white px-8 py-4">
               <div className="flex gap-3">
-                <button onClick={handleReject} disabled={selected.status === "RECHAZADA"}
-                  className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors">
-                  <XCircle size={15} /> No procede
-                </button>
-                <button onClick={() => {
-                    // @ts-ignore – tRPC mutateAsync types lag
-                    void updateStatus.mutateAsync({ tenantId: TENANT_ID, id: selected.id, status: "EN_REVISION" as const });
-                  }}
-                  disabled={selected.status !== "RECIBIDA"}
-                  className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors">
-                  <AlertTriangle size={15} /> En revisión
-                </button>
+                {/* Normal Admin Actions */}
+                {selected.status === "RECIBIDA" && (
+                  <>
+                    <button onClick={handleReject} disabled={selected.status === "RECHAZADA"}
+                      className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors">
+                      <XCircle size={15} /> No procede
+                    </button>
+                  </>
+                )}
+                
+                {/* Simulation Actions */}
+                {selected.status === "EN_REVISION" && (
+                  <button onClick={handleSimulateAccept} disabled={providerAccept.isPending}
+                    className="flex items-center gap-1.5 rounded-xl border border-blue-400 bg-blue-50 px-4 py-2.5 text-sm font-bold text-blue-700 hover:bg-blue-100 disabled:opacity-40 transition-colors shadow-sm">
+                    {providerAccept.isPending ? "Simulando..." : "🤖 Simular Proveedor: Pasar a En Curso"}
+                  </button>
+                )}
+                {selected.status === "EN_CURSO" && (
+                  <button onClick={handleSimulateComplete} disabled={providerComplete.isPending}
+                    className="flex items-center gap-1.5 rounded-xl border border-emerald-400 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-700 hover:bg-emerald-100 disabled:opacity-40 transition-colors shadow-sm">
+                    <CheckCircle2 size={15} /> {providerComplete.isPending ? "Simulando..." : "🤖 Simular Proveedor: Marcar Resuelta"}
+                  </button>
+                )}
               </div>
-              <button onClick={handleAssign} disabled={!selectedProvider || assignProvider.isPending}
-                className="flex items-center gap-2 rounded-xl bg-teal-500 px-6 py-2.5 text-sm font-bold text-white hover:bg-teal-600 disabled:opacity-40 transition-colors shadow-sm">
-                <CheckCircle2 size={15} />
-                {assignProvider.isPending ? "Asignando..." : "Asignar y Notificar Vecino"}
-              </button>
+
+              {selected.status === "RECIBIDA" && (
+                <button onClick={handleAssign} disabled={!selectedProvider || assignProvider.isPending}
+                  className="flex items-center gap-2 rounded-xl bg-teal-500 px-6 py-2.5 text-sm font-bold text-white hover:bg-teal-600 disabled:opacity-40 transition-colors shadow-sm">
+                  <CheckCircle2 size={15} />
+                  {assignProvider.isPending ? "Asignando..." : "Asignar y Notificar Vecino"}
+                </button>
+              )}
             </div>
           </div>
         ) : (
