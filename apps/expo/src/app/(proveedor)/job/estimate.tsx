@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -13,8 +13,40 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, Stack, useLocalSearchParams } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import NetInfo from "@react-native-community/netinfo";
 import { api } from "~/utils/api";
 import { useMutation } from "@tanstack/react-query";
+
+const OFFLINE_ESTIMATE_QUEUE_KEY = "aconvi_offline_estimate_queue";
+
+interface OfflineEstimate {
+  id: string;
+  incidentId: string;
+  providerId: string;
+  tenantId: string;
+  estimatedCost: number;
+  estimatedDays: number;
+  notes: string;
+  createdAt: number;
+}
+
+async function loadEstimateQueue(): Promise<OfflineEstimate[]> {
+  const raw = await AsyncStorage.getItem(OFFLINE_ESTIMATE_QUEUE_KEY);
+  return raw ? JSON.parse(raw) : [];
+}
+async function addEstimateToQueue(job: OfflineEstimate) {
+  const queue = await loadEstimateQueue();
+  queue.push(job);
+  await AsyncStorage.setItem(OFFLINE_ESTIMATE_QUEUE_KEY, JSON.stringify(queue));
+}
+async function removeEstimateFromQueue(id: string) {
+  const queue = await loadEstimateQueue();
+  await AsyncStorage.setItem(
+    OFFLINE_ESTIMATE_QUEUE_KEY,
+    JSON.stringify(queue.filter((j) => j.id !== id)),
+  );
+}
 
 const PRIMARY = "#4aa19b";
 const DARK = "#0f172a";
@@ -156,6 +188,9 @@ export default function EstimateScreen() {
   const [materials, setMaterials] = useState(35);
   const [days, setDays] = useState(1);
   const [goNow, setGoNow] = useState(true);
+  const [isOffline, setIsOffline] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const DEMO_TENANT_ID = "org_aconvi_demo";
   const total = departure + labor + materials;
@@ -175,27 +210,91 @@ export default function EstimateScreen() {
     onError: (e: Error) => Alert.alert("Error", e.message),
   });
 
-  const handleSend = () => {
+  // ─── Sync offline estimate queue ──────────────────────────────────────────
+  const syncEstimateQueue = useCallback(async () => {
+    const queue = await loadEstimateQueue();
+    if (queue.length === 0) return;
+    setIsSyncing(true);
+    for (const job of queue) {
+      try {
+        await new Promise<void>((resolve, reject) => {
+          acceptMutation.mutate(
+            {
+              id: job.incidentId,
+              tenantId: job.tenantId,
+              providerId: job.providerId,
+              estimatedCost: job.estimatedCost,
+              estimatedDays: job.estimatedDays,
+              notes: job.notes,
+            } as any,
+            { onSuccess: () => resolve(), onError: (e: any) => reject(e) },
+          );
+        });
+        await removeEstimateFromQueue(job.id);
+      } catch { /* leave for next retry */ }
+    }
+    const remaining = await loadEstimateQueue();
+    setPendingCount(remaining.length);
+    setIsSyncing(false);
+  }, [acceptMutation]);
+
+  // ─── NetInfo listener ─────────────────────────────────────────────────────
+  useEffect(() => {
+    loadEstimateQueue().then((q) => setPendingCount(q.length));
+    const unsub = NetInfo.addEventListener((state) => {
+      const connected = !!state.isConnected && !!state.isInternetReachable;
+      setIsOffline(!connected);
+      if (connected) void syncEstimateQueue();
+    });
+    return () => unsub();
+  }, [syncEstimateQueue]);
+
+  const handleSend = async () => {
     const incidentId = params.incidentId;
     const providerId = params.providerId;
 
     if (!incidentId || !providerId) {
-      // Demo fallback
       Alert.alert("Estimación enviada ✓", `Presupuesto de ${total}€ enviado.`,
         [{ text: "OK", onPress: () => router.push("/(proveedor)/job/inprogress") }]
       );
       return;
     }
 
-    acceptMutation.mutate({
-      id: incidentId,
-      tenantId: DEMO_TENANT_ID,
-      providerId,
-      estimatedCost: total,
-      estimatedDays: goNow ? 0 : Number(days),
-      notes: goNow ? "Salida inmediata" : "Salida programada",
-    } as any);
+    if (isOffline) {
+      // ── Modo offline: guardar en cola ────────────────────────────────────
+      const job: OfflineEstimate = {
+        id: `offline_est_${Date.now()}`,
+        incidentId,
+        providerId,
+        tenantId: DEMO_TENANT_ID,
+        estimatedCost: total,
+        estimatedDays: goNow ? 0 : Number(days),
+        notes: goNow ? "Salida inmediata" : "Salida programada",
+        createdAt: Date.now(),
+      };
+      await addEstimateToQueue(job);
+      setPendingCount((c) => c + 1);
+      Alert.alert(
+        "📶 Guardado sin conexión",
+        "Tu estimación se ha guardado localmente. Se enviará automáticamente cuando recuperes señal.",
+        [{ text: "OK", onPress: () => router.push({
+          pathname: "/(proveedor)/job/inprogress",
+          params: { incidentId, providerId },
+        }) }]
+      );
+    } else {
+      acceptMutation.mutate({
+        id: incidentId,
+        tenantId: DEMO_TENANT_ID,
+        providerId,
+        estimatedCost: total,
+        estimatedDays: goNow ? 0 : Number(days),
+        notes: goNow ? "Salida inmediata" : "Salida programada",
+      } as any);
+    }
   };
+
+  const isLoading = acceptMutation.isPending || isSyncing;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["bottom"]}>
@@ -208,6 +307,19 @@ export default function EstimateScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        {/* Offline banner */}
+        {isOffline && (
+          <View style={styles.offlineBanner}>
+            <Text style={styles.offlineBannerText}>📵 Sin conexión — la estimación se guardará localmente</Text>
+          </View>
+        )}
+        {!isOffline && pendingCount > 0 && (
+          <TouchableOpacity style={styles.syncBanner} onPress={syncEstimateQueue} disabled={isSyncing}>
+            <Text style={styles.syncBannerText}>
+              {isSyncing ? "⏳ Sincronizando..." : `☁️ ${pendingCount} estimación${pendingCount > 1 ? "es" : ""} pendiente${pendingCount > 1 ? "s" : ""} de subir. Pulsa para sincronizar.`}
+            </Text>
+          </TouchableOpacity>
+        )}
         {/* OT header */}
         <Text style={styles.otTitle}>OT aceptada</Text>
         <Text style={styles.communityName}>Residencial El Lago</Text>
@@ -288,15 +400,17 @@ export default function EstimateScreen() {
 
         {/* CTA */}
         <TouchableOpacity
-          style={[styles.sendButton, acceptMutation.isPending && { opacity: 0.7 }]}
+          style={[styles.sendButton, isLoading && { opacity: 0.7 }]}
           onPress={handleSend}
-          disabled={acceptMutation.isPending}
+          disabled={isLoading}
           activeOpacity={0.85}
         >
-          {acceptMutation.isPending ? (
+          {isLoading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.sendButtonText}>Enviar estimación</Text>
+            <Text style={styles.sendButtonText}>
+              {isOffline ? "💾 Guardar sin conexión" : "Enviar estimación"}
+            </Text>
           )}
         </TouchableOpacity>
 
@@ -311,6 +425,26 @@ export default function EstimateScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#fff" },
   scroll: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 40 },
+  offlineBanner: {
+    backgroundColor: "#fef3c7",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#fde68a",
+  },
+  offlineBannerText: { fontSize: 13, color: "#92400e", fontWeight: "600", textAlign: "center" },
+  syncBanner: {
+    backgroundColor: "#ecfdf5",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
+  },
+  syncBannerText: { fontSize: 13, color: "#065f46", fontWeight: "600", textAlign: "center" },
   otTitle: {
     fontSize: 28,
     fontWeight: "800",

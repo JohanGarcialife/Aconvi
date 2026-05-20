@@ -1,12 +1,22 @@
-import { QueryClient } from "@tanstack/react-query";
+import { QueryClient, onlineManager } from "@tanstack/react-query";
 import { createTRPCClient, httpBatchLink, loggerLink } from "@trpc/client";
 import { createTRPCOptionsProxy } from "@trpc/tanstack-react-query";
 import superjson from "superjson";
+import NetInfo from "@react-native-community/netinfo";
 
 import type { AppRouter } from "@acme/api";
 
 import * as SecureStore from "expo-secure-store";
 import { getBaseUrl } from "./base-url";
+
+// ─── Wire React Query's onlineManager to NetInfo ─────────────────────────────
+// This makes ALL queries and mutations across the entire app automatically
+// pause when there's no internet and resume when it comes back.
+onlineManager.setEventListener((setOnline) => {
+  return NetInfo.addEventListener((state) => {
+    setOnline(!!state.isConnected && !!state.isInternetReachable);
+  });
+});
 
 export const queryClient = new QueryClient({
   defaultOptions: {
