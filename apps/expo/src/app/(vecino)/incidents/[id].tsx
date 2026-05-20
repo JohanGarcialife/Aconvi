@@ -4,8 +4,8 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
@@ -17,13 +17,14 @@ const DARK = "#0f172a";
 const MUTED = "#64748b";
 const BORDER = "#e2e8f0";
 
-const STATUS_LABELS = {
-  NUEVA: { label: "Nueva", color: "#3b82f6", bg: "#eff6ff" },
-  EN_REVISION: { label: "En revisión", color: "#eab308", bg: "#fefce8" },
-  AGENDADA: { label: "Agendada", color: "#a855f7", bg: "#faf5ff" },
-  EN_PROCESO: { label: "En proceso", color: "#f97316", bg: "#fff7ed" },
-  RESUELTA: { label: "Resuelta", color: "#22c55e", bg: "#f0fdf4" },
-  CERRADA: { label: "Cerrada", color: "#64748b", bg: "#f8fafc" },
+// Aligned with real backend status enum
+const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+  RECIBIDA:    { label: "Pendiente 📥",   color: "#92400e", bg: "#fef3c7" },
+  EN_REVISION: { label: "En revisión 🔍", color: "#1e40af", bg: "#dbeafe" },
+  AGENDADA:    { label: "Agendada 📅",    color: "#5b21b6", bg: "#ede9fe" },
+  EN_CURSO:    { label: "En curso 🔧",    color: "#065f46", bg: "#d1fae5" },
+  RESUELTA:    { label: "Resuelta ✅",     color: "#065f46", bg: "#d1fae5" },
+  RECHAZADA:   { label: "Rechazada ❌",   color: "#991b1b", bg: "#fee2e2" },
 };
 
 export default function IncidentDetailScreen() {
@@ -89,10 +90,32 @@ export default function IncidentDetailScreen() {
         <View style={s.card}>
           <Row label="Prioridad" value={incident.priority ?? "NORMAL"} />
           <View style={s.divider} />
-          <Row label="Comunidad" value={incident.organizationId ?? ""} />
-          <View style={s.divider} />
           <Row label="Descripción" value={incident.description ?? ""} />
+          {(incident as any).category && (
+            <>
+              <View style={s.divider} />
+              <Row label="Categoría" value={(incident as any).category} />
+            </>
+          )}
+          {incident.provider && (
+            <>
+              <View style={s.divider} />
+              <Row label="Especialista asignado" value={incident.provider.name ?? ""} />
+            </>
+          )}
         </View>
+
+        {/* Incident photo */}
+        {incident.photoUrl && (
+          <>
+            <Text style={s.sectionTitle}>Foto de la avería</Text>
+            <Image
+              source={{ uri: incident.photoUrl }}
+              style={{ width: "100%", height: 200, borderRadius: 14, marginBottom: 20 }}
+              resizeMode="cover"
+            />
+          </>
+        )}
 
         {/* Timeline */}
         <Text style={s.sectionTitle}>Historial de la reparación</Text>
@@ -118,8 +141,9 @@ export default function IncidentDetailScreen() {
                     <Text style={s.timelineLabelDone}>
                       {entry.action === "CREATED" ? "Reporte enviado" :
                        entry.action === "ASSIGNED" ? "Asignada a especialista" :
-                       entry.action === "COMPLETED" ? "Resuelta" :
-                       entry.newStatus}
+                       entry.action === "COMPLETED" ? "Trabajo finalizado" :
+                       entry.action === "STATUS_CHANGED" ? `Estado: ${entry.newStatus}` :
+                       entry.action}
                     </Text>
                     {entry.comment && (
                       <Text style={{ fontSize: 13, color: "#475569", marginTop: 4, fontStyle: "italic" }}>

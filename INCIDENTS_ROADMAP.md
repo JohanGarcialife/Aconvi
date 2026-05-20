@@ -34,8 +34,10 @@ _Objetivo: Interfaz para los trabajadores y robustez frente a mala cobertura (cu
 
 _Objetivo: Experiencia rápida y sin fricción para reportar averías._
 
-- [ ] **Cámara:** Integrar `expo-camera` o `expo-image-picker` para captura de evidencia visual.
-- [ ] **Formulario:** Pantalla de reporte (título, descripción, envío).
+- [x] **Cámara:** Integrado `expo-image-picker` para captura de evidencia visual (cámara + galería).
+- [x] **Formulario en 2 pasos:** Paso 1: selector de categoría visual. Paso 2: título opcional, descripción, selector de prioridad (Baja/Media/Alta/Urgente) y foto.
+- [x] **Lista de incidencias:** `incidents/index.tsx` muestra todas las incidencias con badge de estado, chip de categoría y colores de prioridad.
+- [x] **Detalle de incidencia:** `incidents/[id].tsx` muestra la foto de la avería, el especialista asignado, el timeline de historial completo y el botón de valoración al resolver.
 - [ ] **Categorización (Opcional IA):** Conectar LLM en el backend para auto-clasificar la incidencia basándose en la descripción del vecino.
 
 ## Fase 4: Notificaciones Push de Coste Cero
