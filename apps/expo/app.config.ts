@@ -4,6 +4,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: "Aconvi",
   slug: "aconvi",
+  owner: "johangarcialife",
   scheme: "aconvi", // deep links: aconvi://job/[id], aconvi://rating/[id]
   version: "0.1.0",
   orientation: "portrait",
@@ -39,6 +40,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       projectId: "1713543a-27cf-4db0-9da2-64ddf821d5d7",
     },
   },
+
   plugins: [
     "expo-router",
     "expo-secure-store",
