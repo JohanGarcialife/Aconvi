@@ -1,97 +1,109 @@
 import { NextResponse } from "next/server";
 import { db } from "@acme/db/client";
 import { sql } from "drizzle-orm";
+import { createHash } from "crypto";
 
 export const dynamic = "force-dynamic";
 
-// ─── Test users to seed ──────────────────────────────────────────────────────
+// ─── PIN de prueba para todos los usuarios de test ────────────────────────────
+// PIN: 123456  →  SHA-256: 8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92
+const TEST_PIN = "123456";
+const TEST_PIN_HASH = createHash("sha256").update(TEST_PIN).digest("hex");
+
 const TEST_USERS = [
   {
     id: "test-user-vecino-001",
     name: "María García",
     email: "vecino@test.aconvi.com",
+    corporateUsername: "vecino.test",
     role: "Vecino",
   },
   {
     id: "test-user-admin-001",
     name: "Carlos López",
     email: "admin@test.aconvi.com",
+    corporateUsername: "admin.test",
     role: "Administrador",
   },
   {
     id: "test-user-proveedor-001",
     name: "Pedro Martínez",
     email: "proveedor@test.aconvi.com",
+    corporateUsername: "proveedor.test",
     role: "Proveedor",
   },
 ];
 
 export async function GET() {
   try {
+    // Ensure mobile_pin_hash column exists (idempotent)
+    await db.execute(
+      sql`ALTER TABLE "user" ADD COLUMN IF NOT EXISTS mobile_pin_hash text;`,
+    );
+
     const results = [];
 
     for (const testUser of TEST_USERS) {
-      // Upsert user — creates or updates role/name if already exists
       await db.execute(sql`
-        INSERT INTO "user" (id, name, email, email_verified, role, updated_at, created_at)
+        INSERT INTO "user" (
+          id, name, email, email_verified, role,
+          corporate_username, initial_pin_hash, mobile_pin_hash,
+          pin_activated, updated_at, created_at
+        )
         VALUES (
           ${testUser.id},
           ${testUser.name},
           ${testUser.email},
           true,
           ${testUser.role},
+          ${testUser.corporateUsername},
+          ${TEST_PIN_HASH},
+          ${TEST_PIN_HASH},
+          true,
           now(),
           now()
         )
         ON CONFLICT (email) DO UPDATE SET
-          name       = EXCLUDED.name,
-          role       = EXCLUDED.role,
-          email_verified = true,
-          updated_at = now();
+          name                 = EXCLUDED.name,
+          role                 = EXCLUDED.role,
+          email_verified       = true,
+          corporate_username   = EXCLUDED.corporate_username,
+          initial_pin_hash     = EXCLUDED.initial_pin_hash,
+          mobile_pin_hash      = EXCLUDED.mobile_pin_hash,
+          pin_activated        = true,
+          updated_at           = now();
       `);
 
-      // Read back to confirm final state
-      const rows = await db.execute(sql`
-        SELECT id, name, email, role, email_verified
+      const row = await db.execute(sql`
+        SELECT id, name, email, role, corporate_username, pin_activated
         FROM "user"
         WHERE email = ${testUser.email}
         LIMIT 1;
       `);
 
-      results.push(rows.rows[0]);
+      results.push(row.rows[0]);
     }
 
     return NextResponse.json({
       success: true,
-      message: "✅ Usuarios de prueba listos en la base de datos",
-      users: results,
-      howToLogin: {
-        method: "Magic Link / OTP (passwordless)",
-        webAdmin: {
-          url: "/login",
-          email: "admin@test.aconvi.com",
-          note: "Introduce el email → el sistema envía un código OTP o magic link al correo",
+      message: "✅ Usuarios de prueba listos con PIN configurado",
+      pin: TEST_PIN,
+      users: results.map((r: any) => ({
+        name: r.name,
+        email: r.email,
+        role: r.role,
+        corporateUsername: r.corporate_username,
+        pinActivated: r.pin_activated,
+        loginInstructions: {
+          usuario: r.corporate_username,
+          pin: TEST_PIN,
         },
-        appVecino: {
-          email: "vecino@test.aconvi.com",
-          note: "En la pantalla de login de la app, introduce el email y sigue el OTP",
-        },
-        appProveedor: {
-          email: "proveedor@test.aconvi.com",
-          note: "En la pantalla de login de la app, introduce el email y sigue el OTP",
-        },
-        devTip:
-          "⚠️ En desarrollo local sin SMTP configurado, el OTP/magic-link se imprime directamente en los logs de la terminal (console.log). Revisa la consola donde corre 'pnpm dev'.",
-      },
+      })),
     });
   } catch (error: any) {
     console.error("[seed-test-users] Error:", error);
     return NextResponse.json(
-      {
-        success: false,
-        error: error.message,
-        hint: "Verifica que POSTGRES_URL esté configurada en las variables de entorno",
-      },
+      { success: false, error: error.message },
       { status: 500 },
     );
   }
