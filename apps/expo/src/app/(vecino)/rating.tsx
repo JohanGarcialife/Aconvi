@@ -9,10 +9,14 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
+import { api, queryClient } from "~/utils/api";
+import { useMutation } from "@tanstack/react-query";
 
 const PRIMARY = "#4aa19b";
 const DARK = "#0f172a";
 const MUTED = "#64748b";
+
+const TENANT_ID = "org_aconvi_demo";
 
 export default function RatingScreen() {
   const { incidentId } = useLocalSearchParams<{ incidentId: string }>();
@@ -20,7 +24,6 @@ export default function RatingScreen() {
   const [rating, setRating] = useState(0);
   const [hovered, setHovered] = useState(0);
   const [comment, setComment] = useState("");
-  const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
 
   const displayRating = hovered || rating;
@@ -33,16 +36,34 @@ export default function RatingScreen() {
     5: "Excelente 🌟",
   };
 
-  const handleSubmit = async () => {
+  const submitRating = useMutation({
+    ...api.incident.submitRating.mutationOptions(),
+    onSuccess: () => {
+      void queryClient.invalidateQueries(api.incident.all.queryFilter());
+      setDone(true);
+    },
+    onError: (e: any) => {
+      Alert.alert("Error al enviar", e.message ?? "Inténtalo de nuevo.");
+    },
+  });
+
+  const submitting = submitRating.isPending;
+
+  const handleSubmit = () => {
     if (!rating) {
       Alert.alert("Selecciona una valoración");
       return;
     }
-    setSubmitting(true);
-    // In production: trpc.incident.submitRating.mutate({ incidentId, rating, comment })
-    await new Promise((r) => setTimeout(r, 900));
-    setSubmitting(false);
-    setDone(true);
+    if (!incidentId) {
+      Alert.alert("Error", "No se encontró el ID de la incidencia.");
+      return;
+    }
+    submitRating.mutate({
+      tenantId: TENANT_ID,
+      id: incidentId,
+      rating,
+      comment,
+    });
   };
 
   if (done) {
@@ -80,7 +101,7 @@ export default function RatingScreen() {
   }
 
   return (
-    <SafeAreaView style={s.safe} edges={["bottom"]}>
+    <SafeAreaView style={s.safe} edges={["top", "bottom"]}>
       <Stack.Screen
         options={{
           title: "Valorar servicio",

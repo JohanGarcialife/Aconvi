@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, Stack, useLocalSearchParams } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 import { api } from "~/utils/api";
 import { useQuery, useMutation } from "@tanstack/react-query";
 
@@ -49,46 +50,60 @@ export default function ProveedorJobScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ incidentId?: string; providerId?: string }>();
 
-  // If incidentId and providerId are passed via params, use them; 
-  // otherwise fall back to listing all assigned incidents
   const incidentId = params.incidentId;
-  const providerId = params.providerId;
 
-  // Fetch assigned incidents for this provider
-  const { data: incidents, isLoading } = useQuery(
-    api.incident.all.queryOptions({
-      tenantId: DEMO_TENANT_ID,
-    }),
+  // Fetch current provider profile from the session
+  const { data: currentProv, isLoading: loadingProv } = useQuery(
+    api.provider.currentProvider.queryOptions()
   );
 
-  // Use the first active (EN_REVISION or RECIBIDA) incident assigned to this provider
+  const providerId = params.providerId ?? currentProv?.id;
+  const tenantId = currentProv?.organizationId ?? DEMO_TENANT_ID;
+
+  // Fetch assigned incidents specifically for this provider
+  const { data: incidents, isLoading: loadingIncidents } = useQuery(
+    api.incident.assignedToProvider.queryOptions(
+      {
+        providerId: providerId ?? "",
+        tenantId: tenantId,
+      },
+      {
+        enabled: !!providerId,
+      }
+    )
+  );
+
+  const isLoading = loadingProv || (!!providerId && loadingIncidents);
+
+  // Use the first active (EN_REVISION or RECIBIDA or AGENDADA) incident assigned to this provider
   const activeIncident = (incidents as any[] | undefined)?.find(
     (i: any) =>
       (incidentId ? i.id === incidentId : true) &&
       (i.status === "EN_REVISION" || i.status === "RECIBIDA" || i.status === "AGENDADA"),
-  ) ?? (incidents as any[] | undefined)?.[0] ?? null;
+  ) ?? null;
 
-  const acceptMutation = useMutation({
-    ...api.incident.providerAccept.mutationOptions(),
-    onSuccess: () => {
-      router.push({
-        pathname: "/(proveedor)/job/estimate",
-        params: {
-          incidentId: activeIncident?.id,
-          providerId,
-        },
-      });
-    },
-    onError: (e: any) => Alert.alert("Error", e.message),
-  });
+  const acceptMutation = useMutation(
+    api.incident.providerAccept.mutationOptions({
+      onSuccess: () => {
+        router.push({
+          pathname: "/(proveedor)/job/estimate",
+          params: {
+            incidentId: activeIncident?.id,
+            providerId,
+          },
+        });
+      },
+      onError: (e: any) => Alert.alert("Error", e.message),
+    })
+  );
 
   const countdown = useCountdown(1 * 3600 + 42 * 60 + 5);
 
   const handleAccept = () => {
-    if (!activeIncident) return;
+    if (!activeIncident || !providerId) return;
     acceptMutation.mutate({
       id: activeIncident.id,
-      tenantId: activeIncident.tenantId,
+      tenantId: activeIncident.organizationId ?? tenantId,
       providerId,
       notes: "Trabajo aceptado por proveedor",
     } as any);
@@ -121,6 +136,42 @@ export default function ProveedorJobScreen() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <Stack.Screen options={{ headerShown: false }} />
+        
+        {/* Header */}
+        <View style={{ 
+          flexDirection: "row", 
+          justifyContent: "space-between", 
+          alignItems: "center", 
+          paddingHorizontal: 24, 
+          paddingVertical: 16, 
+          borderBottomWidth: 1, 
+          borderBottomColor: "#e2e8f0",
+          backgroundColor: "#fff"
+        }}>
+          <Text style={{ fontSize: 18, fontWeight: "800", color: DARK }}>Aconvi Proveedor</Text>
+          <TouchableOpacity 
+            onPress={() => Alert.alert("Cerrar sesión", "¿Seguro?", [
+              { text: "Cancelar", style: "cancel" },
+              {
+                text: "Salir",
+                style: "destructive",
+                onPress: async () => {
+                  await SecureStore.deleteItemAsync("expo_session_token").catch(() => {});
+                  router.replace("/login");
+                },
+              },
+            ])}
+            style={{ 
+              paddingVertical: 6, 
+              paddingHorizontal: 12, 
+              borderRadius: 8, 
+              backgroundColor: "#FEF2F2" 
+            }}
+          >
+            <Text style={{ color: "#DC2626", fontWeight: "600", fontSize: 13 }}>Cerrar sesión</Text>
+          </TouchableOpacity>
+        </View>
+
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 24 }}>
           <Text style={{ fontSize: 48, marginBottom: 16 }}>✅</Text>
           <Text style={{ fontSize: 18, fontWeight: "700", color: DARK, textAlign: "center" }}>
@@ -135,8 +186,43 @@ export default function ProveedorJobScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["bottom"]}>
+    <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
       <Stack.Screen options={{ title: "", headerShown: false }} />
+
+      {/* Header */}
+      <View style={{ 
+        flexDirection: "row", 
+        justifyContent: "space-between", 
+        alignItems: "center", 
+        paddingHorizontal: 24, 
+        paddingVertical: 16, 
+        borderBottomWidth: 1, 
+        borderBottomColor: "#e2e8f0",
+        backgroundColor: "#fff"
+      }}>
+        <Text style={{ fontSize: 18, fontWeight: "800", color: DARK }}>Aconvi Proveedor</Text>
+        <TouchableOpacity 
+          onPress={() => Alert.alert("Cerrar sesión", "¿Seguro?", [
+            { text: "Cancelar", style: "cancel" },
+            {
+              text: "Salir",
+              style: "destructive",
+              onPress: async () => {
+                await SecureStore.deleteItemAsync("expo_session_token").catch(() => {});
+                router.replace("/login");
+              },
+            },
+          ])}
+          style={{ 
+            paddingVertical: 6, 
+            paddingHorizontal: 12, 
+            borderRadius: 8, 
+            backgroundColor: "#FEF2F2" 
+          }}
+        >
+          <Text style={{ color: "#DC2626", fontWeight: "600", fontSize: 13 }}>Cerrar sesión</Text>
+        </TouchableOpacity>
+      </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Community name */}

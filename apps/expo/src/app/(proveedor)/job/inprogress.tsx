@@ -8,7 +8,7 @@ import {
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter, Stack } from "expo-router";
+import { useRouter, Stack, useLocalSearchParams } from "expo-router";
 
 const PRIMARY = "#4aa19b";
 const DARK = "#0f172a";
@@ -17,17 +17,21 @@ const BORDER = "#e2e8f0";
 
 export default function JobInProgressScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ incidentId?: string; providerId?: string }>();
   const [arrivedLoading, setArrivedLoading] = useState(false);
 
   const handleArrived = async () => {
     setArrivedLoading(true);
     await new Promise((r) => setTimeout(r, 800));
     setArrivedLoading(false);
-    router.push("/(proveedor)/job/complete");
+    router.push({
+      pathname: "/(proveedor)/job/complete",
+      params: { incidentId: params.incidentId, providerId: params.providerId },
+    });
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["bottom"]}>
+    <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
       <Stack.Screen options={{ title: "En camino", headerBackTitle: "Regresar" }} />
 
       <View style={styles.container}>

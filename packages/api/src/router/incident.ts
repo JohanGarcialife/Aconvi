@@ -1,7 +1,7 @@
 import { eq, desc, and } from "drizzle-orm";
 import { z } from "zod";
 
-import { incident, incidentNote, provider, incidentHistory } from "@acme/db/schema";
+import { incident, incidentNote, provider, incidentHistory, user } from "@acme/db/schema";
 import { sendPushToUser } from "./notification";
 import { emitWebSocketEvent } from "../utils/ws";
 
@@ -99,6 +99,8 @@ export const incidentRouter = createTRPCRouter({
         })
         .returning();
 
+      if (!created) throw new Error("No se pudo crear la incidencia.");
+
       // Log history
       await ctx.db.insert(incidentHistory).values({
         incidentId: created.id,
@@ -147,6 +149,8 @@ export const incidentRouter = createTRPCRouter({
         )
         .returning();
 
+      if (!updated) throw new Error("No se pudo actualizar el estado de la incidencia.");
+
       if (previous.status !== updated.status) {
         await ctx.db.insert(incidentHistory).values({
           incidentId: updated.id,
@@ -177,7 +181,7 @@ export const incidentRouter = createTRPCRouter({
       z.object({
         tenantId: z.string().min(1),
         id: z.string().uuid(),
-        providerId: z.string().uuid(),
+        providerId: z.string().min(1),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -196,21 +200,28 @@ export const incidentRouter = createTRPCRouter({
         )
         .returning();
 
+      if (!updated) throw new Error("No se pudo asignar el proveedor.");
+
       // Notify provider user room
       await emitWebSocketEvent(input.providerId, "incident-assigned", updated);
 
       // Push notification to provider with deep link data
       if (updated.providerId) {
-        // Find the user linked to this provider
+        // Find the user linked to this provider by email matching
         const prov = await ctx.db.query.provider.findFirst({
           where: eq(provider.id, updated.providerId),
         });
-        if (prov?.userId) {
-          await sendPushToUser(ctx.db, prov.userId, {
-            title: "📋 Nueva incidencia asignada",
-            body: `Se te ha asignado: ${updated.title}`,
-            data: { type: "job_assigned", incidentId: updated.id },
+        if (prov?.email) {
+          const usr = await ctx.db.query.user.findFirst({
+            where: eq(user.email, prov.email),
           });
+          if (usr?.id) {
+            await sendPushToUser(ctx.db, usr.id, {
+              title: "📋 Nueva incidencia asignada",
+              body: `Se te ha asignado: ${updated.title}`,
+              data: { type: "job_assigned", incidentId: updated.id },
+            });
+          }
         }
       }
 
@@ -257,6 +268,7 @@ export const incidentRouter = createTRPCRouter({
           ),
         )
         .returning();
+      if (!updated) throw new Error("No se pudo rechazar la incidencia.");
       return updated;
     }),
 
@@ -295,7 +307,7 @@ export const incidentRouter = createTRPCRouter({
   assignedToProvider: publicProcedure
     .input(
       z.object({
-        providerId: z.string().uuid(),
+        providerId: z.string().min(1),
         tenantId: z.string().min(1).optional(),
       }),
     )
@@ -325,8 +337,8 @@ export const incidentRouter = createTRPCRouter({
       z.object({
         id: z.string().uuid(),
         tenantId: z.string().min(1),
-        providerId: z.string().uuid(),
-        estimatedDays: z.number().int().min(1).optional(),
+        providerId: z.string().min(1),
+        estimatedDays: z.number().int().min(0).optional(),
         estimatedCost: z.number().min(0).optional(),
         notes: z.string().max(1000).optional(),
       }),
@@ -348,16 +360,21 @@ export const incidentRouter = createTRPCRouter({
         )
         .returning();
 
+      if (!updated) throw new Error("No se pudo aceptar la incidencia.");
+
       // Save estimate as internal note
-      if (input.notes || input.estimatedCost || input.estimatedDays) {
+      if (input.notes || input.estimatedCost !== undefined || input.estimatedDays !== undefined) {
         let noteLines = [];
         if (input.notes) noteLines.push(input.notes);
-        if (input.estimatedCost) noteLines.push(`💰 Presupuesto estimado: ${input.estimatedCost}€`);
-        if (input.estimatedDays) noteLines.push(`⏳ Tiempo estimado: ${input.estimatedDays} días`);
+        if (input.estimatedCost !== undefined) noteLines.push(`💰 Presupuesto estimado: ${input.estimatedCost}€`);
+        if (input.estimatedDays !== undefined) {
+          noteLines.push(`⏳ Tiempo estimado: ${input.estimatedDays === 0 ? "Hoy mismo" : `${input.estimatedDays} días`}`);
+        }
 
+        // Use a valid user ID (fallback to demo) instead of providerId which is not in 'user' table
         await ctx.db.insert(incidentNote).values({
           incidentId: input.id,
-          authorId: input.providerId, // In real app, relate to provider user
+          authorId: DEMO_AUTHOR_ID, 
           content: noteLines.join('\n'),
         });
       }
@@ -381,7 +398,7 @@ export const incidentRouter = createTRPCRouter({
       z.object({
         id: z.string().uuid(),
         tenantId: z.string().min(1),
-        providerId: z.string().uuid(),
+        providerId: z.string().min(1),
         completionNote: z.string().max(1000).optional(),
         finalPhotoUrl: z.string().optional(),
       }),
@@ -403,6 +420,8 @@ export const incidentRouter = createTRPCRouter({
         )
         .returning();
 
+      if (!updated) throw new Error("No se pudo completar el trabajo.");
+
       const noteContent = [
         "✅ Trabajo completado",
         input.completionNote,
@@ -413,7 +432,7 @@ export const incidentRouter = createTRPCRouter({
 
       await ctx.db.insert(incidentNote).values({
         incidentId: input.id,
-        authorId: input.providerId,
+        authorId: DEMO_AUTHOR_ID,
         content: noteContent,
       });
 
@@ -435,6 +454,77 @@ export const incidentRouter = createTRPCRouter({
           data: { type: "new_incident", incidentId: updated.id },
         });
       }
+
+      return updated;
+    }),
+
+  // ─── Neighbor: submit rating (feedback) ──────────────────────────────────
+  submitRating: publicProcedure
+    .input(
+      z.object({
+        tenantId: z.string().min(1),
+        id: z.string().uuid(),
+        rating: z.number().int().min(1).max(5),
+        comment: z.string().max(1000).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [updated] = await ctx.db
+        .update(incident)
+        .set({
+          rating: input.rating,
+          ratingComment: input.comment ?? null,
+        })
+        .where(
+          and(
+            eq(incident.id, input.id),
+            eq(incident.organizationId, input.tenantId),
+          ),
+        )
+        .returning();
+
+      if (!updated) throw new Error("No se pudo registrar la valoración.");
+
+      // Log history
+      await ctx.db.insert(incidentHistory).values({
+        incidentId: updated.id,
+        actorName: "Vecino",
+        action: "STATUS_CHANGED",
+        previousStatus: "RESUELTA",
+        newStatus: "RESUELTA",
+        comment: `Valoración: ${input.rating} estrellas. Comentario: ${input.comment ?? "Sin comentarios"}`,
+      });
+
+      // Update provider statistics if any
+      if (updated.providerId) {
+        // Find all resolved incidents for this provider that have a rating
+        const ratedIncidents = await ctx.db.query.incident.findMany({
+          where: and(
+            eq(incident.providerId, updated.providerId),
+            eq(incident.status, "RESUELTA"),
+          ),
+        });
+
+        const ratings = ratedIncidents
+          .map((i) => i.rating)
+          .filter((r): r is number => r !== null && r !== undefined);
+
+        const totalRatings = ratings.length;
+        const avgRating = totalRatings > 0 
+          ? ratings.reduce((sum, r) => sum + r, 0) / totalRatings 
+          : 5.0;
+
+        await ctx.db
+          .update(provider)
+          .set({
+            rating: avgRating,
+            completedJobs: totalRatings,
+          })
+          .where(eq(provider.id, updated.providerId));
+      }
+
+      // Emit realtime event to the tenant room
+      await emitWebSocketEvent(input.tenantId, "incident-updated", updated);
 
       return updated;
     }),

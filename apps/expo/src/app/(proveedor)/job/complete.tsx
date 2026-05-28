@@ -83,15 +83,16 @@ export default function CompleteJobScreen() {
   const appState = useRef(AppState.currentState);
 
   // ─── tRPC mutation ────────────────────────────────────────────────────────
-  const completeMutation = useMutation({
-    ...api.incident.providerComplete.mutationOptions(),
-    onSuccess: () => {
-      router.push("/(proveedor)/job/done");
-    },
-    onError: (e: any) => {
-      Alert.alert("Error al cerrar", e.message ?? "Inténtalo más tarde.");
-    },
-  });
+  const completeMutation = useMutation(
+    api.incident.providerComplete.mutationOptions({
+      onSuccess: () => {
+        router.push("/(proveedor)/job/done");
+      },
+      onError: (e: any) => {
+        Alert.alert("Error al cerrar", e.message ?? "Inténtalo más tarde.");
+      },
+    })
+  );
 
   // ─── Sync offline queue ───────────────────────────────────────────────────
   const syncQueue = useCallback(async () => {
@@ -260,7 +261,7 @@ export default function CompleteJobScreen() {
   const isLoading = completeMutation.isPending || isSyncing;
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["bottom"]}>
+    <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
       <Stack.Screen options={{ title: "Cerrar trabajo", headerBackTitle: "Regresar" }} />
 
       <ScrollView

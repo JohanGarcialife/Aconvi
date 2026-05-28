@@ -107,6 +107,7 @@ export default function RootLayout() {
           <AppInitializer>
             <Stack
               screenOptions={{
+                headerShown: false,
                 headerStyle: { backgroundColor: "#FFFFFF" },
                 headerTintColor: "#4aa19b",
                 headerTitleStyle: { fontWeight: "700", color: "#0f172a" },

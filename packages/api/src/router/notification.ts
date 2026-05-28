@@ -60,7 +60,7 @@ export async function sendPushToAllMembers(
     where: eq(member.organizationId, organizationId),
   });
 
-  const userIds = [...new Set(members.map((m: any) => m.userId as string))];
+  const userIds = [...new Set(members.map((m: any) => m.userId as string))] as string[];
   let sent = 0;
   let failed = 0;
 

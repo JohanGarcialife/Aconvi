@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { provider } from "@acme/db/schema";
 
-import { createTRPCRouter, publicProcedure, tenantProcedure } from "../trpc";
+import { createTRPCRouter, publicProcedure, tenantProcedure, protectedProcedure } from "../trpc";
 
 export const providerRouter = createTRPCRouter({
   // Public — anyone with the orgId can list providers (read-only)
@@ -42,5 +42,17 @@ export const providerRouter = createTRPCRouter({
         .values({ ...data, avatarInitials: initials, organizationId: tenantId })
         .returning();
       return created;
+    }),
+
+  currentProvider: protectedProcedure
+    .query(async ({ ctx }) => {
+      const userEmail = ctx.session.user.email;
+      if (!userEmail) {
+        throw new Error("User has no email configured");
+      }
+      const foundProvider = await ctx.db.query.provider.findFirst({
+        where: eq(provider.email, userEmail),
+      });
+      return foundProvider ?? null;
     }),
 });

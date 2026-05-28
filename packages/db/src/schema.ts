@@ -111,6 +111,8 @@ export const incident = pgTable("incident", (t) => ({
   }),
   estimatedCost: t.real("estimated_cost"),
   estimatedDays: t.integer("estimated_days"),
+  rating: t.integer("rating"),
+  ratingComment: t.text("rating_comment"),
   assignedAt: t.timestamp("assigned_at", { mode: "date", withTimezone: true }),
   resolvedAt: t.timestamp("resolved_at", { mode: "date", withTimezone: true }),
   rejectedAt: t.timestamp("rejected_at", { mode: "date", withTimezone: true }),

@@ -7,6 +7,7 @@ import { Check, Star, Briefcase, Clock, Search, Plus, AlertTriangle, CheckCircle
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authClient } from "~/auth/client";
+import { useSocketClient } from "~/hooks/useSocketClient";
 
 const TENANT_ID = "org_aconvi_demo";
 
@@ -85,6 +86,16 @@ export default function IncidentsPage() {
   };
 
   const { data: incidentsRaw, refetch } = useQuery(trpc.incident.all.queryOptions({ tenantId: TENANT_ID }));
+
+  useSocketClient({
+    tenantId: TENANT_ID,
+    userId: session?.user?.id,
+    token: session?.session?.token,
+    onIncidentUpdated: () => {
+      console.log("[WS] Incident updated event received → refetching...");
+      void refetch();
+    },
+  });
   const { data: providersRaw } = useQuery(trpc.provider.listByOrg.queryOptions({ tenantId: TENANT_ID }));
   const incidents = (incidentsRaw ?? []) as any[];
   const providers = (providersRaw ?? []) as any[];
@@ -144,6 +155,14 @@ export default function IncidentsPage() {
     .join("");
   const selected = incidents.find((i: any) => i.id === selectedId) ?? null;
   const selectedProvider = providers.find((p: any) => p.id === selectedProviderId) ?? providers[0] ?? null;
+
+  useEffect(() => {
+    if (selected) {
+      setSelectedProviderId(selected.providerId ?? null);
+    } else {
+      setSelectedProviderId(null);
+    }
+  }, [selectedId, selected?.providerId]);
 
   const toggleCheck = (id: string) => {
     setChecked(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -409,6 +428,26 @@ export default function IncidentsPage() {
                 </div>
               )}
 
+              {/* Valoración del vecino */}
+              {selected.rating != null && (
+                <div className="mb-6 max-w-lg rounded-2xl border border-amber-200 bg-amber-50/50 p-4">
+                  <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-amber-800">⭐ Valoración del Vecino</h3>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <Star
+                        key={s}
+                        size={16}
+                        className={s <= selected.rating ? "fill-amber-500 text-amber-500" : "text-slate-300"}
+                      />
+                    ))}
+                    <span className="ml-2 text-sm font-bold text-slate-800">{selected.rating} / 5</span>
+                  </div>
+                  {selected.ratingComment && (
+                    <p className="text-sm italic text-slate-700">"{selected.ratingComment}"</p>
+                  )}
+                </div>
+              )}
+
               {/* Description */}
               <div className="mb-6">
                 <h3 className="mb-2 text-sm font-bold text-slate-800">Descripción</h3>
@@ -594,11 +633,36 @@ export default function IncidentsPage() {
               )}
 
               {/* Assign CTA */}
-              <button onClick={handleAssign} disabled={!selectedProvider || assignProvider.isPending}
-                className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-teal-500 py-3 text-sm font-bold text-white hover:bg-teal-600 disabled:opacity-40 transition-colors shadow-sm">
-                <CheckCircle2 size={15} />
-                {assignProvider.isPending ? "Asignando..." : "Asignar y Notificar Vecino"}
-              </button>
+              {(() => {
+                const isAlreadyAssigned = selected.providerId === selectedProvider?.id;
+                const hasAnyProvider = !!selected.providerId;
+                
+                let btnText = "Asignar y Notificar Vecino";
+                let btnCls = "bg-teal-500 hover:bg-teal-600 text-white";
+                let isBtnDisabled = !selectedProvider || assignProvider.isPending;
+
+                if (assignProvider.isPending) {
+                  btnText = "Asignando...";
+                } else if (isAlreadyAssigned) {
+                  btnText = "✓ Proveedor Asignado";
+                  btnCls = "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed";
+                  isBtnDisabled = true;
+                } else if (hasAnyProvider) {
+                  btnText = "Reasignar y Notificar Vecino";
+                  btnCls = "bg-teal-500 hover:bg-teal-600 text-white";
+                }
+
+                return (
+                  <button 
+                    onClick={handleAssign} 
+                    disabled={isBtnDisabled}
+                    className={`mt-4 flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold transition-colors shadow-sm ${btnCls}`}
+                  >
+                    {!isAlreadyAssigned && <CheckCircle2 size={15} />}
+                    {btnText}
+                  </button>
+                );
+              })()}
             </div>
           </div>
         )}

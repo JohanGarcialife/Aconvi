@@ -84,6 +84,37 @@ export async function GET() {
       results.push(row.rows[0]);
     }
 
+    // Ensure organization exists
+    await db.execute(sql`
+      INSERT INTO "organization" (id, name, slug, created_at) 
+      VALUES ('org_aconvi_demo', 'Aconvi Demo', 'aconvi-demo', now())
+      ON CONFLICT (id) DO NOTHING;
+    `);
+
+    // Ensure provider record exists for the test provider user
+    await db.execute(sql`
+      INSERT INTO "provider" (
+        id, organization_id, name, speciality, email, rating, is_trusted, completed_jobs, avg_days_to_resolve, created_at, updated_at
+      )
+      VALUES (
+        '11111111-2222-3333-4444-555555555555',
+        'org_aconvi_demo',
+        'Pedro Martínez',
+        'fontaneria',
+        'proveedor@test.aconvi.com',
+        5.0,
+        true,
+        12,
+        2,
+        now(),
+        now()
+      )
+      ON CONFLICT (id) DO UPDATE SET
+        name = EXCLUDED.name,
+        email = EXCLUDED.email,
+        updated_at = now();
+    `);
+
     return NextResponse.json({
       success: true,
       message: "✅ Usuarios de prueba listos con PIN configurado",

@@ -67,7 +67,7 @@ export default function IncidentDetailScreen() {
   const st = STATUS_LABELS[incident.status as keyof typeof STATUS_LABELS] || { label: incident.status, color: "#92400e", bg: "#fef3c7" };
 
   return (
-    <SafeAreaView style={s.safe} edges={["bottom"]}>
+    <SafeAreaView style={s.safe} edges={["top", "bottom"]}>
       <Stack.Screen
         options={{
           title: "Detalle incidencia",

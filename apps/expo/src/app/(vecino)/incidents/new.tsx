@@ -143,7 +143,7 @@ export default function NewIncidentScreen() {
   // ─── STEP 1: Category selector ────────────────────────────────────────────
   if (step === "category") {
     return (
-      <SafeAreaView style={styles.safeArea} edges={["bottom"]}>
+      <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
         <Stack.Screen options={{ title: "Nueva incidencia", headerBackTitle: "Inicio" }} />
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           <Text style={styles.pageTitle}>¿Qué tipo de problema es?</Text>
@@ -188,7 +188,7 @@ export default function NewIncidentScreen() {
 
   // ─── STEP 2: Details ──────────────────────────────────────────────────────
   return (
-    <SafeAreaView style={styles.safeArea} edges={["bottom"]}>
+    <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
       <Stack.Screen options={{ title: "Detalles de la avería", headerBackTitle: "Categoría" }} />
       <ScrollView
         style={{ flex: 1 }}

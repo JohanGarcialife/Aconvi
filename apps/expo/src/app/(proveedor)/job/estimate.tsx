@@ -195,20 +195,21 @@ export default function EstimateScreen() {
   const DEMO_TENANT_ID = "org_aconvi_demo";
   const total = departure + labor + materials;
 
-  const acceptMutation = useMutation({
-    ...api.incident.providerAccept.mutationOptions(),
-    onSuccess: () => {
-      Alert.alert(
-        "Estimación enviada ✓",
-        `Presupuesto de ${total}€ guardado. El administrador será notificado.`,
-        [{ text: "OK", onPress: () => router.push({
-          pathname: "/(proveedor)/job/inprogress",
-          params: { incidentId: params.incidentId, providerId: params.providerId },
-        }) }]
-      );
-    },
-    onError: (e: Error) => Alert.alert("Error", e.message),
-  });
+  const acceptMutation = useMutation(
+    api.incident.providerAccept.mutationOptions({
+      onSuccess: () => {
+        Alert.alert(
+          "Estimación enviada ✓",
+          `Presupuesto de ${total}€ guardado. El administrador será notificado.`,
+          [{ text: "OK", onPress: () => router.push({
+            pathname: "/(proveedor)/job/inprogress",
+            params: { incidentId: params.incidentId, providerId: params.providerId },
+          }) }]
+        );
+      },
+      onError: (e: any) => Alert.alert("Error", e.message),
+    })
+  );
 
   // ─── Sync offline estimate queue ──────────────────────────────────────────
   const syncEstimateQueue = useCallback(async () => {
@@ -297,7 +298,7 @@ export default function EstimateScreen() {
   const isLoading = acceptMutation.isPending || isSyncing;
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["bottom"]}>
+    <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
       <Stack.Screen
         options={{ title: "Intervención", headerBackTitle: "Regresar" }}
       />

@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useTRPC } from "~/trpc/react";
 import {
   Search,
   CheckCircle2,
   Building2,
-  Copy,
   Plus,
   Landmark,
   Star,
@@ -15,7 +17,8 @@ import {
   Loader2,
 } from "lucide-react";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+const TENANT_ID = "org_aconvi_demo";
+
 type PageState = "pending" | "validating" | "closed";
 
 // ─── Copy helper ─────────────────────────────────────────────────────────────
@@ -24,7 +27,7 @@ function copyToClipboard(text: string) {
 }
 
 // ─── "Closed" confirmation screen ────────────────────────────────────────────
-function ClosedScreen() {
+function ClosedScreen({ incidentTitle }: { incidentTitle: string }) {
   return (
     <div className="flex flex-1 items-center justify-center bg-slate-50">
       <div className="max-w-md w-full text-center px-8 py-12">
@@ -55,7 +58,7 @@ function ClosedScreen() {
                 Aconvi · Enviado ahora
               </p>
               <p className="text-xs text-slate-600 mt-0.5 leading-snug">
-                Tu incidencia "Portón no cierra correctamente" ha sido resuelta.
+                Tu incidencia "{incidentTitle}" ha sido resuelta.
                 ¿Cómo valorarías el servicio?
               </p>
               <div className="flex gap-1 mt-2">
@@ -82,29 +85,46 @@ function ClosedScreen() {
   );
 }
 
-// ─── Main page ───────────────────────────────────────────────────────────────
-export default function IncidentValidatePage() {
+// ─── Inner validate screen content ───────────────────────────────────────────
+function ValidateContent() {
+  const trpc = useTRPC();
+  const searchParams = useSearchParams();
+  const incidentId = searchParams ? searchParams.get("id") : null;
+
   const [confirmed, setConfirmed] = useState(false);
   const [pageState, setPageState] = useState<PageState>("pending");
   const [copied, setCopied] = useState(false);
 
+  const { data: incident, isLoading } = useQuery(
+    trpc.incident.byId.queryOptions(
+      { id: incidentId as string, tenantId: TENANT_ID },
+      { enabled: !!incidentId }
+    )
+  );
+
+  const addNote = useMutation(
+    trpc.incident.addNote.mutationOptions()
+  );
+
   const handleCopyIBAN = () => {
-    copyToClipboard("ES91210004184502000513 39");
+    copyToClipboard("ES9121000418450200051339");
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   const handleValidate = async () => {
-    if (!confirmed) return;
+    if (!confirmed || !incident) return;
     setPageState("validating");
 
-    // 1. Simulate tRPC mutation to mark incident as RESUELTO
-    await new Promise((r) => setTimeout(r, 1200));
-
-    // 2. Dispatch WebSocket push notification to vecino
-    //    In production this fires through the server-side tRPC mutation which
-    //    emits `notify-rating-request` to socket room `user:<vecinoId>`
     try {
+      // 1. Add internal note to close the folder
+      await addNote.mutateAsync({
+        tenantId: TENANT_ID,
+        incidentId: incident.id,
+        content: "✅ El administrador ha validado el trabajo y cerrado el expediente.",
+      });
+
+      // 2. Dispatch WebSocket push notification to vecino
       const ws = new WebSocket(
         process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:3001"
       );
@@ -113,30 +133,54 @@ export default function IncidentValidatePage() {
           JSON.stringify({
             event: "rating-request",
             payload: {
-              incidentId: "INC-2025-0418",
-              tenantId: "org_123",
-              message:
-                'Tu incidencia "Portón no cierra correctamente" ha sido resuelta. ¿Cómo valorarías el servicio?',
+              incidentId: incident.id,
+              tenantId: TENANT_ID,
+              message: `Tu incidencia "${incident.title}" ha sido resuelta. ¿Cómo valorarías el servicio?`,
             },
           })
         );
         ws.close();
       };
-    } catch {
-      // WS unreachable in dev — ignore
+    } catch (e) {
+      console.error(e);
     }
 
     setPageState("closed");
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-50">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!incident) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center bg-slate-50 gap-4">
+        <h2 className="text-xl font-bold text-slate-800">Incidencia no encontrada</h2>
+        <Link href="/incidents" className="text-primary font-semibold hover:underline">
+          Volver a incidencias
+        </Link>
+      </div>
+    );
+  }
+
   if (pageState === "closed") {
     return (
       <div className="flex h-screen flex-col bg-slate-50">
         <TopBar />
-        <ClosedScreen />
+        <ClosedScreen incidentTitle={incident.title} />
       </div>
     );
   }
+
+  // Cost breakdown calculation
+  const total = incident.estimatedCost ?? 150;
+  const desplazamiento = total > 50 ? 25 : 0;
+  const materiales = parseFloat(((total - desplazamiento) * 0.3).toFixed(2));
+  const manoDeObra = parseFloat((total - desplazamiento - materiales).toFixed(2));
 
   return (
     <div className="flex h-screen flex-col bg-slate-50">
@@ -152,16 +196,18 @@ export default function IncidentValidatePage() {
                 Pendiente de validación
               </span>
               <h2 className="text-2xl font-bold text-slate-900">
-                Incidencia: Portón no cierra correctamente
+                Incidencia: {incident.title}
               </h2>
               <p className="mt-1 text-sm text-slate-500">
                 Incidencia finalizada por el proveedor.
               </p>
             </div>
-            <button className="flex shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50">
-              <Plus className="h-4 w-4" />
-              Nueva incidencia
-            </button>
+            <Link
+              href="/incidents"
+              className="flex shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+            >
+              Volver a la lista
+            </Link>
           </div>
 
           {/* 2-col grid */}
@@ -172,18 +218,18 @@ export default function IncidentValidatePage() {
               <div className="rounded-2xl border border-slate-200 bg-white p-5">
                 <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2.5 text-sm">
                   <dt className="font-semibold text-slate-900">Proveedor:</dt>
-                  <dd className="text-slate-700">Fontanería Pérez</dd>
+                  <dd className="text-slate-700">{incident.provider?.name ?? "Sin asignar"}</dd>
 
-                  <dt className="font-semibold text-slate-900">Técnico:</dt>
+                  <dt className="font-semibold text-slate-900">Contacto:</dt>
                   <dd className="text-slate-700">
-                    Javier Pérez · 24 abril 2025 · 16:32
+                    {incident.provider?.phone ?? "No disponible"} · {incident.provider?.email ?? ""}
                   </dd>
 
                   <dt className="font-semibold text-slate-900">
                     Nº Incidencia:
                   </dt>
                   <dd className="text-slate-700">
-                    INC-2025-0418 · Residencial Las Encinas
+                    {`INC-${incident.id.slice(0, 8).toUpperCase()}`} · Residencial Los Olivos
                   </dd>
                 </dl>
               </div>
@@ -199,15 +245,14 @@ export default function IncidentValidatePage() {
                     <span className="font-semibold">
                       Incidencia reportada:
                     </span>{" "}
-                    Desajuste en el cierre del portón de acceso principal.
+                    {incident.description}
                   </p>
                   <p>
-                    <span className="font-semibold">Ubicación:</span> Entrada
-                    principal · Residencial Las Encinas
+                    <span className="font-semibold">Ubicación:</span> Residencial Los Olivos
                   </p>
                   <p>
-                    <span className="font-semibold">Reportado por:</span> Vecino
-                    · 18 abril 2025
+                    <span className="font-semibold">Reportado por:</span> {incident.reporter?.name ?? "Vecino"}{" "}
+                    · {new Date(incident.createdAt).toLocaleDateString("es-ES")}
                   </p>
                 </div>
               </div>
@@ -219,9 +264,9 @@ export default function IncidentValidatePage() {
                 </h3>
                 <div className="space-y-2 text-sm">
                   {[
-                    ["Desplazamiento", "25,00 €"],
-                    ["Mano de obra", "80,00 €"],
-                    ["Materiales", "45,00 €"],
+                    ["Desplazamiento", `${desplazamiento.toFixed(2).replace(".", ",")} €`],
+                    ["Mano de obra", `${manoDeObra.toFixed(2).replace(".", ",")} €`],
+                    ["Materiales", `${materiales.toFixed(2).replace(".", ",")} €`],
                   ].map(([label, value]) => (
                     <div key={label} className="flex justify-between text-slate-700">
                       <span>{label}</span>
@@ -231,7 +276,7 @@ export default function IncidentValidatePage() {
                   <div className="my-2 h-px bg-slate-200" />
                   <div className="flex justify-between font-bold text-slate-900">
                     <span>Total</span>
-                    <span>150,00 €</span>
+                    <span>{total.toFixed(2).replace(".", ",")} €</span>
                   </div>
                 </div>
                 <p className="mt-3 text-xs leading-snug text-slate-400">
@@ -247,11 +292,10 @@ export default function IncidentValidatePage() {
                   Copiar IBAN del proveedor
                 </div>
                 <p className="font-mono text-sm tracking-wide text-slate-900">
-                  ES91 2100 0418{" "}
-                  <span className="font-bold">4502 0005 1339</span>
+                  ES91 2100 0418 <span className="font-bold">4502 0005 1339</span>
                 </p>
                 <p className="mt-1 text-xs text-slate-400">
-                  Titular: Fontanería Pérez SL
+                  Titular: {incident.provider?.name ?? "Fontanería Pérez SL"}
                 </p>
               </div>
             </div>
@@ -261,23 +305,26 @@ export default function IncidentValidatePage() {
               {/* Solution photo */}
               <div className="rounded-2xl border border-slate-200 bg-white p-5">
                 <h3 className="mb-3 font-semibold text-slate-900">Solución</h3>
-                <div className="relative mb-3 aspect-video w-full overflow-hidden rounded-xl bg-slate-100">
-                  {/* In production: <Image src={incident.solutionPhotoUrl} fill … /> */}
-                  <div className="absolute inset-0 bg-linear-to-br from-slate-700 to-slate-900 flex items-end">
-                    {/* Simulated door photo overlay */}
-                    <div
-                      className="absolute inset-0"
-                      style={{
-                        background:
-                          "linear-gradient(135deg, #334155 0%, #1e293b 50%, #0f172a 100%)",
-                        opacity: 0.85,
-                      }}
-                    />
-                    <div className="relative z-10 m-3 flex items-center gap-1.5 rounded-full bg-primary/90 px-3 py-1 text-xs font-semibold text-white backdrop-blur-sm">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      Reparado
+                <div className="relative mb-3 aspect-video w-full overflow-hidden rounded-xl bg-slate-100 flex items-center justify-center">
+                  {incident.finalPhotoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={incident.finalPhotoUrl} alt="Solución" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="absolute inset-0 bg-linear-to-br from-slate-700 to-slate-900 flex items-end">
+                      <div
+                        className="absolute inset-0"
+                        style={{
+                          background:
+                            "linear-gradient(135deg, #334155 0%, #1e293b 50%, #0f172a 100%)",
+                          opacity: 0.85,
+                        }}
+                      />
+                      <div className="relative z-10 m-3 flex items-center gap-1.5 rounded-full bg-primary/90 px-3 py-1 text-xs font-semibold text-white backdrop-blur-sm">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        Reparado (Sin foto de cierre)
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
                 <p className="flex items-center gap-1.5 text-xs text-slate-500">
                   <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />
@@ -285,8 +332,58 @@ export default function IncidentValidatePage() {
                 </p>
               </div>
 
+              {/* Neighbor rating (if rated) */}
+              {incident.rating != null && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-5">
+                  <h3 className="mb-3 font-semibold text-slate-900">Valoración del Vecino</h3>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <Star
+                        key={s}
+                        className={`h-5 w-5 ${s <= incident.rating! ? "fill-amber-500 text-amber-500" : "text-slate-200"}`}
+                      />
+                    ))}
+                    <span className="ml-2 text-sm font-bold text-slate-800">{incident.rating} / 5</span>
+                  </div>
+                  {incident.ratingComment && (
+                    <p className="text-sm italic text-slate-700">"{incident.ratingComment}"</p>
+                  )}
+                </div>
+              )}
+
               {/* CTA block */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-3">
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
+                {/* Final confirmation checkbox inside CTA block for immediate visibility */}
+                <div className="pb-3 border-b border-slate-100">
+                  <label
+                    onClick={() => setConfirmed((v) => !v)}
+                    className="flex cursor-pointer items-start gap-3 select-none"
+                  >
+                    <div
+                      className={`mt-0.5 h-4 w-4 shrink-0 rounded border-2 transition-all flex items-center justify-center ${
+                        confirmed
+                          ? "border-primary bg-primary"
+                          : "border-slate-300 bg-white"
+                      }`}
+                    >
+                      {confirmed && (
+                        <svg
+                          viewBox="0 0 12 12"
+                          className="h-3 w-3 fill-white"
+                        >
+                          <path d="M1.5 6l3 3 6-6" stroke="white" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                    </div>
+                    <span className="text-xs text-slate-600 leading-snug">
+                      Confirmo que he revisado la incidencia y apruebo su cierre.{" "}
+                      <span className="text-primary font-medium">
+                        El vecino recibirá una notificación para valorar el servicio.
+                      </span>
+                    </span>
+                  </label>
+                </div>
+
                 <button
                   onClick={handleValidate}
                   disabled={!confirmed || pageState === "validating"}
@@ -332,7 +429,7 @@ export default function IncidentValidatePage() {
                 <p className="mb-4 text-xs text-slate-500">
                   Al validar, certificas que:
                 </p>
-                <ul className="space-y-2.5 text-sm text-slate-700 mb-4">
+                <ul className="space-y-2.5 text-sm text-slate-700">
                   {[
                     "El trabajo ha sido revisado",
                     "La solución es conforme",
@@ -345,37 +442,6 @@ export default function IncidentValidatePage() {
                     </li>
                   ))}
                 </ul>
-
-                {/* Final confirmation checkbox */}
-                <div className="border-t border-slate-100 pt-4">
-                  <label className="flex cursor-pointer items-start gap-3 select-none">
-                    <div
-                      onClick={() => setConfirmed((v) => !v)}
-                      className={`mt-0.5 h-4 w-4 shrink-0 rounded border-2 transition-all flex items-center justify-center ${
-                        confirmed
-                          ? "border-primary bg-primary"
-                          : "border-slate-300 bg-white"
-                      }`}
-                    >
-                      {confirmed && (
-                        <svg
-                          viewBox="0 0 12 12"
-                          className="h-3 w-3 fill-white"
-                        >
-                          <path d="M1.5 6l3 3 6-6" stroke="white" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      )}
-                    </div>
-                    <span className="text-xs text-slate-600 leading-snug">
-                      Confirmo que he revisado la incidencia y apruebo su
-                      cierre.{" "}
-                      <span className="text-primary font-medium">
-                        El vecino recibirá una notificación para valorar el
-                        servicio.
-                      </span>
-                    </span>
-                  </label>
-                </div>
               </div>
             </div>
           </div>
@@ -410,5 +476,20 @@ function TopBar() {
         </div>
       </div>
     </header>
+  );
+}
+
+// ─── Main export with Suspense ───────────────────────────────────────────────
+export default function IncidentValidatePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-screen items-center justify-center bg-slate-50">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      }
+    >
+      <ValidateContent />
+    </Suspense>
   );
 }

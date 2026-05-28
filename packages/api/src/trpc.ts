@@ -31,12 +31,28 @@ export const createTRPCContext = async (opts: {
   auth: Auth;
 }) => {
   const authApi = opts.auth.api;
+  console.log("[createTRPCContext] trpc headers Authorization:", opts.headers.get("authorization") || opts.headers.get("Authorization"));
   const session = await authApi.getSession({
     headers: opts.headers,
   });
+  console.log("[createTRPCContext] session user:", session?.user?.id, "role:", session?.user?.role);
   return {
-    authApi,
-    session,
+    authApi: authApi as any,
+    session: session as {
+      user: {
+        id: string;
+        email: string;
+        name: string;
+        image?: string | null;
+        role?: string;
+      };
+      session: {
+        id: string;
+        userId: string;
+        token: string;
+        expiresAt: Date;
+      };
+    } | null,
     db,
   };
 };
@@ -162,22 +178,7 @@ export const tenantProcedure = protectedProcedure
     });
   });
 
-/**
- * Role-based procedure factory
- *
- * Generates a protected procedure that further restricts access to users
- * who have one of the `allowedRoles` within the specified `tenantId`.
- */
-export const createRoleProcedure = (allowedRoles: string[]) =>
-  tenantProcedure.use(({ ctx, next }) => {
-    if (!allowedRoles.includes(ctx.tenant.role)) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "Permisos insuficientes para realizar esta acción.",
-      });
-    }
-    return next();
-  });
+
 
 /**
  * SuperAdmin (SaaS) protected procedure

@@ -222,7 +222,9 @@ export default function VecinoHome() {
     ?.sort((a: any, b: any) => (a.closesAt && b.closesAt ? new Date(a.closesAt).getTime() - new Date(b.closesAt).getTime() : 0))[0];
 
   const latestNotice = (notices as any[] | undefined)?.[0];
-  const latestIncident = (incidents as any[] | undefined)?.[0];
+  const latestIncident = (incidents as any[] | undefined)?.find(
+    (i: any) => i.status !== "RECHAZADA" && !(i.status === "RESUELTA" && i.rating !== null)
+  );
 
   const nextBooking = (bookings as any[] | undefined)?.filter((b: any) => {
     const today = format(new Date(), "yyyy-MM-dd");
@@ -402,7 +404,11 @@ export default function VecinoHome() {
               <Text style={styles.chevron}>›</Text>
             </TouchableOpacity>
           ) : (
-            <Text style={styles.mutedText}>No tienes incidencias reportadas.</Text>
+            <Text style={styles.mutedText}>
+              {incidents && incidents.length > 0
+                ? "No tienes incidencias activas."
+                : "No tienes incidencias reportadas."}
+            </Text>
           )}
         </View>
 
