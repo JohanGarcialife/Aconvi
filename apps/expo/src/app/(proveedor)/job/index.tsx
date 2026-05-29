@@ -15,6 +15,7 @@ import { useRouter, Stack, useLocalSearchParams } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { api, queryClient } from "~/utils/api";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { getBaseUrl } from "~/utils/base-url";
 
 const PRIMARY = "#4aa19b";
 const DARK = "#0f172a";
@@ -47,21 +48,56 @@ function priorityLabel(p: string) {
   return "🟢 Baja prioridad";
 }
 
+// ─── Hook: resolve logged-in user's email from our custom session endpoint ────
+function useSessionEmail() {
+  const [email, setEmail] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchEmail() {
+      try {
+        const token = await SecureStore.getItemAsync("expo_session_token");
+        if (!token) { setLoading(false); return; }
+        const res = await fetch(`${getBaseUrl()}/api/auth/get-session`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json() as { user?: { email?: string } };
+          setEmail(data?.user?.email ?? null);
+        }
+      } catch {
+        // ignore network errors
+      } finally {
+        setLoading(false);
+      }
+    }
+    void fetchEmail();
+  }, []);
+
+  return { email, loading };
+}
+
 export default function ProveedorJobScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ incidentId?: string; providerId?: string }>();
 
   const incidentId = params.incidentId;
 
-  // Fetch current provider profile from the session
+  // Step 1: Get the logged-in user's email from our reliable get-session endpoint
+  const { email: sessionEmail, loading: loadingEmail } = useSessionEmail();
+
+  // Step 2: Fetch the provider record by email (publicProcedure — no Better Auth dependency)
   const { data: currentProv, isLoading: loadingProv } = useQuery(
-    api.provider.currentProvider.queryOptions()
+    api.provider.byEmail.queryOptions(
+      { email: sessionEmail ?? "" },
+      { enabled: !!sessionEmail }
+    )
   );
 
   const providerId = params.providerId ?? currentProv?.id;
   const tenantId = currentProv?.organizationId ?? DEMO_TENANT_ID;
 
-  // Fetch assigned incidents specifically for this provider
+  // Step 3: Fetch assigned incidents for this provider
   const { data: incidents, isLoading: loadingIncidents, refetch: refetchIncidents, isRefetching } = useQuery(
     api.incident.assignedToProvider.queryOptions(
       {
@@ -80,13 +116,13 @@ export default function ProveedorJobScreen() {
     await refetchIncidents();
   };
 
-  const isLoading = loadingProv || (!!providerId && loadingIncidents);
+  const isLoading = loadingEmail || loadingProv || (!!providerId && loadingIncidents);
 
   // Use the first active (EN_REVISION or RECIBIDA or AGENDADA) incident assigned to this provider
   const activeIncident = (incidents as any[] | undefined)?.find(
     (i: any) =>
       (incidentId ? i.id === incidentId : true) &&
-      (i.status === "EN_REVISION" || i.status === "RECIBIDA" || i.status === "AGENDADA"),
+      (i.status === "EN_REVISION" || i.status === "RECIBIDA" || i.status === "AGENDADA" || i.status === "EN_CURSO"),
   ) ?? null;
 
   const acceptMutation = useMutation(
@@ -108,6 +144,7 @@ export default function ProveedorJobScreen() {
 
   const handleAccept = () => {
     if (!activeIncident || !providerId) return;
+
     acceptMutation.mutate({
       id: activeIncident.id,
       tenantId: activeIncident.organizationId ?? tenantId,

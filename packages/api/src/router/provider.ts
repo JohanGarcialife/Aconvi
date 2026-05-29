@@ -44,6 +44,18 @@ export const providerRouter = createTRPCRouter({
       return created;
     }),
 
+  // Look up a provider by email — used by the mobile app where Better Auth
+  // protectedProcedure may not resolve correctly with custom sessions.
+  // The email is obtained client-side from /api/auth/get-session (Bearer-aware).
+  byEmail: publicProcedure
+    .input(z.object({ email: z.string().email() }))
+    .query(async ({ ctx, input }) => {
+      const found = await ctx.db.query.provider.findFirst({
+        where: eq(sql`lower(${provider.email})`, input.email.toLowerCase()),
+      });
+      return found ?? null;
+    }),
+
   currentProvider: protectedProcedure
     .query(async ({ ctx }) => {
       const userEmail = ctx.session.user.email;
