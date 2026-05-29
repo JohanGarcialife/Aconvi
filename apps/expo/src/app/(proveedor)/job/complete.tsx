@@ -27,7 +27,7 @@ import { useRouter, Stack, useLocalSearchParams } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import NetInfo from "@react-native-community/netinfo";
-import { api } from "~/utils/api";
+import { api, queryClient } from "~/utils/api";
 import { useMutation } from "@tanstack/react-query";
 
 const PRIMARY = "#4aa19b";
@@ -86,6 +86,9 @@ export default function CompleteJobScreen() {
   const completeMutation = useMutation(
     api.incident.providerComplete.mutationOptions({
       onSuccess: () => {
+        // Invalidate all incident caches so screens refresh automatically
+        void queryClient.invalidateQueries(api.incident.assignedToProvider.queryFilter());
+        void queryClient.invalidateQueries(api.incident.all.queryFilter());
         router.push("/(proveedor)/job/done");
       },
       onError: (e: any) => {

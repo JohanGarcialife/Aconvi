@@ -15,7 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, Stack, useLocalSearchParams } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import NetInfo from "@react-native-community/netinfo";
-import { api } from "~/utils/api";
+import { api, queryClient } from "~/utils/api";
 import { useMutation } from "@tanstack/react-query";
 
 const OFFLINE_ESTIMATE_QUEUE_KEY = "aconvi_offline_estimate_queue";
@@ -198,6 +198,9 @@ export default function EstimateScreen() {
   const acceptMutation = useMutation(
     api.incident.providerAccept.mutationOptions({
       onSuccess: () => {
+        // Invalidate so job list reflects the status change
+        void queryClient.invalidateQueries(api.incident.assignedToProvider.queryFilter());
+        void queryClient.invalidateQueries(api.incident.all.queryFilter());
         Alert.alert(
           "Estimación enviada ✓",
           `Presupuesto de ${total}€ guardado. El administrador será notificado.`,

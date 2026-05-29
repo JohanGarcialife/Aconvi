@@ -1,4 +1,4 @@
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { provider } from "@acme/db/schema";
@@ -51,7 +51,7 @@ export const providerRouter = createTRPCRouter({
         throw new Error("User has no email configured");
       }
       const foundProvider = await ctx.db.query.provider.findFirst({
-        where: eq(provider.email, userEmail),
+        where: eq(sql`lower(${provider.email})`, userEmail.toLowerCase()),
       });
       return foundProvider ?? null;
     }),

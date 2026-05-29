@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, Stack } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
-import { api } from "~/utils/api";
+import { api, queryClient } from "~/utils/api";
 import { useMutation } from "@tanstack/react-query";
 
 const PRIMARY = "#4aa19b";
@@ -56,6 +56,8 @@ export default function NewIncidentScreen() {
   const createIncident = useMutation({
     ...api.incident.create.mutationOptions(),
     onSuccess: () => {
+      // Invalidate so the incidents list and home dashboard refresh immediately
+      void queryClient.invalidateQueries(api.incident.all.queryFilter());
       Alert.alert(
         "✅ Reporte enviado",
         "Tu incidencia ha sido enviada al administrador. Recibirás notificaciones sobre su estado.",

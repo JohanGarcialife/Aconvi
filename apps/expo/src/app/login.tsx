@@ -14,6 +14,7 @@ import {
 import { useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { getBaseUrl } from "~/utils/base-url";
+import { queryClient } from "~/utils/api";
 
 
 const TEAL = "#00BDA5";
@@ -69,6 +70,9 @@ export default function LoginScreen() {
       const isProvider = role.toLowerCase().includes("proveedor") || role.toLowerCase() === "provider";
 
       setStep("done");
+
+      // Clear any cached queries from a previous session
+      queryClient.clear();
 
       // 4. Navegar DIRECTO a la pantalla correcta (sin pasar por index.tsx)
       if (isProvider) {

@@ -17,7 +17,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
-import { api } from "~/utils/api";
+import { api, queryClient } from "~/utils/api";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -175,6 +175,7 @@ function ProfileModal({ visible, onClose }: { visible: boolean; onClose: () => v
               style: "destructive",
               onPress: async () => {
                 await SecureStore.deleteItemAsync("expo_session_token").catch(() => {});
+                queryClient.clear();
                 onClose();
                 router.replace("/login");
               },

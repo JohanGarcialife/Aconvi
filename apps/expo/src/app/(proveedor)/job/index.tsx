@@ -8,11 +8,12 @@ import {
   Alert,
   ActivityIndicator,
   Image,
+  RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, Stack, useLocalSearchParams } from "expo-router";
 import * as SecureStore from "expo-secure-store";
-import { api } from "~/utils/api";
+import { api, queryClient } from "~/utils/api";
 import { useQuery, useMutation } from "@tanstack/react-query";
 
 const PRIMARY = "#4aa19b";
@@ -61,7 +62,7 @@ export default function ProveedorJobScreen() {
   const tenantId = currentProv?.organizationId ?? DEMO_TENANT_ID;
 
   // Fetch assigned incidents specifically for this provider
-  const { data: incidents, isLoading: loadingIncidents } = useQuery(
+  const { data: incidents, isLoading: loadingIncidents, refetch: refetchIncidents, isRefetching } = useQuery(
     api.incident.assignedToProvider.queryOptions(
       {
         providerId: providerId ?? "",
@@ -69,9 +70,15 @@ export default function ProveedorJobScreen() {
       },
       {
         enabled: !!providerId,
+        // Re-fetch every 30s in background to catch new assignments
+        refetchInterval: 30_000,
       }
     )
   );
+
+  const handleRefresh = async () => {
+    await refetchIncidents();
+  };
 
   const isLoading = loadingProv || (!!providerId && loadingIncidents);
 
@@ -157,6 +164,7 @@ export default function ProveedorJobScreen() {
                 style: "destructive",
                 onPress: async () => {
                   await SecureStore.deleteItemAsync("expo_session_token").catch(() => {});
+                  queryClient.clear();
                   router.replace("/login");
                 },
               },
@@ -180,6 +188,12 @@ export default function ProveedorJobScreen() {
           <Text style={{ color: MUTED, textAlign: "center", marginTop: 8 }}>
             Recibirás una notificación cuando se te asigne una nueva incidencia.
           </Text>
+          <TouchableOpacity
+            onPress={handleRefresh}
+            style={{ marginTop: 20, paddingVertical: 10, paddingHorizontal: 24, backgroundColor: PRIMARY, borderRadius: 10 }}
+          >
+            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>↻ Verificar ahora</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -209,6 +223,7 @@ export default function ProveedorJobScreen() {
               style: "destructive",
               onPress: async () => {
                 await SecureStore.deleteItemAsync("expo_session_token").catch(() => {});
+                queryClient.clear();
                 router.replace("/login");
               },
             },
@@ -224,7 +239,17 @@ export default function ProveedorJobScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={handleRefresh}
+            tintColor={PRIMARY}
+          />
+        }
+      >
         {/* Community name */}
         <Text style={styles.communityName}>
           {activeIncident.title}
