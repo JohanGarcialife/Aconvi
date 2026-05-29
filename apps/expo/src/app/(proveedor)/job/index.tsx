@@ -48,6 +48,22 @@ function priorityLabel(p: string) {
   return "🟢 Baja prioridad";
 }
 
+// ─── Status pill helper ───────────────────────────────────────────────────────
+function statusLabelAndColor(status: string) {
+  switch (status) {
+    case "RECIBIDA":
+      return { label: "Recibida", color: "#3b82f6", bgColor: "#eff6ff" };
+    case "EN_REVISION":
+      return { label: "En Revisión", color: "#d97706", bgColor: "#fef3c7" };
+    case "AGENDADA":
+      return { label: "Agendada", color: "#a855f7", bgColor: "#faf5ff" };
+    case "EN_CURSO":
+      return { label: "En Curso", color: "#22c55e", bgColor: "#f0fdf4" };
+    default:
+      return { label: status, color: "#64748b", bgColor: "#f1f5f9" };
+  }
+}
+
 // ─── Hook: resolve logged-in user's email from our custom session endpoint ────
 function useSessionEmail() {
   const [email, setEmail] = useState<string | null>(null);
@@ -118,12 +134,26 @@ export default function ProveedorJobScreen() {
 
   const isLoading = loadingEmail || loadingProv || (!!providerId && loadingIncidents);
 
-  // Use the first active (EN_REVISION or RECIBIDA or AGENDADA) incident assigned to this provider
-  const activeIncident = (incidents as any[] | undefined)?.find(
+  // All active incidents (EN_REVISION, RECIBIDA, AGENDADA, EN_CURSO) assigned to this provider
+  const activeIncidents = (incidents as any[] | undefined)?.filter(
     (i: any) =>
-      (incidentId ? i.id === incidentId : true) &&
-      (i.status === "EN_REVISION" || i.status === "RECIBIDA" || i.status === "AGENDADA" || i.status === "EN_CURSO"),
-  ) ?? null;
+      i.status === "EN_REVISION" || i.status === "RECIBIDA" || i.status === "AGENDADA" || i.status === "EN_CURSO",
+  ) ?? [];
+
+  // State to track selected incident
+  const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
+
+  // Sync selectedIncidentId with router parameter if present
+  useEffect(() => {
+    if (incidentId) {
+      setSelectedIncidentId(incidentId);
+    }
+  }, [incidentId]);
+
+  // Use the selected active incident, or null if none is selected
+  const activeIncident = selectedIncidentId
+    ? activeIncidents.find((i: any) => i.id === selectedIncidentId) ?? null
+    : null;
 
   const acceptMutation = useMutation(
     api.incident.providerAccept.mutationOptions({
@@ -159,7 +189,7 @@ export default function ProveedorJobScreen() {
       "¿Seguro que quieres rechazar esta incidencia?",
       [
         { text: "Cancelar", style: "cancel" },
-        { text: "Rechazar", style: "destructive", onPress: () => router.back() },
+        { text: "Rechazar", style: "destructive", onPress: () => setSelectedIncidentId(null) },
       ]
     );
   };
@@ -176,7 +206,7 @@ export default function ProveedorJobScreen() {
     );
   }
 
-  if (!activeIncident) {
+  if (activeIncidents.length === 0) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <Stack.Screen options={{ headerShown: false }} />
@@ -236,11 +266,113 @@ export default function ProveedorJobScreen() {
     );
   }
 
+  // If no specific active incident is selected, show list
+  if (!activeIncident) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
+        <Stack.Screen options={{ title: "", headerShown: false }} />
+
+        {/* Header */}
+        <View style={{ 
+          flexDirection: "row", 
+          justifyContent: "space-between", 
+          alignItems: "center", 
+          paddingHorizontal: 24, 
+          paddingVertical: 16, 
+          borderBottomWidth: 1, 
+          borderBottomColor: "#e2e8f0",
+          backgroundColor: "#fff"
+        }}>
+          <Text style={{ fontSize: 18, fontWeight: "800", color: DARK }}>Aconvi Proveedor</Text>
+          <TouchableOpacity 
+            onPress={() => Alert.alert("Cerrar sesión", "¿Seguro?", [
+              { text: "Cancelar", style: "cancel" },
+              {
+                text: "Salir",
+                style: "destructive",
+                onPress: async () => {
+                  await SecureStore.deleteItemAsync("expo_session_token").catch(() => {});
+                  queryClient.clear();
+                  router.replace("/login");
+                },
+              },
+            ])}
+            style={{ 
+              paddingVertical: 6, 
+              paddingHorizontal: 12, 
+              borderRadius: 8, 
+              backgroundColor: "#FEF2F2" 
+            }}
+          >
+            <Text style={{ color: "#DC2626", fontWeight: "600", fontSize: 13 }}>Cerrar sesión</Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView
+          contentContainerStyle={styles.listScroll}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={handleRefresh}
+              tintColor={PRIMARY}
+            />
+          }
+        >
+          <Text style={styles.listTitle}>Trabajos Asignados</Text>
+          <Text style={styles.listSubtitle}>
+            Tienes {activeIncidents.length} {activeIncidents.length === 1 ? "incidencia activa" : "incidencias activas"}
+          </Text>
+
+          {activeIncidents.map((i: any) => {
+            const status = statusLabelAndColor(i.status);
+            return (
+              <TouchableOpacity
+                key={i.id}
+                style={styles.card}
+                onPress={() => setSelectedIncidentId(i.id)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.cardHeader}>
+                  <View style={[styles.statusBadge, { backgroundColor: status.bgColor }]}>
+                    <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
+                  </View>
+                  <Text style={styles.cardDate}>
+                    {new Date(i.createdAt).toLocaleDateString("es-ES", {
+                      day: "2-digit",
+                      month: "short",
+                    })}
+                  </Text>
+                </View>
+
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  {i.title}
+                </Text>
+
+                <Text style={styles.cardDesc} numberOfLines={2}>
+                  {i.description}
+                </Text>
+
+                <View style={styles.cardFooter}>
+                  <Text style={styles.cardPriority}>
+                    {priorityLabel(i.priority ?? "MEDIA")}
+                  </Text>
+                  <Text style={styles.viewDetailText}>Ver detalle →</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // Show detailed view of the selected incident
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
       <Stack.Screen options={{ title: "", headerShown: false }} />
 
-      {/* Header */}
+      {/* Header with Back button */}
       <View style={{ 
         flexDirection: "row", 
         justifyContent: "space-between", 
@@ -251,7 +383,22 @@ export default function ProveedorJobScreen() {
         borderBottomColor: "#e2e8f0",
         backgroundColor: "#fff"
       }}>
-        <Text style={{ fontSize: 18, fontWeight: "800", color: DARK }}>Aconvi Proveedor</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <TouchableOpacity 
+            onPress={() => setSelectedIncidentId(null)}
+            style={{ 
+              paddingVertical: 6, 
+              paddingHorizontal: 10, 
+              borderRadius: 8, 
+              backgroundColor: "#f1f5f9",
+              marginRight: 4
+            }}
+          >
+            <Text style={{ color: DARK, fontWeight: "700", fontSize: 14 }}>← Volver</Text>
+          </TouchableOpacity>
+          <Text style={{ fontSize: 18, fontWeight: "800", color: DARK }}>Incidencia</Text>
+        </View>
+        
         <TouchableOpacity 
           onPress={() => Alert.alert("Cerrar sesión", "¿Seguro?", [
             { text: "Cancelar", style: "cancel" },
@@ -392,4 +539,70 @@ const styles = StyleSheet.create({
   acceptButtonText: { color: "#fff", fontSize: 17, fontWeight: "800", letterSpacing: 1 },
   declineButton: { paddingVertical: 12 },
   declineButtonText: { color: MUTED, fontSize: 14, textDecorationLine: "underline", textAlign: "center" },
+
+  // List View Styles
+  listScroll: { paddingHorizontal: 24, paddingTop: 20, paddingBottom: 32 },
+  listTitle: { fontSize: 24, fontWeight: "800", color: DARK, letterSpacing: -0.5 },
+  listSubtitle: { fontSize: 14, color: MUTED, marginTop: 4, marginBottom: 20 },
+  card: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#f1f5f9",
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  statusBadge: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  cardDate: {
+    fontSize: 12,
+    color: MUTED,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: DARK,
+    marginBottom: 6,
+  },
+  cardDesc: {
+    fontSize: 14,
+    color: MUTED,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  cardFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderTopWidth: 1,
+    borderTopColor: "#f1f5f9",
+    paddingTop: 12,
+  },
+  cardPriority: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  viewDetailText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: PRIMARY,
+  },
 });

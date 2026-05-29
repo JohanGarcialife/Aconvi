@@ -458,14 +458,36 @@ export default function IncidentsPage() {
               <div className="mb-6">
                 <h3 className="mb-3 text-sm font-bold text-slate-800">Notas internas</h3>
                 <div className="space-y-2">
-                  {(selected.notes ?? []).map((n: any) => (
-                    <div key={n.id} className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
-                      <p className="text-sm font-medium text-slate-800">{n.content}</p>
-                      <p className="mt-1 text-xs text-slate-400">
-                        {n.author?.name ?? "AF"} · {new Date(n.createdAt).toLocaleDateString("es-ES")}
-                      </p>
-                    </div>
-                  ))}
+                  {(selected.notes ?? []).map((n: any) => {
+                    // Detect base64 image data embedded in note content
+                    const base64Match = n.content?.match(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/);
+                    // Extract non-image text (everything before the base64 blob)
+                    const textPart = base64Match
+                      ? n.content.replace(base64Match[0], "").trim()
+                      : n.content;
+
+                    return (
+                      <div key={n.id} className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                        {textPart && (
+                          <p className="text-sm font-medium text-slate-800 break-words whitespace-pre-wrap">
+                            {textPart}
+                          </p>
+                        )}
+                        {base64Match && (
+                          <img
+                            src={base64Match[0]}
+                            alt="Foto del proveedor"
+                            className="mt-2 w-full max-w-xs rounded-lg object-cover"
+                            style={{ maxHeight: 240 }}
+                          />
+                        )}
+                        <p className="mt-1 text-xs text-slate-400">
+                          {n.author?.name ?? "AF"} · {new Date(n.createdAt).toLocaleDateString("es-ES")}
+                        </p>
+                      </div>
+                    );
+                  })}
+
                 </div>
                 <form onSubmit={handleAddNote} className="mt-3 flex gap-2">
                   <input value={noteText} onChange={e => setNoteText(e.target.value)}
