@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
   Alert,
   ActivityIndicator,
   Image,
+  Keyboard,
+  Animated,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, Stack } from "expo-router";
@@ -24,52 +26,52 @@ const BG = "#f8fafc";
 
 const TENANT_ID = "org_aconvi_demo";
 
+// ─── Categories — matching the client mockup (6 tiles) ────────────────────────
 const CATEGORIES = [
-  { id: "electricidad",  label: "Electricidad",       emoji: "⚡" },
-  { id: "agua",          label: "Agua / Fontanería",   emoji: "💧" },
-  { id: "acceso",        label: "Acceso / Cerrajería", emoji: "🔑" },
-  { id: "limpieza",      label: "Limpieza",            emoji: "🧴" },
-  { id: "ascensor",      label: "Ascensor",            emoji: "🛗" },
-  { id: "jardineria",    label: "Jardinería",          emoji: "🌳" },
-  { id: "ruidos",        label: "Ruidos / Molestias",  emoji: "🔊" },
-  { id: "otro",          label: "Otro",                emoji: "❓" },
-];
-
-const PRIORITIES = [
-  { id: "BAJA",    label: "Baja",    color: "#64748b", desc: "No es urgente" },
-  { id: "MEDIA",   label: "Media",   color: "#3b82f6", desc: "Puede esperar unos días" },
-  { id: "ALTA",    label: "Alta",    color: "#f97316", desc: "Requiere atención pronto" },
-  { id: "URGENTE", label: "Urgente", color: "#ef4444", desc: "Peligro o sin servicio básico" },
+  { id: "electricidad", label: "No funciona", icon: "⚡" },
+  { id: "agua",         label: "Agua",         icon: "💧" },
+  { id: "acceso",       label: "Acceso",        icon: "🔑" },
+  { id: "limpieza",     label: "Limpieza",      icon: "🧹" },
+  { id: "ruidos",       label: "Molestias",     icon: "🔊" },
+  { id: "otro",         label: "Otro",          icon: "➕" },
 ];
 
 export default function NewIncidentScreen() {
   const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedPriority, setSelectedPriority] = useState<string>("MEDIA");
-  const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoBase64, setPhotoBase64] = useState<string | null>(null);
-  const [step, setStep] = useState<"category" | "details">("category");
 
-  // ─── tRPC mutation ────────────────────────────────────────────────────────
+  // Subtle scale animation on category card press
+  const scaleAnims = useRef(
+    CATEGORIES.reduce(
+      (acc, c) => ({ ...acc, [c.id]: new Animated.Value(1) }),
+      {} as Record<string, Animated.Value>,
+    ),
+  ).current;
+
+  const animatePressIn = (id: string) => {
+    Animated.spring(scaleAnims[id]!, { toValue: 0.93, useNativeDriver: true, speed: 40 }).start();
+  };
+  const animatePressOut = (id: string) => {
+    Animated.spring(scaleAnims[id]!, { toValue: 1, useNativeDriver: true, speed: 20 }).start();
+  };
+
+  // ─── tRPC mutation ──────────────────────────────────────────────────────────
   const createIncident = useMutation({
     ...api.incident.create.mutationOptions(),
     onSuccess: () => {
-      // Invalidate so the incidents list and home dashboard refresh immediately
       void queryClient.invalidateQueries(api.incident.all.queryFilter());
-      Alert.alert(
-        "✅ Reporte enviado",
-        "Tu incidencia ha sido enviada al administrador. Recibirás notificaciones sobre su estado.",
-        [{ text: "Ver mis incidencias", onPress: () => router.replace("/(vecino)/incidents") }],
-      );
+      // Navigate directly — no blocking alert
+      router.replace("/(vecino)/incidents");
     },
     onError: (e: any) => {
       Alert.alert("Error al enviar", e.message ?? "Inténtalo de nuevo.");
     },
   });
 
-  // ─── Camera / Gallery ─────────────────────────────────────────────────────
+  // ─── Camera / Gallery (no forced crop) ─────────────────────────────────────
   const handlePickPhoto = async (useCamera: boolean) => {
     const permission = useCamera
       ? await ImagePicker.requestCameraPermissionsAsync()
@@ -86,17 +88,15 @@ export default function NewIncidentScreen() {
     const result = useCamera
       ? await ImagePicker.launchCameraAsync({
           mediaTypes: "images",
-          quality: 0.35,
+          quality: 0.5,
           base64: true,
-          allowsEditing: true,
-          aspect: [4, 3],
+          allowsEditing: false, // ← no crop
         })
       : await ImagePicker.launchImageLibraryAsync({
           mediaTypes: "images",
-          quality: 0.35,
+          quality: 0.5,
           base64: true,
-          allowsEditing: true,
-          aspect: [4, 3],
+          allowsEditing: false, // ← no crop
         });
 
     if (!result.canceled && result.assets[0]) {
@@ -108,204 +108,130 @@ export default function NewIncidentScreen() {
   };
 
   const showPhotoOptions = () => {
-    Alert.alert("Añadir foto de la avería", "¿Cómo quieres añadir la foto?", [
+    Keyboard.dismiss();
+    Alert.alert("Añadir foto", "¿Cómo quieres adjuntar la foto?", [
       { text: "📷 Cámara", onPress: () => handlePickPhoto(true) },
       { text: "🖼️ Galería", onPress: () => handlePickPhoto(false) },
       { text: "Cancelar", style: "cancel" },
     ]);
   };
 
-  // ─── Submit ───────────────────────────────────────────────────────────────
+  // ─── Submit ─────────────────────────────────────────────────────────────────
   const handleSubmit = () => {
-    if (!selectedCategory) {
-      Alert.alert("Categoría requerida", "Por favor indica qué tipo de incidencia es.");
-      return;
-    }
-    if (!description.trim()) {
-      Alert.alert("Descripción requerida", "Describe brevemente el problema.");
-      return;
-    }
+    if (!selectedCategory) return;
 
     const catLabel = CATEGORIES.find((c) => c.id === selectedCategory)?.label ?? "Incidencia";
-    const finalTitle = title.trim() || `${catLabel}: ${description.slice(0, 50)}`;
+    const finalTitle = description.trim()
+      ? `${catLabel}: ${description.trim().slice(0, 60)}`
+      : `${catLabel} reportada`;
+    const finalDescription = description.trim() || catLabel;
 
     createIncident.mutate({
       tenantId: TENANT_ID,
       title: finalTitle,
-      description: description.trim(),
+      description: finalDescription,
       category: selectedCategory,
-      priority: selectedPriority as any,
+      priority: "MEDIA",
       ...(photoBase64 ? { photoUrl: photoBase64 } : {}),
     });
   };
 
   const isLoading = createIncident.isPending;
-  const selectedPriorityObj = PRIORITIES.find((p) => p.id === selectedPriority)!;
+  const canSubmit = !!selectedCategory && !isLoading;
 
-  // ─── STEP 1: Category selector ────────────────────────────────────────────
-  if (step === "category") {
-    return (
-      <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
-        <Stack.Screen options={{ title: "Nueva incidencia", headerBackTitle: "Inicio" }} />
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-          <Text style={styles.pageTitle}>¿Qué tipo de problema es?</Text>
-          <Text style={styles.pageSubtitle}>Selecciona la categoría que mejor lo describe</Text>
-
-          <View style={styles.grid}>
-            {CATEGORIES.map((cat) => {
-              const isSelected = selectedCategory === cat.id;
-              return (
-                <TouchableOpacity
-                  key={cat.id}
-                  style={[styles.categoryCard, isSelected && styles.categoryCardSelected]}
-                  onPress={() => setSelectedCategory(cat.id)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.categoryEmoji}>{cat.emoji}</Text>
-                  <Text style={[styles.categoryLabel, isSelected && styles.categoryLabelSelected]}>
-                    {cat.label}
-                  </Text>
-                  {isSelected && (
-                    <View style={styles.categoryCheck}>
-                      <Text style={{ color: "#fff", fontSize: 10, fontWeight: "800" }}>✓</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          <TouchableOpacity
-            style={[styles.submitButton, !selectedCategory && styles.submitButtonDisabled]}
-            onPress={() => selectedCategory && setStep("details")}
-            disabled={!selectedCategory}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.submitButtonText}>Continuar →</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
-
-  // ─── STEP 2: Details ──────────────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
-      <Stack.Screen options={{ title: "Detalles de la avería", headerBackTitle: "Categoría" }} />
+      <Stack.Screen options={{ headerShown: false }} />
+
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} hitSlop={12}>
+          <Text style={styles.backBtnText}>←</Text>
+        </TouchableOpacity>
+      </View>
+
       <ScrollView
-        style={{ flex: 1 }}
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Categoría seleccionada (chip) */}
-        <TouchableOpacity onPress={() => setStep("category")} style={styles.catChip}>
-          <Text style={styles.catChipText}>
-            {CATEGORIES.find((c) => c.id === selectedCategory)?.emoji}{" "}
-            {CATEGORIES.find((c) => c.id === selectedCategory)?.label}
-          </Text>
-          <Text style={{ fontSize: 11, color: PRIMARY }}> · Cambiar</Text>
+        {/* ── Title ──────────────────────────────────────────────────────── */}
+        <Text style={styles.pageTitle}>¿Qué ocurre?</Text>
+
+        {/* ── Category grid (2×3) ────────────────────────────────────────── */}
+        <View style={styles.grid}>
+          {CATEGORIES.map((cat) => {
+            const isSelected = selectedCategory === cat.id;
+            return (
+              <Animated.View
+                key={cat.id}
+                style={[styles.categoryCardWrap, { transform: [{ scale: scaleAnims[cat.id]! }] }]}
+              >
+                <TouchableOpacity
+                  style={[styles.categoryCard, isSelected && styles.categoryCardSelected]}
+                  onPress={() => setSelectedCategory(cat.id)}
+                  onPressIn={() => animatePressIn(cat.id)}
+                  onPressOut={() => animatePressOut(cat.id)}
+                  activeOpacity={1}
+                >
+                  <Text style={styles.categoryIcon}>{cat.icon}</Text>
+                  <Text style={[styles.categoryLabel, isSelected && styles.categoryLabelSelected]}>
+                    {cat.label}
+                  </Text>
+                </TouchableOpacity>
+              </Animated.View>
+            );
+          })}
+        </View>
+
+        {/* ── Photo button ───────────────────────────────────────────────── */}
+        <TouchableOpacity style={styles.photoRow} onPress={showPhotoOptions} activeOpacity={0.7}>
+          {photoUri ? (
+            <View style={styles.photoThumbWrap}>
+              <Image source={{ uri: photoUri }} style={styles.photoThumb} />
+              <TouchableOpacity
+                style={styles.photoRemoveBtn}
+                onPress={() => { setPhotoUri(null); setPhotoBase64(null); }}
+                hitSlop={8}
+              >
+                <Text style={styles.photoRemoveText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              <Text style={styles.photoCameraIcon}>📷</Text>
+              <Text style={styles.photoRowLabel}>Añadir foto</Text>
+            </>
+          )}
         </TouchableOpacity>
 
-        {/* Título opcional */}
-        <Text style={styles.label}>Título (opcional)</Text>
+        {/* ── Description ────────────────────────────────────────────────── */}
         <TextInput
-          style={styles.input}
-          placeholder="Ej: Gotera en el techo del ascensor"
-          placeholderTextColor="#94a3b8"
-          value={title}
-          onChangeText={setTitle}
-          maxLength={80}
-        />
-
-        {/* Descripción */}
-        <Text style={styles.label}>Descripción <Text style={{ color: "#ef4444" }}>*</Text></Text>
-        <TextInput
-          style={styles.textArea}
-          placeholder="Describe el problema con detalle: qué ocurre, dónde exactamente, desde cuándo..."
+          style={styles.descInput}
+          placeholder="Añade detalles o indica ubicación exacta..."
           placeholderTextColor="#94a3b8"
           multiline
           value={description}
           onChangeText={setDescription}
           textAlignVertical="top"
-          maxLength={500}
+          maxLength={300}
+          returnKeyType="done"
+          blurOnSubmit
         />
-        <Text style={{ fontSize: 11, color: MUTED, marginBottom: 16, alignSelf: "flex-end" }}>
-          {description.length}/500
-        </Text>
 
-        {/* Prioridad */}
-        <Text style={styles.label}>Urgencia</Text>
-        <View style={styles.priorityRow}>
-          {PRIORITIES.map((p) => (
-            <TouchableOpacity
-              key={p.id}
-              style={[
-                styles.priorityBtn,
-                selectedPriority === p.id && { borderColor: p.color, backgroundColor: `${p.color}12` },
-              ]}
-              onPress={() => setSelectedPriority(p.id)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.priorityLabel, selectedPriority === p.id && { color: p.color }]}>
-                {p.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        <Text style={[styles.priorityDesc, { color: selectedPriorityObj.color }]}>
-          {selectedPriorityObj.desc}
-        </Text>
-
-        {/* Foto */}
-        <Text style={styles.label}>Foto de la avería</Text>
+        {/* ── Submit ─────────────────────────────────────────────────────── */}
         <TouchableOpacity
-          style={[styles.photoBox, photoUri && styles.photoBoxFilled]}
-          onPress={showPhotoOptions}
-          activeOpacity={0.7}
-        >
-          {photoUri ? (
-            <Image source={{ uri: photoUri }} style={styles.photoPreview} />
-          ) : (
-            <>
-              <Text style={{ fontSize: 32, marginBottom: 6 }}>📷</Text>
-              <Text style={styles.photoLabel}>Añadir foto (opcional)</Text>
-              <Text style={{ fontSize: 11, color: MUTED, marginTop: 2 }}>Cámara o galería</Text>
-            </>
-          )}
-        </TouchableOpacity>
-
-        {photoUri && (
-          <TouchableOpacity
-            onPress={() => { setPhotoUri(null); setPhotoBase64(null); }}
-            style={{ marginBottom: 16, alignSelf: "flex-start" }}
-          >
-            <Text style={{ fontSize: 12, color: MUTED, textDecorationLine: "underline" }}>
-              Eliminar foto
-            </Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Enviar */}
-        <TouchableOpacity
-          style={[
-            styles.submitButton,
-            (!description.trim() || isLoading) && styles.submitButtonDisabled,
-          ]}
+          style={[styles.submitBtn, !canSubmit && styles.submitBtnDisabled]}
           onPress={handleSubmit}
-          disabled={!description.trim() || isLoading}
-          activeOpacity={0.85}
+          disabled={!canSubmit}
+          activeOpacity={0.88}
         >
           {isLoading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.submitButtonText}>📤 Enviar reporte</Text>
+            <Text style={styles.submitBtnText}>Enviar reporte</Text>
           )}
         </TouchableOpacity>
-
-        <Text style={{ fontSize: 11, color: MUTED, textAlign: "center", marginTop: 8 }}>
-          El administrador recibirá tu reporte y te notificará del avance.
-        </Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -313,110 +239,149 @@ export default function NewIncidentScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#fff" },
-  scroll: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 40 },
-  pageTitle: { fontSize: 24, fontWeight: "800", color: DARK, textAlign: "center", marginBottom: 6, letterSpacing: -0.5 },
-  pageSubtitle: { fontSize: 13, color: MUTED, textAlign: "center", marginBottom: 24, lineHeight: 18 },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 24 },
-  categoryCard: {
+
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: BG,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  backBtnText: { fontSize: 18, color: DARK, fontWeight: "700", lineHeight: 22 },
+
+  scroll: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 32,
+  },
+
+  pageTitle: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: DARK,
+    textAlign: "center",
+    letterSpacing: -0.5,
+    marginBottom: 24,
+  },
+
+  // ── Grid ──────────────────────────────────────────────────────────────────
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    marginBottom: 20,
+  },
+  categoryCardWrap: {
     width: "47%",
-    aspectRatio: 1.4,
+  },
+  categoryCard: {
+    aspectRatio: 1.3,
     backgroundColor: "#fff",
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1.5,
     borderColor: BORDER,
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
-    shadowColor: "#000",
+    gap: 8,
+    shadowColor: "#0f172a",
     shadowOpacity: 0.04,
-    shadowRadius: 6,
+    shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
     elevation: 1,
   },
-  categoryCardSelected: { borderColor: PRIMARY, borderWidth: 2.5, backgroundColor: `${PRIMARY}08` },
-  categoryEmoji: { fontSize: 28 },
-  categoryLabel: { fontSize: 12, fontWeight: "600", color: MUTED, textAlign: "center" },
-  categoryLabelSelected: { color: PRIMARY },
-  categoryCheck: {
-    position: "absolute", top: 8, right: 8,
-    width: 18, height: 18, borderRadius: 9,
-    backgroundColor: PRIMARY,
-    alignItems: "center", justifyContent: "center",
+  categoryCardSelected: {
+    borderColor: PRIMARY,
+    borderWidth: 2.5,
+    backgroundColor: `${PRIMARY}08`,
   },
-  catChip: {
+  categoryIcon: { fontSize: 30 },
+  categoryLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: MUTED,
+    textAlign: "center",
+  },
+  categoryLabelSelected: { color: PRIMARY },
+
+  // ── Photo ──────────────────────────────────────────────────────────────────
+  photoRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: `${PRIMARY}10`,
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    alignSelf: "flex-start",
-    marginBottom: 20,
-  },
-  catChipText: { fontSize: 13, fontWeight: "700", color: PRIMARY },
-  label: { fontSize: 13, fontWeight: "700", color: DARK, marginBottom: 6 },
-  input: {
-    backgroundColor: BG,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: BORDER,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 14,
-    color: DARK,
-    marginBottom: 16,
-  },
-  textArea: {
-    backgroundColor: BG,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: BORDER,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 14,
-    color: DARK,
-    minHeight: 100,
-    marginBottom: 4,
-  },
-  priorityRow: { flexDirection: "row", gap: 8, marginBottom: 6 },
-  priorityBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: BORDER,
-    alignItems: "center",
-  },
-  priorityLabel: { fontSize: 12, fontWeight: "700", color: MUTED },
-  priorityDesc: { fontSize: 11, fontWeight: "600", marginBottom: 16 },
-  photoBox: {
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 18,
     borderRadius: 16,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: BORDER,
-    borderStyle: "dashed",
     backgroundColor: BG,
+    marginBottom: 14,
+  },
+  photoCameraIcon: { fontSize: 26 },
+  photoRowLabel: { fontSize: 15, fontWeight: "600", color: MUTED },
+
+  photoThumbWrap: {
+    position: "relative",
+    width: 80,
+    height: 80,
+    borderRadius: 12,
+    overflow: "visible",
+  },
+  photoThumb: {
+    width: 80,
+    height: 80,
+    borderRadius: 12,
+  },
+  photoRemoveBtn: {
+    position: "absolute",
+    top: -8,
+    right: -8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#ef4444",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 24,
-    marginBottom: 8,
-    minHeight: 120,
-    overflow: "hidden",
   },
-  photoBoxFilled: { borderColor: PRIMARY, backgroundColor: `${PRIMARY}08`, borderStyle: "solid", paddingVertical: 0, height: 180 },
-  photoPreview: { width: "100%", height: "100%", borderRadius: 14 },
-  photoLabel: { fontSize: 14, fontWeight: "600", color: MUTED },
-  submitButton: {
+  photoRemoveText: { color: "#fff", fontSize: 11, fontWeight: "800" },
+
+  // ── Description ────────────────────────────────────────────────────────────
+  descInput: {
+    backgroundColor: BG,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: BORDER,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 15,
+    color: DARK,
+    minHeight: 56,
+    marginBottom: 20,
+    lineHeight: 22,
+  },
+
+  // ── Submit ─────────────────────────────────────────────────────────────────
+  submitBtn: {
     backgroundColor: PRIMARY,
-    borderRadius: 14,
-    paddingVertical: 16,
+    borderRadius: 16,
+    paddingVertical: 18,
     alignItems: "center",
     shadowColor: PRIMARY,
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
     elevation: 4,
-    marginTop: 4,
   },
-  submitButtonDisabled: { opacity: 0.45 },
-  submitButtonText: { color: "#fff", fontSize: 17, fontWeight: "700", letterSpacing: 0.3 },
+  submitBtnDisabled: { opacity: 0.4 },
+  submitBtnText: {
+    color: "#fff",
+    fontSize: 17,
+    fontWeight: "700",
+    letterSpacing: 0.2,
+  },
 });
