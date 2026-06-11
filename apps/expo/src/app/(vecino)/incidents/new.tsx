@@ -11,6 +11,8 @@ import {
   Image,
   Keyboard,
   Animated,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, Stack } from "expo-router";
@@ -42,6 +44,8 @@ export default function NewIncidentScreen() {
   const [description, setDescription] = useState("");
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoBase64, setPhotoBase64] = useState<string | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const descInputRef = useRef<TextInput>(null);
 
   // Subtle scale animation on category card press
   const scaleAnims = useRef(
@@ -59,11 +63,18 @@ export default function NewIncidentScreen() {
   };
 
   // ─── tRPC mutation ──────────────────────────────────────────────────────────
+  const resetForm = () => {
+    setSelectedCategory(null);
+    setDescription("");
+    setPhotoUri(null);
+    setPhotoBase64(null);
+  };
+
   const createIncident = useMutation({
     ...api.incident.create.mutationOptions(),
     onSuccess: () => {
       void queryClient.invalidateQueries(api.incident.all.queryFilter());
-      // Navigate directly — no blocking alert
+      resetForm();
       router.replace("/(vecino)/incidents");
     },
     onError: (e: any) => {
@@ -150,7 +161,14 @@ export default function NewIncidentScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* KeyboardAvoidingView ensures the scroll content rises above the keyboard */}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={0}
+      >
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -207,6 +225,7 @@ export default function NewIncidentScreen() {
 
         {/* ── Description ────────────────────────────────────────────────── */}
         <TextInput
+          ref={descInputRef}
           style={styles.descInput}
           placeholder="Añade detalles o indica ubicación exacta..."
           placeholderTextColor="#94a3b8"
@@ -217,6 +236,12 @@ export default function NewIncidentScreen() {
           maxLength={300}
           returnKeyType="done"
           blurOnSubmit
+          onFocus={() => {
+            // Scroll down so the input is fully visible above the keyboard
+            setTimeout(() => {
+              scrollRef.current?.scrollToEnd({ animated: true });
+            }, 150);
+          }}
         />
 
         {/* ── Submit ─────────────────────────────────────────────────────── */}
@@ -233,6 +258,7 @@ export default function NewIncidentScreen() {
           )}
         </TouchableOpacity>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
