@@ -19,6 +19,16 @@ const INCIDENT_STATUSES = [
   "RECHAZADA",
 ] as const;
 
+function sanitizeText(str: string): string {
+  const map: Record<string, string> = {
+    'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u',
+    'Á': 'A', 'É': 'E', 'Í': 'I', 'Ó': 'O', 'Ú': 'U',
+    'ñ': 'n', 'Ñ': 'N',
+    'ü': 'u', 'Ü': 'U'
+  };
+  return str.split('').map(c => map[c] || c).join('');
+}
+
 export const incidentRouter = createTRPCRouter({
   // ─── List (public) ────────────────────────────────────────────────────────
   all: publicProcedure
@@ -89,10 +99,14 @@ export const incidentRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const { tenantId, ...data } = input;
+      const sanitizedTitle = sanitizeText(data.title);
+      const sanitizedDescription = sanitizeText(data.description);
       const [created] = await ctx.db
         .insert(incident)
         .values({
           ...data,
+          title: sanitizedTitle,
+          description: sanitizedDescription,
           organizationId: tenantId,
           reporterId: DEMO_AUTHOR_ID,
           status: "RECIBIDA",
@@ -297,7 +311,7 @@ export const incidentRouter = createTRPCRouter({
         .values({
           incidentId: input.incidentId,
           authorId: input.authorId ?? DEMO_AUTHOR_ID,
-          content: input.content,
+          content: sanitizeText(input.content),
         })
         .returning();
       return note;
@@ -473,7 +487,7 @@ export const incidentRouter = createTRPCRouter({
         .update(incident)
         .set({
           rating: input.rating,
-          ratingComment: input.comment ?? null,
+          ratingComment: input.comment ? sanitizeText(input.comment) : null,
         })
         .where(
           and(

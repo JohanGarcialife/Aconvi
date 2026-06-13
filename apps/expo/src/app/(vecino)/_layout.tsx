@@ -126,6 +126,7 @@ export default function VecinoLayout() {
       <Tabs.Screen
         name="common-areas"
         options={{
+          href: null,
           title: "Zonas",
           tabBarIcon: ({ focused }) => (
             <TabIcon name="Zonas" focused={focused} />
@@ -144,6 +145,7 @@ export default function VecinoLayout() {
       <Tabs.Screen
         name="voting"
         options={{
+          href: null,
           title: "Votaciones",
           tabBarIcon: ({ focused }) => (
             <TabIcon name="Votaciones" focused={focused} />

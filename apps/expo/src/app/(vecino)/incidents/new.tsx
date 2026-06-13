@@ -17,8 +17,19 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, Stack } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
 import { api, queryClient } from "~/utils/api";
 import { useMutation } from "@tanstack/react-query";
+
+const sanitizeText = (str: string): string => {
+  const map: Record<string, string> = {
+    'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u',
+    'Á': 'A', 'É': 'E', 'Í': 'I', 'Ó': 'O', 'Ú': 'U',
+    'ñ': 'n', 'Ñ': 'N',
+    'ü': 'u', 'Ü': 'U'
+  };
+  return str.split('').map(c => map[c] || c).join('');
+};
 
 const PRIMARY = "#4aa19b";
 const DARK = "#0f172a";
@@ -96,24 +107,36 @@ export default function NewIncidentScreen() {
       return;
     }
 
+    // Do NOT request base64 from image picker directly (prevents OOM crashes with high-res cameras)
     const result = useCamera
       ? await ImagePicker.launchCameraAsync({
           mediaTypes: "images",
-          quality: 0.5,
-          base64: true,
           allowsEditing: false, // ← no crop
         })
       : await ImagePicker.launchImageLibraryAsync({
           mediaTypes: "images",
-          quality: 0.5,
-          base64: true,
           allowsEditing: false, // ← no crop
         });
 
     if (!result.canceled && result.assets[0]) {
-      setPhotoUri(result.assets[0].uri);
-      if (result.assets[0].base64) {
-        setPhotoBase64(`data:image/jpeg;base64,${result.assets[0].base64}`);
+      try {
+        // Manipulate image: resize to max width of 1000px and compress to 0.7
+        const manipResult = await ImageManipulator.manipulateAsync(
+          result.assets[0].uri,
+          [{ resize: { width: 1000 } }],
+          { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+        );
+        setPhotoUri(manipResult.uri);
+        if (manipResult.base64) {
+          setPhotoBase64(`data:image/jpeg;base64,${manipResult.base64}`);
+        }
+      } catch (error) {
+        console.error("Error manipulating image:", error);
+        // Fallback
+        setPhotoUri(result.assets[0].uri);
+        if (result.assets[0].base64) {
+          setPhotoBase64(`data:image/jpeg;base64,${result.assets[0].base64}`);
+        }
       }
     }
   };
@@ -132,10 +155,11 @@ export default function NewIncidentScreen() {
     if (!selectedCategory) return;
 
     const catLabel = CATEGORIES.find((c) => c.id === selectedCategory)?.label ?? "Incidencia";
-    const finalTitle = description.trim()
-      ? `${catLabel}: ${description.trim().slice(0, 60)}`
+    const cleanDesc = sanitizeText(description.trim());
+    const finalTitle = cleanDesc
+      ? `${catLabel}: ${cleanDesc.slice(0, 60)}`
       : `${catLabel} reportada`;
-    const finalDescription = description.trim() || catLabel;
+    const finalDescription = cleanDesc || catLabel;
 
     createIncident.mutate({
       tenantId: TENANT_ID,
