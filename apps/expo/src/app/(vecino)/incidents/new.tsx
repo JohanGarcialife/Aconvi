@@ -18,6 +18,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, Stack } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
+import * as FileSystem from "expo-file-system/legacy";
 import { api, queryClient } from "~/utils/api";
 import { useMutation } from "@tanstack/react-query";
 
@@ -53,8 +54,11 @@ export default function NewIncidentScreen() {
   const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [description, setDescription] = useState("");
+  // Store only the local file URI in state — never the base64 string.
+  // The base64 is read from disk only right before the API call.
+  // This prevents react-query-persist-client from serializing a 10MB+
+  // base64 string into AsyncStorage and OOM-crashing the bridge.
   const [photoUri, setPhotoUri] = useState<string | null>(null);
-  const [photoBase64, setPhotoBase64] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const descInputRef = useRef<TextInput>(null);
 
@@ -78,7 +82,6 @@ export default function NewIncidentScreen() {
     setSelectedCategory(null);
     setDescription("");
     setPhotoUri(null);
-    setPhotoBase64(null);
   };
 
   const createIncident = useMutation({
@@ -93,7 +96,7 @@ export default function NewIncidentScreen() {
     },
   });
 
-  // ─── Camera / Gallery (no forced crop) ─────────────────────────────────────
+  // ─── Camera / Gallery ─────────────────────────────────────────────────────────
   const handlePickPhoto = async (useCamera: boolean) => {
     const permission = useCamera
       ? await ImagePicker.requestCameraPermissionsAsync()
@@ -107,36 +110,26 @@ export default function NewIncidentScreen() {
       return;
     }
 
-    // Do NOT request base64 from image picker directly (prevents OOM crashes with high-res cameras)
+    // Pick photo without requesting base64 — avoids OOM in native bridge
     const result = useCamera
-      ? await ImagePicker.launchCameraAsync({
-          mediaTypes: "images",
-          allowsEditing: false, // ← no crop
-        })
-      : await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: "images",
-          allowsEditing: false, // ← no crop
-        });
+      ? await ImagePicker.launchCameraAsync({ mediaTypes: "images", allowsEditing: false })
+      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: "images", allowsEditing: false });
 
     if (!result.canceled && result.assets[0]) {
       try {
-        // Manipulate image: resize to max width of 1000px and compress to 0.7
+        // Resize to max 500px wide, compress to 0.3 quality — keeps the JPEG tiny
+        // while still showing the problem location clearly.
+        // base64 is NOT requested here — it will be read from disk only at submit time.
         const manipResult = await ImageManipulator.manipulateAsync(
           result.assets[0].uri,
-          [{ resize: { width: 1000 } }],
-          { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+          [{ resize: { width: 500 } }],
+          { compress: 0.3, format: ImageManipulator.SaveFormat.JPEG }
         );
         setPhotoUri(manipResult.uri);
-        if (manipResult.base64) {
-          setPhotoBase64(`data:image/jpeg;base64,${manipResult.base64}`);
-        }
       } catch (error) {
         console.error("Error manipulating image:", error);
-        // Fallback
+        // Fallback: use original URI, base64 will be read from disk at submit time
         setPhotoUri(result.assets[0].uri);
-        if (result.assets[0].base64) {
-          setPhotoBase64(`data:image/jpeg;base64,${result.assets[0].base64}`);
-        }
       }
     }
   };
@@ -151,7 +144,7 @@ export default function NewIncidentScreen() {
   };
 
   // ─── Submit ─────────────────────────────────────────────────────────────────
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!selectedCategory) return;
 
     const catLabel = CATEGORIES.find((c) => c.id === selectedCategory)?.label ?? "Incidencia";
@@ -161,13 +154,27 @@ export default function NewIncidentScreen() {
       : `${catLabel} reportada`;
     const finalDescription = cleanDesc || catLabel;
 
+    // Read base64 from disk ONLY at submit time — never stored in React state
+    // or React Query cache to avoid OOM when persist-client serializes to AsyncStorage.
+    let photoUrl: string | undefined;
+    if (photoUri) {
+      try {
+        const b64 = await FileSystem.readAsStringAsync(photoUri, {
+          encoding: "base64" as const,
+        });
+        photoUrl = `data:image/jpeg;base64,${b64}`;
+      } catch (err) {
+        console.warn("Could not read photo file:", err);
+      }
+    }
+
     createIncident.mutate({
       tenantId: TENANT_ID,
       title: finalTitle,
       description: finalDescription,
       category: selectedCategory,
       priority: "MEDIA",
-      ...(photoBase64 ? { photoUrl: photoBase64 } : {}),
+      ...(photoUrl ? { photoUrl } : {}),
     });
   };
 
@@ -233,7 +240,7 @@ export default function NewIncidentScreen() {
               <Image source={{ uri: photoUri }} style={styles.photoThumb} />
               <TouchableOpacity
                 style={styles.photoRemoveBtn}
-                onPress={() => { setPhotoUri(null); setPhotoBase64(null); }}
+                onPress={() => { setPhotoUri(null); }}
                 hitSlop={8}
               >
                 <Text style={styles.photoRemoveText}>✕</Text>

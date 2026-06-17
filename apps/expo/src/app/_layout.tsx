@@ -18,6 +18,14 @@ import { SocketProvider } from "~/components/SocketProvider";
 
 const asyncStoragePersister = createAsyncStoragePersister({
   storage: AsyncStorage,
+  // Limit key size to avoid writing huge payloads
+  serialize: (data) => {
+    try {
+      return JSON.stringify(data);
+    } catch {
+      return JSON.stringify({ clientState: { queries: [], mutations: [] }, timestamp: 0, buster: '' });
+    }
+  },
 });
 
 // ─── Inner component wraps hooks that need QueryClient ────────────────────────
@@ -101,7 +109,19 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <PersistQueryClientProvider
         client={queryClient}
-        persistOptions={{ persister: asyncStoragePersister }}
+        persistOptions={{
+          persister: asyncStoragePersister,
+          // CRITICAL: Never persist mutations — they can contain large base64 photo
+          // strings that OOM the React Native bridge when written to AsyncStorage
+          dehydrateOptions: {
+            shouldDehydrateMutation: () => false,
+            shouldDehydrateQuery: (query) => {
+              // Don't persist queries that could contain large photo payloads
+              const key = query.queryKey?.[0];
+              return query.state.status === 'success' && key !== 'incident';
+            },
+          },
+        }}
       >
         <SocketProvider>
           <AppInitializer>
