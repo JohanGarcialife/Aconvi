@@ -53,6 +53,7 @@ const CATEGORIES = [
 export default function NewIncidentScreen() {
   const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [categoryError, setCategoryError] = useState(false); // Bug 2: track missing-category error
   const [description, setDescription] = useState("");
   // Store only the local file URI in state — never the base64 string.
   // The base64 is read from disk only right before the API call.
@@ -92,7 +93,19 @@ export default function NewIncidentScreen() {
       router.replace("/(vecino)/incidents");
     },
     onError: (e: any) => {
-      Alert.alert("Error al enviar", e.message ?? "Inténtalo de nuevo.");
+      // Bug 3: "JSON Parse error: Unexpected character: o" means the server returned
+      // a non-JSON response (e.g. plain text "ok" or HTML error page).
+      // Treat parse errors as a transient network/server issue with a user-friendly message.
+      const msg: string = e?.message ?? "";
+      const isParseError = msg.toLowerCase().includes("json") || msg.toLowerCase().includes("parse") || msg.toLowerCase().includes("unexpected");
+      if (isParseError) {
+        Alert.alert(
+          "Error de conexión",
+          "Ocurrió un problema al comunicarse con el servidor. Por favor, verifica tu conexión e inténtalo de nuevo.",
+        );
+      } else {
+        Alert.alert("Error al enviar", msg || "Inténtalo de nuevo.");
+      }
     },
   });
 
@@ -116,21 +129,27 @@ export default function NewIncidentScreen() {
       : await ImagePicker.launchImageLibraryAsync({ mediaTypes: "images", allowsEditing: false });
 
     if (!result.canceled && result.assets[0]) {
-      try {
-        // Resize to max 500px wide, compress to 0.3 quality — keeps the JPEG tiny
-        // while still showing the problem location clearly.
-        // base64 is NOT requested here — it will be read from disk only at submit time.
-        const manipResult = await ImageManipulator.manipulateAsync(
-          result.assets[0].uri,
-          [{ resize: { width: 500 } }],
-          { compress: 0.3, format: ImageManipulator.SaveFormat.JPEG }
-        );
-        setPhotoUri(manipResult.uri);
-      } catch (error) {
-        console.error("Error manipulating image:", error);
-        // Fallback: use original URI, base64 will be read from disk at submit time
-        setPhotoUri(result.assets[0].uri);
-      }
+      // Bug 1: Show preview INSTANTLY with the original URI so the user sees
+      // the photo immediately. Then compress in the background — the URI in
+      // state is updated silently once compression finishes, so the final
+      // upload always uses the small file but the user perceives zero wait.
+      const originalUri = result.assets[0].uri;
+      setPhotoUri(originalUri); // ← instant preview
+
+      // Compress in background (no await blocks the UI)
+      ImageManipulator.manipulateAsync(
+        originalUri,
+        [{ resize: { width: 500 } }],
+        { compress: 0.3, format: ImageManipulator.SaveFormat.JPEG },
+      )
+        .then((manipResult) => {
+          // Silently swap to the compressed file URI; thumbnail stays the same size
+          setPhotoUri(manipResult.uri);
+        })
+        .catch((err) => {
+          // Compression failed — keep original URI, size will be larger but not blocking
+          console.warn("Background compression failed, using original:", err);
+        });
     }
   };
 
@@ -145,7 +164,17 @@ export default function NewIncidentScreen() {
 
   // ─── Submit ─────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
-    if (!selectedCategory) return;
+    // Bug 2: show explicit error when category is missing instead of silent no-op
+    if (!selectedCategory) {
+      setCategoryError(true);
+      Alert.alert(
+        "Categoría requerida",
+        "Por favor selecciona una categoría antes de enviar el reporte.",
+      );
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
+      return;
+    }
+    setCategoryError(false);
 
     const catLabel = CATEGORIES.find((c) => c.id === selectedCategory)?.label ?? "Incidencia";
     const cleanDesc = sanitizeText(description.trim());
@@ -208,7 +237,11 @@ export default function NewIncidentScreen() {
         <Text style={styles.pageTitle}>¿Qué ocurre?</Text>
 
         {/* ── Category grid (2×3) ────────────────────────────────────────── */}
-        <View style={styles.grid}>
+        {/* Bug 2: show error hint when user tried to submit without selecting a category */}
+        {categoryError && !selectedCategory && (
+          <Text style={styles.categoryErrorText}>⚠️ Selecciona una categoría</Text>
+        )}
+        <View style={[styles.grid, categoryError && !selectedCategory && styles.gridError]}>
           {CATEGORIES.map((cat) => {
             const isSelected = selectedCategory === cat.id;
             return (
@@ -217,8 +250,15 @@ export default function NewIncidentScreen() {
                 style={[styles.categoryCardWrap, { transform: [{ scale: scaleAnims[cat.id]! }] }]}
               >
                 <TouchableOpacity
-                  style={[styles.categoryCard, isSelected && styles.categoryCardSelected]}
-                  onPress={() => setSelectedCategory(cat.id)}
+                  style={[
+                    styles.categoryCard,
+                    isSelected && styles.categoryCardSelected,
+                    categoryError && !selectedCategory && !isSelected && styles.categoryCardError,
+                  ]}
+                  onPress={() => {
+                    setSelectedCategory(cat.id);
+                    setCategoryError(false); // clear error on selection
+                  }}
                   onPressIn={() => animatePressIn(cat.id)}
                   onPressOut={() => animatePressOut(cat.id)}
                   activeOpacity={1}
@@ -356,6 +396,21 @@ const styles = StyleSheet.create({
     borderColor: PRIMARY,
     borderWidth: 2.5,
     backgroundColor: `${PRIMARY}08`,
+  },
+  // Bug 2: error state styles for category grid
+  gridError: {
+    // subtle shake effect handled via Alert; border handled per-card
+  },
+  categoryCardError: {
+    borderColor: "#f87171",
+    borderWidth: 1.5,
+  },
+  categoryErrorText: {
+    color: "#ef4444",
+    fontSize: 13,
+    fontWeight: "600",
+    marginBottom: 8,
+    textAlign: "center",
   },
   categoryIcon: { fontSize: 30 },
   categoryLabel: {
