@@ -212,6 +212,10 @@ export default function VecinoHome() {
     api.commonArea.myBookings.queryOptions()
   );
   
+  const { data: commonAreas, isLoading: loadingCommonAreas } = useQuery(
+    api.commonArea.all.queryOptions({ tenantId: TENANT_ID })
+  );
+
   const DEMO_AUTHOR_ID = "user_admin";
   const { data: fees, isLoading: loadingFees } = useQuery(
     api.fee.myFees.queryOptions({ tenantId: TENANT_ID, userId: DEMO_AUTHOR_ID })
@@ -231,6 +235,10 @@ export default function VecinoHome() {
     const today = format(new Date(), "yyyy-MM-dd");
     return b.date >= today;
   })[0];
+
+  const hasActiveCommonAreas = useMemo(() => {
+    return (commonAreas as any[] | undefined)?.some((area: any) => area.isActive) ?? false;
+  }, [commonAreas]);
 
   // Notification badge = unread notices
   const notifCount = (notices as any[])?.length ?? 0;
@@ -287,31 +295,31 @@ export default function VecinoHome() {
         </TouchableOpacity>
 
         {/* ── Votación Activa Card ── */}
-        <View style={styles.card}>
-          <SectionTitle title="Votación Activa" />
-          {loadingVoting ? (
-            <ActivityIndicator color={PRIMARY} />
-          ) : activeVoting ? (
-            <>
-              <Text style={styles.cardTitleMedium}>{activeVoting.title}</Text>
-              <Text style={styles.votingAmount}>En curso</Text>
-              <Text style={styles.mutedText}>
-                {activeVoting.closesAt
-                  ? `Fecha límite: ${format(new Date(activeVoting.closesAt), "dd MMM · HH:mm 'h'", { locale: es })}`
-                  : "Sin fecha límite"}
-              </Text>
-              <TouchableOpacity
-                style={styles.primaryButton}
-                onPress={() => router.push("/(vecino)/voting")}
-              >
-                <Text style={styles.primaryButtonText}>Votar ahora</Text>
-                <Text style={[styles.primaryButtonText, { fontSize: 18, marginLeft: 6 }]}>→</Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <Text style={styles.mutedText}>No hay votaciones activas en este momento.</Text>
-          )}
-        </View>
+        {(loadingVoting || activeVoting) && (
+          <View style={styles.card}>
+            <SectionTitle title="Votación Activa" />
+            {loadingVoting ? (
+              <ActivityIndicator color={PRIMARY} />
+            ) : (
+              <>
+                <Text style={styles.cardTitleMedium}>{activeVoting.title}</Text>
+                <Text style={styles.votingAmount}>En curso</Text>
+                <Text style={styles.mutedText}>
+                  {activeVoting.closesAt
+                    ? `Fecha límite: ${format(new Date(activeVoting.closesAt), "dd MMM · HH:mm 'h'", { locale: es })}`
+                    : "Sin fecha límite"}
+                </Text>
+                <TouchableOpacity
+                  style={styles.primaryButton}
+                  onPress={() => router.push("/(vecino)/voting")}
+                >
+                  <Text style={styles.primaryButtonText}>Votar ahora</Text>
+                  <Text style={[styles.primaryButtonText, { fontSize: 18, marginLeft: 6 }]}>→</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        )}
 
         {/* ── Mis Cuotas Card ── */}
         <View style={styles.card}>
@@ -350,33 +358,33 @@ export default function VecinoHome() {
         </View>
 
         {/* ── Comunicados Card ── */}
-        <View style={styles.card}>
-          <SectionTitle title="Comunicados" />
-          {loadingNotice ? (
-            <ActivityIndicator color={PRIMARY} />
-          ) : latestNotice ? (
-            <TouchableOpacity
-              style={styles.rowItem}
-              activeOpacity={0.7}
-              onPress={() => router.push("/(vecino)/communication")}
-            >
-              <View style={styles.iconBox}>
-                <Text style={styles.iconLarge}>
-                  {latestNotice.type === "URGENTE" ? "🚨" : latestNotice.type === "AVISO" ? "📢" : "📋"}
-                </Text>
-              </View>
-              <View style={styles.rowContent}>
-                <Text style={styles.cardTitleSmall}>{latestNotice.title}</Text>
-                <Text style={styles.mutedText}>
-                  {format(new Date(latestNotice.createdAt), "dd MMM · HH:mm", { locale: es })}
-                </Text>
-              </View>
-              <Text style={styles.chevron}>›</Text>
-            </TouchableOpacity>
-          ) : (
-            <Text style={styles.mutedText}>No hay comunicados recientes.</Text>
-          )}
-        </View>
+        {(loadingNotice || latestNotice) && (
+          <View style={styles.card}>
+            <SectionTitle title="Comunicados" />
+            {loadingNotice ? (
+              <ActivityIndicator color={PRIMARY} />
+            ) : (
+              <TouchableOpacity
+                style={styles.rowItem}
+                activeOpacity={0.7}
+                onPress={() => router.push("/(vecino)/communication")}
+              >
+                <View style={styles.iconBox}>
+                  <Text style={styles.iconLarge}>
+                    {latestNotice.type === "URGENTE" ? "🚨" : latestNotice.type === "AVISO" ? "📢" : "📋"}
+                  </Text>
+                </View>
+                <View style={styles.rowContent}>
+                  <Text style={styles.cardTitleSmall}>{latestNotice.title}</Text>
+                  <Text style={styles.mutedText}>
+                    {format(new Date(latestNotice.createdAt), "dd MMM · HH:mm", { locale: es })}
+                  </Text>
+                </View>
+                <Text style={styles.chevron}>›</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
         {/* ── Incidencias Card ── */}
         <View style={styles.card}>
@@ -414,42 +422,44 @@ export default function VecinoHome() {
         </View>
 
         {/* ── Reservas de Zonas Comunes Card ── */}
-        <View style={[styles.card, { marginBottom: 32 }]}>
-          <SectionTitle title="Reservas de Zonas Comunes" />
-          {loadingBooking ? (
-            <ActivityIndicator color={PRIMARY} />
-          ) : nextBooking ? (
-            <View style={styles.rowItem}>
-              <View style={styles.iconBox}>
-                <Text style={styles.iconLarge}>🏊</Text>
+        {(loadingCommonAreas || hasActiveCommonAreas) && (
+          <View style={[styles.card, { marginBottom: 32 }]}>
+            <SectionTitle title="Reservas de Zonas Comunes" />
+            {loadingBooking || loadingCommonAreas ? (
+              <ActivityIndicator color={PRIMARY} />
+            ) : nextBooking ? (
+              <View style={styles.rowItem}>
+                <View style={styles.iconBox}>
+                  <Text style={styles.iconLarge}>🏊</Text>
+                </View>
+                <View style={styles.rowContent}>
+                  <Text style={styles.cardTitleSmall}>{nextBooking.commonArea?.name ?? "Zona Común"}</Text>
+                  <Text style={styles.mutedText}>
+                    {format(new Date(nextBooking.date), "dd MMM", { locale: es })} · {nextBooking.startTime} h
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.outlineButton}
+                  onPress={() => router.push("/(vecino)/common-areas")}
+                >
+                  <Text style={styles.outlineButtonText}>Ver reservas</Text>
+                </TouchableOpacity>
               </View>
-              <View style={styles.rowContent}>
-                <Text style={styles.cardTitleSmall}>{nextBooking.commonArea?.name ?? "Zona Común"}</Text>
-                <Text style={styles.mutedText}>
-                  {format(new Date(nextBooking.date), "dd MMM", { locale: es })} · {nextBooking.startTime} h
-                </Text>
+            ) : (
+              <View style={styles.rowItem}>
+                <View style={styles.rowContent}>
+                  <Text style={styles.mutedText}>No tienes reservas próximas.</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.outlineButton}
+                  onPress={() => router.push("/(vecino)/common-areas")}
+                >
+                  <Text style={styles.outlineButtonText}>Reservar</Text>
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity
-                style={styles.outlineButton}
-                onPress={() => router.push("/(vecino)/common-areas")}
-              >
-                <Text style={styles.outlineButtonText}>Ver reservas</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.rowItem}>
-              <View style={styles.rowContent}>
-                <Text style={styles.mutedText}>No tienes reservas próximas.</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.outlineButton}
-                onPress={() => router.push("/(vecino)/common-areas")}
-              >
-                <Text style={styles.outlineButtonText}>Reservar</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
+            )}
+          </View>
+        )}
       </ScrollView>
 
       {/* ── Modals ── */}
