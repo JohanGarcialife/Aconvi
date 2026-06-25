@@ -9,20 +9,51 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, Stack, useLocalSearchParams } from "expo-router";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { api } from "~/utils/api";
 
 const PRIMARY = "#4aa19b";
 const DARK = "#0f172a";
 const MUTED = "#64748b";
 const BORDER = "#e2e8f0";
+const DEMO_TENANT_ID = "org_aconvi_demo";
 
 export default function JobInProgressScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ incidentId?: string; providerId?: string }>();
   const [arrivedLoading, setArrivedLoading] = useState(false);
 
+  // ─── Fetch incident details ───────────────────────────────────────────────
+  const { data: incident } = useQuery(
+    api.incident.byId.queryOptions(
+      { id: params.incidentId ?? "", tenantId: DEMO_TENANT_ID },
+      { enabled: !!params.incidentId }
+    )
+  );
+
+  // ─── Mutation: register provider arrival on site ──────────────────────────
+  const arrivedMutation = useMutation(
+    api.incident.providerArrived.mutationOptions({
+      onError: () => {
+        // Non-critical: log failure silently, navigate forward regardless
+      },
+    })
+  );
+
   const handleArrived = async () => {
     setArrivedLoading(true);
-    await new Promise((r) => setTimeout(r, 800));
+    // Call backend to log arrival (push to vecino + history entry)
+    if (params.incidentId && params.providerId) {
+      try {
+        await arrivedMutation.mutateAsync({
+          id: params.incidentId,
+          tenantId: DEMO_TENANT_ID,
+          providerId: params.providerId,
+        });
+      } catch {
+        // Non-fatal: proceed to complete screen even if this fails
+      }
+    }
     setArrivedLoading(false);
     router.push({
       pathname: "/(proveedor)/job/complete",
@@ -55,23 +86,28 @@ export default function JobInProgressScreen() {
 
         <Text style={styles.title}>OT en curso</Text>
         <Text style={styles.subtitle}>
-          Residencial El Lago{"\n"}Calle Los Sauces, 345
+          {incident?.organization?.name ?? "Residencial El Lago"}{"\n"}Av. de Andalucía, 105
         </Text>
 
         {/* Info pills */}
         <View style={styles.pillRow}>
           <View style={styles.pill}>
-            <Text style={styles.pillText}>INC-2025-0412</Text>
+            <Text style={styles.pillText}>
+              {incident ? `INC-${incident.id.slice(0, 8).toUpperCase()}` : "INC-2025-0412"}
+            </Text>
           </View>
           <View style={styles.pill}>
-            <Text style={styles.pillText}>Gotea techo pasillo</Text>
+            <Text style={styles.pillText}>{incident?.title ?? "Gotea techo pasillo"}</Text>
           </View>
         </View>
 
         {/* Steps */}
         {[
           { done: true, label: "OT aceptada" },
-          { done: true, label: "Estimación enviada (155 €)" },
+          { 
+            done: true, 
+            label: `Estimación enviada (${incident?.estimatedCost ? `${incident.estimatedCost} €` : "155 €"})` 
+          },
           { done: false, label: "Llegada confirmada" },
           { done: false, label: "Trabajo finalizado" },
         ].map((step, i) => (

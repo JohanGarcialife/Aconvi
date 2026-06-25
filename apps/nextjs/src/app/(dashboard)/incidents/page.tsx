@@ -164,6 +164,15 @@ export default function IncidentsPage() {
     }
   }, [selectedId, selected?.providerId]);
 
+  // Auto-select first incident on initial data load
+  const autoSelected = useRef(false);
+  useEffect(() => {
+    if (!autoSelected.current && !selectedId && incidents.length > 0) {
+      setSelectedId(incidents[0]!.id);
+      autoSelected.current = true;
+    }
+  }, [incidents.length, selectedId]);
+
   const toggleCheck = (id: string) => {
     setChecked(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   };
@@ -544,18 +553,12 @@ export default function IncidentsPage() {
                   </>
                 )}
                 
-                {/* Simulation Actions */}
-                {selected.status === "EN_REVISION" && (
-                  <button onClick={handleSimulateAccept} disabled={providerAccept.isPending}
-                    className="flex items-center gap-1.5 rounded-xl border border-blue-400 bg-blue-50 px-4 py-2.5 text-sm font-bold text-blue-700 hover:bg-blue-100 disabled:opacity-40 transition-colors shadow-sm">
-                    {providerAccept.isPending ? "Simulando..." : "🤖 Simular Proveedor: Pasar a En Curso"}
-                  </button>
-                )}
-                {selected.status === "EN_CURSO" && (
-                  <button onClick={handleSimulateComplete} disabled={providerComplete.isPending}
-                    className="flex items-center gap-1.5 rounded-xl border border-emerald-400 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-700 hover:bg-emerald-100 disabled:opacity-40 transition-colors shadow-sm">
-                    <CheckCircle2 size={15} /> {providerComplete.isPending ? "Simulando..." : "🤖 Simular Proveedor: Marcar Resuelta"}
-                  </button>
+              {/* Simulation Actions — replaced with informational message */}
+                {(selected.status === "EN_REVISION" || selected.status === "EN_CURSO") && (
+                  <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-500">
+                    <span>📱</span>
+                    <span>El proveedor gestionará esto desde la app móvil</span>
+                  </div>
                 )}
               </div>
 

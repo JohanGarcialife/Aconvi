@@ -57,6 +57,9 @@ function buildTimeline(history: any[], currentStatus: string): TimelineEntry[] {
     if (h.action === "COMPLETED" || h.newStatus === "RESUELTA") {
       return { key: h.id, label: "Resuelta", detail: "El técnico ha completado el trabajo.", icon: "✅", date: dateStr };
     }
+    if (h.action === "ARRIVED") {
+      return { key: h.id, label: "Técnico en el lugar", detail: "El especialista ha llegado y está evaluando la incidencia.", icon: "📍", date: dateStr };
+    }
     if (h.newStatus === "EN_CURSO") {
       return { key: h.id, label: "En reparación", detail: "El técnico está trabajando en la incidencia.", icon: "🔧", date: dateStr };
     }
@@ -94,6 +97,7 @@ export default function IncidentDetailScreen() {
   const { data: incident, isLoading } = useQuery({
     ...api.incident.byId.queryOptions({ id: id as string, tenantId: TENANT_ID }),
     enabled: !!id,
+    refetchInterval: 30_000,
   });
 
   // ─── Loading ───────────────────────────────────────────────────────────────

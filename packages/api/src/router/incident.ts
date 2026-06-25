@@ -73,6 +73,7 @@ export const incidentRouter = createTRPCRouter({
           reporter: { columns: { id: true, name: true, phoneNumber: true } },
           assignee: { columns: { id: true, name: true } },
           provider: true,
+          organization: true,
           notes: {
             with: { author: { columns: { id: true, name: true } } },
             orderBy: (n, { asc }) => asc(n.createdAt),
@@ -123,8 +124,8 @@ export const incidentRouter = createTRPCRouter({
         newStatus: "RECIBIDA",
       });
 
-      // Emit realtime event to the tenant room
-      await emitWebSocketEvent(tenantId, "incident-created", created);
+      // Fire-and-forget: WS event doesn't block the mutation response
+      void emitWebSocketEvent(tenantId, "incident-created", created);
 
       return created;
     }),
@@ -183,8 +184,8 @@ export const incidentRouter = createTRPCRouter({
         }
       }
 
-      // Emit realtime event to the tenant room
-      await emitWebSocketEvent(input.tenantId, "incident-updated", updated);
+      // Fire-and-forget: WS event doesn't block the mutation response
+      void emitWebSocketEvent(input.tenantId, "incident-updated", updated);
 
       return updated;
     }),
@@ -216,8 +217,8 @@ export const incidentRouter = createTRPCRouter({
 
       if (!updated) throw new Error("No se pudo asignar el proveedor.");
 
-      // Notify provider user room
-      await emitWebSocketEvent(input.providerId, "incident-assigned", updated);
+      // Fire-and-forget: notify provider user room
+      void emitWebSocketEvent(input.providerId, "incident-assigned", updated);
 
       // Push notification to provider with deep link data
       if (updated.providerId) {
@@ -248,8 +249,8 @@ export const incidentRouter = createTRPCRouter({
         comment: "Se asignó un proveedor",
       });
 
-      // Emit realtime event to the tenant room
-      await emitWebSocketEvent(input.tenantId, "incident-updated", updated);
+      // Fire-and-forget: WS event to tenant room
+      void emitWebSocketEvent(input.tenantId, "incident-updated", updated);
 
       // Push notification to reporter (vecino)
       if (updated.reporterId) {
@@ -403,6 +404,18 @@ export const incidentRouter = createTRPCRouter({
         comment: input.notes ? `Notas: ${input.notes}` : "Trabajo aceptado",
       });
 
+      // Push notification to vecino: provider started working
+      if (updated.reporterId) {
+        await sendPushToUser(ctx.db, updated.reporterId, {
+          title: "🔧 Tu incidencia está en reparación",
+          body: `El especialista ha aceptado trabajar en "${updated.title}".`,
+          data: { type: "new_incident", incidentId: updated.id },
+        });
+      }
+
+      // Fire-and-forget: WS event to tenant room
+      void emitWebSocketEvent(input.tenantId, "incident-updated", updated);
+
       return updated;
     }),
 
@@ -469,7 +482,61 @@ export const incidentRouter = createTRPCRouter({
         });
       }
 
+      // Fire-and-forget: WS event to tenant room
+      void emitWebSocketEvent(input.tenantId, "incident-updated", updated);
+
       return updated;
+    }),
+
+  // ─── Provider: arrived on site ────────────────────────────────────────────
+  providerArrived: publicProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        tenantId: z.string().min(1),
+        providerId: z.string().min(1),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const inc = await ctx.db.query.incident.findFirst({
+        where: and(
+          eq(incident.id, input.id),
+          eq(incident.organizationId, input.tenantId),
+        ),
+      });
+
+      if (!inc) throw new Error("Incidencia no encontrada");
+
+      // Add internal note recording arrival
+      await ctx.db.insert(incidentNote).values({
+        incidentId: input.id,
+        authorId: DEMO_AUTHOR_ID,
+        content: "📍 Proveedor llegó al lugar de la incidencia",
+      });
+
+      // Log history — action ARRIVED for distinct timeline entry
+      await ctx.db.insert(incidentHistory).values({
+        incidentId: input.id,
+        actorName: "Proveedor",
+        action: "ARRIVED",
+        previousStatus: "EN_CURSO",
+        newStatus: "EN_CURSO",
+        comment: "Proveedor llegó al lugar",
+      });
+
+      // Push notification to vecino
+      if (inc.reporterId) {
+        await sendPushToUser(ctx.db, inc.reporterId, {
+          title: "📍 Tu técnico ha llegado",
+          body: `El especialista ha llegado a atender "${inc.title}".`,
+          data: { type: "new_incident", incidentId: inc.id },
+        });
+      }
+
+      // Fire-and-forget: WS event to tenant room
+      void emitWebSocketEvent(input.tenantId, "incident-updated", inc);
+
+      return inc;
     }),
 
   // ─── Neighbor: submit rating (feedback) ──────────────────────────────────
@@ -537,8 +604,8 @@ export const incidentRouter = createTRPCRouter({
           .where(eq(provider.id, updated.providerId));
       }
 
-      // Emit realtime event to the tenant room
-      await emitWebSocketEvent(input.tenantId, "incident-updated", updated);
+      // Fire-and-forget: WS event to tenant room
+      void emitWebSocketEvent(input.tenantId, "incident-updated", updated);
 
       return updated;
     }),

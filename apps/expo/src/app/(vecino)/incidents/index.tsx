@@ -46,7 +46,7 @@ export default function VecinoIncidentsScreen() {
   const [tab, setTab] = useState<"activas" | "finalizadas">("activas");
 
   const { data: incidents = [], isLoading, refetch, isRefetching } = useQuery(
-    api.incident.all.queryOptions({ tenantId: TENANT_ID }),
+    api.incident.all.queryOptions({ tenantId: TENANT_ID }, { refetchInterval: 30_000 }),
   );
 
   const activas = incidents.filter((i) => ACTIVE_STATUSES.includes(i.status));
