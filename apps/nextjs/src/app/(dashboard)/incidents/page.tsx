@@ -101,7 +101,19 @@ export default function IncidentsPage() {
   const providers = (providersRaw ?? []) as any[];
 
   const assignProvider = useMutation(
-    trpc.incident.assignProvider.mutationOptions({ onSuccess: () => { refetch().catch(() => null); } })
+    trpc.incident.assignProvider.mutationOptions({
+      onSuccess: (updated: any) => {
+        // Immediately update the list cache with the server response
+        queryClient.setQueryData(
+          trpc.incident.all.queryOptions({ tenantId: TENANT_ID }).queryKey,
+          (old: any) => Array.isArray(old)
+            ? old.map((i: any) => i.id === updated.id ? { ...i, ...updated } : i)
+            : old,
+        );
+        // Background sync to refresh full relations (provider, history…)
+        refetch().catch(() => null);
+      },
+    })
   );
   const updateStatus = useMutation(
     trpc.incident.updateStatus.mutationOptions({ onSuccess: () => { refetch().catch(() => null); } })
@@ -182,8 +194,9 @@ export default function IncidentsPage() {
     try {
       // @ts-ignore – tRPC mutateAsync types lag
       await assignProvider.mutateAsync({ tenantId: TENANT_ID, id: selected.id, providerId: selectedProvider.id });
-      showToast("✅ Proveedor asignado y vecino notificado");
-    } catch { showToast("❌ Error al asignar", false); }
+      // onSuccess already updated the cache — show confirmation
+      showToast("\u2705 Proveedor asignado y vecino notificado");
+    } catch { showToast("\u274c Error al asignar", false); }
   };
 
   const handleBulkAssign = async () => {
