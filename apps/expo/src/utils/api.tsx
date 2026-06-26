@@ -10,11 +10,19 @@ import * as SecureStore from "expo-secure-store";
 import { getBaseUrl } from "./base-url";
 
 // ─── Wire React Query's onlineManager to NetInfo ─────────────────────────────
-// This makes ALL queries and mutations across the entire app automatically
-// pause when there's no internet and resume when it comes back.
+// IMPORTANT: isInternetReachable starts as null on Android while NetInfo probes
+// the network. Using !!null = false would mark the app as "offline" at startup
+// and pause ALL queries until the probe finishes (can take 30s+).
+// Fix: assume online at startup and only flip offline when isConnected is
+// explicitly false (i.e. no Wi-Fi/cellular at all).
+onlineManager.setOnline(true);
+
 onlineManager.setEventListener((setOnline) => {
   return NetInfo.addEventListener((state) => {
-    setOnline(!!state.isConnected && !!state.isInternetReachable);
+    // isConnected !== false covers: true (connected) and null (unknown/checking)
+    // We only go offline when isConnected is explicitly false.
+    const isOnline = state.isConnected !== false;
+    setOnline(isOnline);
   });
 });
 
@@ -22,8 +30,9 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       gcTime: 1000 * 60 * 60 * 24, // 24 hours
-      staleTime: 1000 * 60 * 2, // 2 minutes
-      retry: 2, // Retry failed requests
+      staleTime: 1000 * 60 * 5,    // 5 minutes (was 2m — more cache hits on revisit)
+      retry: 1,                     // 1 retry (was 2 — halves backoff wait on failure)
+      refetchOnWindowFocus: false,  // don't re-fetch on app foreground if data is fresh
     },
   },
 });
