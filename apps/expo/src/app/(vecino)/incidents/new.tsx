@@ -87,10 +87,19 @@ export default function NewIncidentScreen() {
 
   const createIncident = useMutation({
     ...api.incident.create.mutationOptions(),
-    onSuccess: () => {
-      void queryClient.invalidateQueries(api.incident.all.queryFilter());
+    onSuccess: (created) => {
+      // Inject the new incident at the top of the cache immediately —
+      // the user sees it the instant they land on the list, no waiting for refetch.
+      const queryKey = api.incident.all.queryOptions({ tenantId: TENANT_ID }).queryKey;
+      queryClient.setQueryData(queryKey, (old: any) => {
+        if (!Array.isArray(old)) return old;
+        const optimistic = { ...created, reporter: null, provider: null, notes: [], history: [] };
+        return [optimistic, ...old];
+      });
       resetForm();
       router.replace("/(vecino)/incidents");
+      // Background sync to fill relations (reporter, provider, history…)
+      void queryClient.invalidateQueries(api.incident.all.queryFilter());
     },
     onError: (e: any) => {
       // Bug 3: "JSON Parse error: Unexpected character: o" means the server returned
