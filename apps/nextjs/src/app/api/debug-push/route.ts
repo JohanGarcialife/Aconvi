@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@acme/db";
+import { db } from "@acme/db/client";
 import { pushToken, user } from "@acme/db/schema";
 import { eq } from "drizzle-orm";
 
