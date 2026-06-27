@@ -3,6 +3,8 @@ import { db } from "@acme/db/client";
 import { pushToken, user } from "@acme/db/schema";
 import { eq } from "drizzle-orm";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const tokens = await db.select().from(pushToken);
