@@ -122,8 +122,8 @@ export default function ProveedorJobScreen() {
       },
       {
         enabled: !!providerId,
-        // Re-fetch every 30s in background to catch new assignments
-        refetchInterval: 30_000,
+        // Re-fetch every 5s in background to catch new assignments
+        refetchInterval: 5_000,
       }
     )
   );

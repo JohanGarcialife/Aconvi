@@ -40,35 +40,34 @@ export const queryClient = new QueryClient({
 /**
  * A set of typesafe hooks for consuming your API.
  */
+// Raw tRPC client — use this outside of React hooks (e.g., after login)
+export const trpcClient = createTRPCClient<AppRouter>({
+  links: [
+    loggerLink({
+      enabled: (opts) =>
+        process.env.NODE_ENV === "development" ||
+        (opts.direction === "down" && opts.result instanceof Error),
+      colorMode: "ansi",
+    }),
+    httpBatchLink({
+      transformer: superjson,
+      url: `${getBaseUrl()}/api/trpc`,
+      async headers() {
+        const headers: Record<string, string> = {
+          "x-trpc-source": "expo-react",
+        };
+        try {
+          const token = await SecureStore.getItemAsync("expo_session_token");
+          if (token) headers.Authorization = `Bearer ${token}`;
+        } catch (e) {}
+        return headers;
+      },
+    }),
+  ],
+});
+
 export const trpc = createTRPCOptionsProxy<AppRouter>({
-  client: createTRPCClient({
-    links: [
-      loggerLink({
-        enabled: (opts) =>
-          process.env.NODE_ENV === "development" ||
-          (opts.direction === "down" && opts.result instanceof Error),
-        colorMode: "ansi",
-      }),
-      httpBatchLink({
-        transformer: superjson,
-        url: `${getBaseUrl()}/api/trpc`,
-        async headers() {
-          const headers: Record<string, string> = {
-            "x-trpc-source": "expo-react",
-          };
-
-          try {
-            const token = await SecureStore.getItemAsync("expo_session_token");
-            if (token) {
-              headers.Authorization = `Bearer ${token}`;
-            }
-          } catch (e) {}
-
-          return headers;
-        },
-      }),
-    ],
-  }),
+  client: trpcClient,
   queryClient,
 });
 

@@ -95,12 +95,11 @@ function ValidateContent() {
   const [pageState, setPageState] = useState<PageState>("pending");
   const [copied, setCopied] = useState(false);
 
-  const { data: incident, isLoading } = useQuery(
-    trpc.incident.byId.queryOptions(
-      { id: incidentId as string, tenantId: TENANT_ID },
-      { enabled: !!incidentId }
-    )
-  );
+  const { data: incident, isLoading } = useQuery({
+    ...trpc.incident.byId.queryOptions({ id: incidentId as string, tenantId: TENANT_ID }),
+    enabled: !!incidentId,
+    refetchInterval: 5000,
+  });
 
   const addNote = useMutation(
     trpc.incident.addNote.mutationOptions()

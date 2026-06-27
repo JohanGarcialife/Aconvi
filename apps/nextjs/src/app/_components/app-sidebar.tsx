@@ -45,9 +45,10 @@ export function AppSidebar() {
   const trpc = useTRPC();
 
   // Fetch pending incidents count for the sidebar badge
-  const { data: incidents } = useQuery(
-    trpc.incident.all.queryOptions({ tenantId: "org_aconvi_demo" }),
-  );
+  const { data: incidents } = useQuery({
+    ...trpc.incident.all.queryOptions({ tenantId: "org_aconvi_demo" }),
+    refetchInterval: 5000,
+  });
   
   // Show total incidents count in badge
   const totalCount = incidents?.length ?? 0;

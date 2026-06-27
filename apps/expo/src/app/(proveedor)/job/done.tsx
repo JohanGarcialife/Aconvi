@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter, Stack } from "expo-router";
+import { useRouter, Stack, useLocalSearchParams } from "expo-router";
 
 const PRIMARY = "#4aa19b";
 const DARK = "#0f172a";
@@ -8,6 +8,11 @@ const MUTED = "#64748b";
 
 export default function JobDoneScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ id?: string; community?: string; cost?: string }>();
+
+  const incidentId = params.id ?? "INC-2025-0412";
+  const communityName = params.community ?? "Residencial El Lago";
+  const estimatedCost = params.cost ?? "155 €";
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
@@ -25,9 +30,9 @@ export default function JobDoneScreen() {
         {/* Summary */}
         <View style={styles.summaryCard}>
           {[
-            ["Incidencia", "INC-2025-0412"],
-            ["Comunidad", "Residencial El Lago"],
-            ["Total estimado", "155 €"],
+            ["Incidencia", incidentId],
+            ["Comunidad", communityName],
+            ["Total estimado", estimatedCost],
             ["Estado", "Pendiente de validación"],
           ].map(([label, value]) => (
             <View key={label} style={styles.summaryRow}>

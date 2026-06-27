@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
+import Constants from "expo-constants";
 import { trpc, queryClient } from "../utils/api";
 import { useMutation } from "@tanstack/react-query";
 
@@ -87,8 +88,13 @@ async function registerForPushNotificationsAsync(): Promise<string | null> {
 
   // Get Expo push token — requires projectId for EAS builds
   // During development with Expo Go, this works without EAS
+  const projectId =
+    process.env.EXPO_PUBLIC_PROJECT_ID ??
+    Constants.expoConfig?.extra?.eas?.projectId ??
+    Constants.easConfig?.projectId;
+
   const tokenData = await Notifications.getExpoPushTokenAsync({
-    projectId: process.env.EXPO_PUBLIC_PROJECT_ID,
+    projectId,
   });
 
   console.log("[Push] Expo Push Token:", tokenData.data);

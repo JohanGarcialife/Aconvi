@@ -13,8 +13,11 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
+import * as Notifications from "expo-notifications";
+import * as Device from "expo-device";
+import Constants from "expo-constants";
 import { getBaseUrl } from "~/utils/base-url";
-import { queryClient } from "~/utils/api";
+import { queryClient, trpcClient } from "~/utils/api";
 
 
 const TEAL = "#00BDA5";
@@ -73,6 +76,34 @@ export default function LoginScreen() {
 
       // Clear any cached queries from a previous session
       queryClient.clear();
+
+      // Re-register push token now that auth is established.
+      // The usePushNotifications hook fires at app start (before login)
+      // so the first registerToken call always fails with 401. This
+      // ensures push notifications work from the very first session.
+      void (async () => {
+        try {
+          if (!Device.isDevice) return;
+          const { status } = await Notifications.getPermissionsAsync();
+          if (status !== "granted") return;
+          const projectId =
+            process.env.EXPO_PUBLIC_PROJECT_ID ??
+            Constants.expoConfig?.extra?.eas?.projectId ??
+            Constants.easConfig?.projectId;
+          const tokenData = await Notifications.getExpoPushTokenAsync({
+            projectId,
+          });
+          if (tokenData?.data) {
+            await trpcClient.notification.registerToken.mutate({
+              token: tokenData.data,
+              platform: "expo",
+            });
+            console.log("[Push] Token registered after login:", tokenData.data.slice(0, 30) + "...");
+          }
+        } catch (err) {
+          console.warn("[Push] Could not register push token after login:", err);
+        }
+      })();
 
       // 4. Navegar DIRECTO a la pantalla correcta (sin pasar por index.tsx)
       if (isProvider) {

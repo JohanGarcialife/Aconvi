@@ -92,12 +92,14 @@ export default function HomePage() {
   const trpc = useTRPC();
 
   // Only use publicProcedure endpoints
-  const { data: incidents } = useQuery(
-    trpc.incident.all.queryOptions({ tenantId: TENANT_ID }),
-  );
-  const { data: notices } = useQuery(
-    trpc.notice.all.queryOptions({ tenantId: TENANT_ID }),
-  );
+  const { data: incidents } = useQuery({
+    ...trpc.incident.all.queryOptions({ tenantId: TENANT_ID }),
+    refetchInterval: 5000,
+  });
+  const { data: notices } = useQuery({
+    ...trpc.notice.all.queryOptions({ tenantId: TENANT_ID }),
+    refetchInterval: 5000,
+  });
   const { data: communities } = useQuery(
     trpc.community.all.queryOptions(),
   );

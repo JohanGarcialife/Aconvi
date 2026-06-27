@@ -28,7 +28,7 @@ import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import NetInfo from "@react-native-community/netinfo";
 import { api, queryClient } from "~/utils/api";
-import { useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 
 const PRIMARY = "#4aa19b";
 const DARK = "#0f172a";
@@ -82,6 +82,14 @@ export default function CompleteJobScreen() {
   const [isSyncing, setIsSyncing] = useState(false);
   const appState = useRef(AppState.currentState);
 
+  // ─── Fetch incident details ───────────────────────────────────────────────
+  const { data: incident } = useQuery(
+    api.incident.byId.queryOptions(
+      { id: params.incidentId ?? "", tenantId: DEMO_TENANT_ID },
+      { enabled: !!params.incidentId }
+    )
+  );
+
   // ─── tRPC mutation ────────────────────────────────────────────────────────
   const completeMutation = useMutation(
     api.incident.providerComplete.mutationOptions({
@@ -89,7 +97,14 @@ export default function CompleteJobScreen() {
         // Invalidate all incident caches so screens refresh automatically
         void queryClient.invalidateQueries(api.incident.assignedToProvider.queryFilter());
         void queryClient.invalidateQueries(api.incident.all.queryFilter());
-        router.push("/(proveedor)/job/done");
+        router.push({
+          pathname: "/(proveedor)/job/done",
+          params: {
+            id: incident ? `INC-${incident.id.slice(0, 8).toUpperCase()}` : "INC-2025-0412",
+            community: incident?.organization?.name ?? "Residencial El Lago",
+            cost: incident?.estimatedCost ? `${incident.estimatedCost} €` : "155 €",
+          }
+        });
       },
       onError: (e: any) => {
         Alert.alert("Error al cerrar", e.message ?? "Inténtalo más tarde.");
@@ -225,7 +240,14 @@ export default function CompleteJobScreen() {
     const providerId = params.providerId;
 
     if (!incidentId || !providerId) {
-      router.push("/(proveedor)/job/done");
+      router.push({
+        pathname: "/(proveedor)/job/done",
+        params: {
+          id: incident ? `INC-${incident.id.slice(0, 8).toUpperCase()}` : "INC-2025-0412",
+          community: incident?.organization?.name ?? "Residencial El Lago",
+          cost: incident?.estimatedCost ? `${incident.estimatedCost} €` : "155 €",
+        }
+      });
       return;
     }
 
@@ -247,7 +269,14 @@ export default function CompleteJobScreen() {
       Alert.alert(
         "📶 Guardado sin conexión",
         "Tu cierre de trabajo se ha guardado localmente. Se enviará automáticamente cuando recuperes señal.",
-        [{ text: "OK", onPress: () => router.push("/(proveedor)/job/done") }],
+        [{ text: "OK", onPress: () => router.push({
+          pathname: "/(proveedor)/job/done",
+          params: {
+            id: incident ? `INC-${incident.id.slice(0, 8).toUpperCase()}` : "INC-2025-0412",
+            community: incident?.organization?.name ?? "Residencial El Lago",
+            cost: incident?.estimatedCost ? `${incident.estimatedCost} €` : "155 €",
+          }
+        }) }],
       );
     } else {
       // ── Online: enviar directamente ──────────────────────────────────

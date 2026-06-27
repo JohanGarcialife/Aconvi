@@ -24,18 +24,20 @@ export default function JobInProgressScreen() {
   const [arrivedLoading, setArrivedLoading] = useState(false);
 
   // ─── Fetch incident details ───────────────────────────────────────────────
-  const { data: incident } = useQuery(
-    api.incident.byId.queryOptions(
-      { id: params.incidentId ?? "", tenantId: DEMO_TENANT_ID },
-      { enabled: !!params.incidentId }
-    )
-  );
+  const { data: incident } = useQuery({
+    ...api.incident.byId.queryOptions({ id: params.incidentId ?? "", tenantId: DEMO_TENANT_ID }),
+    enabled: !!params.incidentId,
+    refetchInterval: 5000,
+  });
 
   // ─── Mutation: register provider arrival on site ──────────────────────────
   const arrivedMutation = useMutation(
     api.incident.providerArrived.mutationOptions({
-      onError: () => {
-        // Non-critical: log failure silently, navigate forward regardless
+      onError: (err: any) => {
+        Alert.alert(
+          "Error de conexión",
+          "No se pudo confirmar tu llegada en el servidor. Por favor, reintenta: " + (err.message || "")
+        );
       },
     })
   );
@@ -50,15 +52,20 @@ export default function JobInProgressScreen() {
           tenantId: DEMO_TENANT_ID,
           providerId: params.providerId,
         });
+        router.push({
+          pathname: "/(proveedor)/job/complete",
+          params: { incidentId: params.incidentId, providerId: params.providerId },
+        });
       } catch {
-        // Non-fatal: proceed to complete screen even if this fails
+        // Handled by onError Alert
       }
+    } else {
+      router.push({
+        pathname: "/(proveedor)/job/complete",
+        params: { incidentId: params.incidentId, providerId: params.providerId },
+      });
     }
     setArrivedLoading(false);
-    router.push({
-      pathname: "/(proveedor)/job/complete",
-      params: { incidentId: params.incidentId, providerId: params.providerId },
-    });
   };
 
   return (

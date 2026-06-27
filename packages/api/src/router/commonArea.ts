@@ -35,6 +35,21 @@ export const commonAreaRouter = createTRPCRouter({
       });
     }),
 
+  // List all bookings for the currently authenticated user (or demo user if guest)
+  myBookings: publicProcedure
+    .query(async ({ ctx }) => {
+      const userId = ctx.session?.user?.id ?? DEMO_USER_ID;
+      return ctx.db.query.commonAreaBooking.findMany({
+        where: eq(commonAreaBooking.userId, userId),
+        with: {
+          commonArea: {
+            columns: { id: true, name: true, organizationId: true },
+          },
+        },
+        orderBy: [desc(commonAreaBooking.date), desc(commonAreaBooking.startTime)],
+      });
+    }),
+
   // Get one area with its bookings for a given date
   availability: publicProcedure
     .input(z.object({ tenantId: z.string().min(1), areaId: z.string().uuid(), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }))
@@ -114,6 +129,7 @@ export const commonAreaRouter = createTRPCRouter({
         })
         .returning();
 
+      if (!booking) throw new Error("No se pudo confirmar la reserva.");
       return booking;
     }),
 

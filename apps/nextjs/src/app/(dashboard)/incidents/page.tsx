@@ -85,7 +85,10 @@ export default function IncidentsPage() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const { data: incidentsRaw, refetch } = useQuery(trpc.incident.all.queryOptions({ tenantId: TENANT_ID }));
+  const { data: incidentsRaw, refetch } = useQuery({
+    ...trpc.incident.all.queryOptions({ tenantId: TENANT_ID }),
+    refetchInterval: 5000,
+  });
 
   useSocketClient({
     tenantId: TENANT_ID,
@@ -123,12 +126,6 @@ export default function IncidentsPage() {
   );
   const addNote = useMutation(
     trpc.incident.addNote.mutationOptions({ onSuccess: () => { refetch().catch(() => null); } })
-  );
-  const providerAccept = useMutation(
-    trpc.incident.providerAccept.mutationOptions({ onSuccess: () => { refetch().catch(() => null); } })
-  );
-  const providerComplete = useMutation(
-    trpc.incident.providerComplete.mutationOptions({ onSuccess: () => { refetch().catch(() => null); } })
   );
 
   // Close user menu on outside click
@@ -219,23 +216,6 @@ export default function IncidentsPage() {
     } catch { showToast("❌ Error", false); }
   };
 
-  const handleSimulateAccept = async () => {
-    if (!selected || !selected.providerId) return;
-    try {
-      // @ts-ignore
-      await providerAccept.mutateAsync({ tenantId: TENANT_ID, id: selected.id, providerId: selected.providerId, notes: "Simulación: Aceptado desde panel de pruebas" });
-      showToast("✅ Simulación: El proveedor aceptó el trabajo");
-    } catch { showToast("❌ Error al simular", false); }
-  };
-
-  const handleSimulateComplete = async () => {
-    if (!selected || !selected.providerId) return;
-    try {
-      // @ts-ignore
-      await providerComplete.mutateAsync({ tenantId: TENANT_ID, id: selected.id, providerId: selected.providerId, completionNote: "Simulación: Reparación finalizada correctamente." });
-      showToast("✅ Simulación: El proveedor finalizó el trabajo");
-    } catch { showToast("❌ Error al simular", false); }
-  };
 
   const handleAddNote = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -33,6 +33,7 @@ export const feeRouter = createTRPCRouter({
         )
         .returning();
 
+      if (!updated) throw new Error("No se pudo registrar el pago.");
       return updated;
     }),
 
