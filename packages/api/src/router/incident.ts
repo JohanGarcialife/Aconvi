@@ -96,12 +96,16 @@ export const incidentRouter = createTRPCRouter({
         category: z.string().default("otro"),
         photoUrl: z.string().optional(),
         priority: z.enum(["BAJA", "MEDIA", "ALTA", "URGENTE"]).default("MEDIA"),
+        // Real user ID of the logged-in vecino — required for push notifications
+        reporterId: z.string().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const { tenantId, ...data } = input;
+      const { tenantId, reporterId: inputReporterId, ...data } = input;
       const sanitizedTitle = sanitizeText(data.title);
       const sanitizedDescription = sanitizeText(data.description);
+      // Use the real user ID if provided; fall back to demo ID
+      const resolvedReporterId = inputReporterId ?? DEMO_AUTHOR_ID;
       const [created] = await ctx.db
         .insert(incident)
         .values({
@@ -109,7 +113,7 @@ export const incidentRouter = createTRPCRouter({
           title: sanitizedTitle,
           description: sanitizedDescription,
           organizationId: tenantId,
-          reporterId: DEMO_AUTHOR_ID,
+          reporterId: resolvedReporterId,
           status: "RECIBIDA",
         })
         .returning();

@@ -20,6 +20,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as FileSystem from "expo-file-system/legacy";
 import { api, queryClient } from "~/utils/api";
+import { authClient } from "~/utils/auth";
 import { useMutation } from "@tanstack/react-query";
 
 const sanitizeText = (str: string): string => {
@@ -52,6 +53,8 @@ const CATEGORIES = [
 
 export default function NewIncidentScreen() {
   const router = useRouter();
+  const { data: session } = authClient.useSession();
+  const userId = session?.user?.id;
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [categoryError, setCategoryError] = useState(false); // Bug 2: track missing-category error
   const [description, setDescription] = useState("");
@@ -213,6 +216,7 @@ export default function NewIncidentScreen() {
       category: selectedCategory,
       priority: "MEDIA",
       ...(photoUrl ? { photoUrl } : {}),
+      ...(userId ? { reporterId: userId } : {}),
     });
   };
 
