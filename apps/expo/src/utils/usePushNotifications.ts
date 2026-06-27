@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
-import { Platform } from "react-native";
+import { Platform, Alert } from "react-native";
 import Constants from "expo-constants";
 import { trpc, queryClient } from "../utils/api";
 import { useMutation } from "@tanstack/react-query";
@@ -23,16 +23,35 @@ export function usePushNotifications() {
   const responseListener = useRef<Notifications.EventSubscription | null>(null);
 
   // tRPC mutation to register token in backend
-  const registerToken = useMutation(trpc.notification.registerToken.mutationOptions());
+  const registerToken = useMutation({
+    ...trpc.notification.registerToken.mutationOptions(),
+    onSuccess: () => {
+      console.log("[Push] Token saved in DB successfully");
+      // Optional: Uncomment for live visual debug on device
+      // Alert.alert("Registro Exitoso", "Token guardado en base de datos correctamente.");
+    },
+    onError: (err) => {
+      console.error("[Push] Error saving token to DB:", err);
+      Alert.alert("Error de Registro", "No se pudo guardar el token en la base de datos: " + (err?.message ?? "Error desconocido"));
+    }
+  });
 
   useEffect(() => {
     // Register for push notifications
-    void registerForPushNotificationsAsync().then(async (token) => {
-      if (!token) return;
-      setExpoPushToken(token);
-      // Store in backend
-      registerToken.mutate({ token, platform: "expo" } as any);
-    });
+    registerForPushNotificationsAsync()
+      .then(async (token) => {
+        if (!token) {
+          console.warn("[Push] No token returned from registration helper.");
+          return;
+        }
+        setExpoPushToken(token);
+        // Store in backend
+        registerToken.mutate({ token, platform: "expo" } as any);
+      })
+      .catch((err) => {
+        console.error("[Push] Error in registerForPushNotificationsAsync:", err);
+        Alert.alert("Error de Permisos/FCM", "No se pudo obtener el token de notificaciones: " + (err?.message ?? "Error desconocido"));
+      });
 
     // Listener: receives notification while app is open
     notificationListener.current =

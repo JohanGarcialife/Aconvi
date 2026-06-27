@@ -10,6 +10,7 @@ import {
   Platform,
   ScrollView,
   Image,
+  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
@@ -100,8 +101,9 @@ export default function LoginScreen() {
             });
             console.log("[Push] Token registered after login:", tokenData.data.slice(0, 30) + "...");
           }
-        } catch (err) {
+        } catch (err: any) {
           console.warn("[Push] Could not register push token after login:", err);
+          Alert.alert("Error de Registro", "No se pudo registrar las notificaciones al iniciar sesión: " + (err?.message ?? "Error desconocido"));
         }
       })();
 
