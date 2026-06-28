@@ -1,26 +1,54 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { db } from "@acme/db/client";
-import { auth } from "@acme/auth";
-import { pushToken } from "@acme/db/schema";
-import { sql } from "drizzle-orm";
+import { pushToken, session } from "@acme/db/schema";
+import { eq, sql } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * POST /api/register-push-token
+ * Body: { token: string, platform?: "expo" | "web" }
+ * Auth: Bearer <session_token>
+ *
+ * Registers a push token for the authenticated user.
+ * Resolves session via DB lookup (same as get-session route).
+ */
 export async function POST(req: NextRequest) {
   try {
-    const session = await auth.api.getSession({ headers: req.headers });
-    if (!session?.user?.id) {
+    // 1. Extract Bearer token
+    const authHeader = req.headers.get("authorization") ?? "";
+    const sessionToken = authHeader.startsWith("Bearer ")
+      ? authHeader.slice(7).trim()
+      : null;
+
+    if (!sessionToken) {
       return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
     }
+
+    // 2. Resolve session from DB
+    const foundSession = await db.query.session.findFirst({
+      where: eq(session.token, sessionToken),
+    });
+
+    if (!foundSession || foundSession.expiresAt < new Date()) {
+      return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
+    }
+
+    const userId = foundSession.userId;
+
+    // 3. Parse body
     const body = await req.json() as { token?: string; platform?: string };
     if (!body.token) {
       return NextResponse.json({ ok: false, error: "token required" }, { status: 400 });
     }
+
     const platform = body.platform ?? "expo";
-    const userId = session.user.id;
+
+    // 4. Upsert: delete old token for this user+platform, insert fresh
     await db.execute(sql`DELETE FROM push_token WHERE user_id = ${userId} AND platform = ${platform}`);
     await db.insert(pushToken).values({ userId, token: body.token, platform });
-    console.log("[PUSH_TOKEN] Registered for user", userId, body.token.slice(0, 30));
+
+    console.log(`[PUSH_TOKEN] Registered for user ${userId}: ${body.token.slice(0, 30)}...`);
     return NextResponse.json({ ok: true });
   } catch (err: any) {
     console.error("[PUSH_TOKEN_ERROR]", err);
