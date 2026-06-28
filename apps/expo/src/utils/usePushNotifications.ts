@@ -27,11 +27,14 @@ export function usePushNotifications() {
     ...trpc.notification.registerToken.mutationOptions(),
     onSuccess: () => {
       console.log("[Push] Token saved in DB successfully");
-      // Optional: Uncomment for live visual debug on device
-      // Alert.alert("Registro Exitoso", "Token guardado en base de datos correctamente.");
     },
     onError: (err) => {
       console.error("[Push] Error saving token to DB:", err);
+      const isUnauth = err?.message?.toUpperCase().includes("UNAUTHORIZED");
+      if (isUnauth) {
+        // Expected at startup when user is not logged in yet.
+        return;
+      }
       Alert.alert("Error de Registro", "No se pudo guardar el token en la base de datos: " + (err?.message ?? "Error desconocido"));
     }
   });
