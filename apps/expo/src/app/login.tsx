@@ -18,7 +18,10 @@ import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import Constants from "expo-constants";
 import { getBaseUrl } from "~/utils/base-url";
-import { queryClient, trpcClient } from "~/utils/api";
+import { createTRPCClient, httpBatchLink, loggerLink } from "@trpc/client";
+import superjson from "superjson";
+import type { AppRouter } from "@acme/api";
+import { queryClient } from "~/utils/api";
 
 
 const TEAL = "#00BDA5";
@@ -79,9 +82,8 @@ export default function LoginScreen() {
       queryClient.clear();
 
       // Re-register push token now that auth is established.
-      // The usePushNotifications hook fires at app start (before login)
-      // so the first registerToken call always fails with 401. This
-      // ensures push notifications work from the very first session.
+      // We create a one-shot tRPC client with the token injected directly
+      // to avoid any SecureStore read-timing race conditions.
       void (async () => {
         try {
           if (!Device.isDevice) return;
@@ -95,7 +97,22 @@ export default function LoginScreen() {
             projectId,
           });
           if (tokenData?.data) {
-            await trpcClient.notification.registerToken.mutate({
+            // Use a one-shot client with the session token baked in
+            // to avoid SecureStore async timing issues.
+            const authedClient = createTRPCClient<AppRouter>({
+              links: [
+                loggerLink({ enabled: () => false }),
+                httpBatchLink({
+                  transformer: superjson,
+                  url: `${getBaseUrl()}/api/trpc`,
+                  headers: () => ({
+                    "x-trpc-source": "expo-react",
+                    Authorization: `Bearer ${token}`,
+                  }),
+                }),
+              ],
+            });
+            await authedClient.notification.registerToken.mutate({
               token: tokenData.data,
               platform: "expo",
             });
@@ -103,7 +120,9 @@ export default function LoginScreen() {
           }
         } catch (err: any) {
           console.warn("[Push] Could not register push token after login:", err);
-          Alert.alert("Error de Registro", "No se pudo registrar las notificaciones al iniciar sesión: " + (err?.message ?? "Error desconocido"));
+          const msg = err?.message ?? "";
+          if (msg.toUpperCase().includes("UNAUTHORIZED")) return;
+          Alert.alert("Error de Registro", "No se pudo registrar las notificaciones al iniciar sesión: " + msg);
         }
       })();
 
