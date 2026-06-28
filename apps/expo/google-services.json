@@ -1,148 +1,26 @@
 {
   "project_info": {
-    "project_number": "950183292908",
-    "firebase_url": "https://lilo-23fef-default-rtdb.firebaseio.com",
-    "project_id": "lilo-23fef",
-    "storage_bucket": "lilo-23fef.firebasestorage.app"
+    "project_number": "793625418172",
+    "project_id": "creative-feel-agency",
+    "storage_bucket": "creative-feel-agency.appspot.com"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:950183292908:android:dc3884f13a5e2351941ac9",
+        "mobilesdk_app_id": "1:793625418172:android:cd567435e66f2ecd49f3b9",
         "android_client_info": {
           "package_name": "com.aconvi.app"
         }
       },
-      "oauth_client": [
-        {
-          "client_id": "950183292908-73525mhctb661c9b1fe8s2q7d4kb3tsn.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
+      "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyD2upDHj51JONWFpvpYt8Fxf93wHK9dL48"
+          "current_key": "AIzaSyAGdxpH1avp0hPLgbnK96dHsVrjgwz-EFI"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "950183292908-73525mhctb661c9b1fe8s2q7d4kb3tsn.apps.googleusercontent.com",
-              "client_type": 3
-            },
-            {
-              "client_id": "950183292908-38g4a348m2tfej1fmjqbl13efsiba8ir.apps.googleusercontent.com",
-              "client_type": 2,
-              "ios_info": {
-                "bundle_id": "com.creativefeeldev.lilo"
-              }
-            }
-          ]
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:950183292908:android:b1fb507928c5a7ff941ac9",
-        "android_client_info": {
-          "package_name": "com.creativefeeldev.liloapp"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "950183292908-74llod73tshh0v6r1efdbd6rkv1j2qf2.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.creativefeeldev.liloapp",
-            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
-          }
-        },
-        {
-          "client_id": "950183292908-g302v2f49jr8fqh339tq7de4qaq2gkq7.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.creativefeeldev.liloapp",
-            "certificate_hash": "c2b19e05fa2cbc6cbd962a33448b2a4fd22a5466"
-          }
-        },
-        {
-          "client_id": "950183292908-gql91c1meukiqdqp5glngc0cem82bimr.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.creativefeeldev.liloapp",
-            "certificate_hash": "8cd387fbe6c04623c7725bb576e1dca1f9f39485"
-          }
-        },
-        {
-          "client_id": "950183292908-73525mhctb661c9b1fe8s2q7d4kb3tsn.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyD2upDHj51JONWFpvpYt8Fxf93wHK9dL48"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "950183292908-73525mhctb661c9b1fe8s2q7d4kb3tsn.apps.googleusercontent.com",
-              "client_type": 3
-            },
-            {
-              "client_id": "950183292908-38g4a348m2tfej1fmjqbl13efsiba8ir.apps.googleusercontent.com",
-              "client_type": 2,
-              "ios_info": {
-                "bundle_id": "com.creativefeeldev.lilo"
-              }
-            }
-          ]
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:950183292908:android:1e7b76a83b9df027941ac9",
-        "android_client_info": {
-          "package_name": "com.creativefeeldev.liloriderapp"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "950183292908-onbjt240l0d0f9qh4u0rmemd67eg4cui.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.creativefeeldev.liloriderapp",
-            "certificate_hash": "e85337acc552d75daa05c3ba951f606764f9ed3c"
-          }
-        },
-        {
-          "client_id": "950183292908-73525mhctb661c9b1fe8s2q7d4kb3tsn.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyD2upDHj51JONWFpvpYt8Fxf93wHK9dL48"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "950183292908-73525mhctb661c9b1fe8s2q7d4kb3tsn.apps.googleusercontent.com",
-              "client_type": 3
-            },
-            {
-              "client_id": "950183292908-38g4a348m2tfej1fmjqbl13efsiba8ir.apps.googleusercontent.com",
-              "client_type": 2,
-              "ios_info": {
-                "bundle_id": "com.creativefeeldev.lilo"
-              }
-            }
-          ]
+          "other_platform_oauth_client": []
         }
       }
     }
