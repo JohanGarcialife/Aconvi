@@ -46,7 +46,8 @@ export async function POST(req: NextRequest) {
 
     // 4. Upsert: delete old token for this user+platform, insert fresh
     await db.execute(sql`DELETE FROM push_token WHERE user_id = ${userId} AND platform = ${platform}`);
-    await db.insert(pushToken).values({ userId, token: body.token, platform });
+    await db.insert(pushToken).values({ id: crypto.randomUUID(), userId, token: body.token, platform });
+
 
     console.log(`[PUSH_TOKEN] Registered for user ${userId}: ${body.token.slice(0, 30)}...`);
     return NextResponse.json({ ok: true });
