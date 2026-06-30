@@ -26,8 +26,16 @@ function saveBase64Image(base64Data: string): string | undefined {
 
     const filename = `incident_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${extension}`;
     
-    // nextjs/public/uploads path
-    const uploadDir = join(process.cwd(), "public", "uploads");
+    // Adapt to Turborepo monorepo structure where cwd is /app but public is in apps/nextjs/public
+    let baseDir = process.cwd();
+    const monorepoPublicDir = join(baseDir, "apps/nextjs/public");
+    if (existsSync(monorepoPublicDir)) {
+      baseDir = monorepoPublicDir;
+    } else {
+      baseDir = join(baseDir, "public");
+    }
+
+    const uploadDir = join(baseDir, "uploads");
     if (!existsSync(uploadDir)) {
       mkdirSync(uploadDir, { recursive: true });
     }
