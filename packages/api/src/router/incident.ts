@@ -81,11 +81,8 @@ export const incidentRouter = createTRPCRouter({
         status: z.enum(INCIDENT_STATUSES).optional(),
       }),
     )
-    .query(({ ctx, input }) => {
-      return ctx.db.query.incident.findMany({
-        columns: {
-          photoUrl: false, // Bypasses sending heavy base64 strings in listings
-        },
+    .query(async ({ ctx, input }) => {
+      const results = await ctx.db.query.incident.findMany({
         where: and(
           eq(incident.organizationId, input.tenantId),
           input.status ? eq(incident.status, input.status) : undefined,
@@ -104,6 +101,11 @@ export const incidentRouter = createTRPCRouter({
           },
         },
       });
+
+      return results.map((r) => ({
+        ...r,
+        photoUrl: r.photoUrl?.startsWith("data:image/") ? null : r.photoUrl,
+      }));
     }),
 
   // ─── Single detail (public) ──────────────────────────────────────────────
