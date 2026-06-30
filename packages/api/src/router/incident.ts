@@ -104,8 +104,9 @@ export const incidentRouter = createTRPCRouter({
       const { tenantId, reporterId: inputReporterId, ...data } = input;
       const sanitizedTitle = sanitizeText(data.title);
       const sanitizedDescription = sanitizeText(data.description);
-      // Use the real user ID if provided; fall back to demo ID
-      const resolvedReporterId = inputReporterId ?? DEMO_AUTHOR_ID;
+      // Priority: session user ID (from Bearer token) > client-sent reporterId > demo fallback
+      const resolvedReporterId = ctx.session?.user?.id ?? inputReporterId ?? DEMO_AUTHOR_ID;
+      console.log("[incident.create] resolvedReporterId:", resolvedReporterId, "session:", ctx.session?.user?.id, "input:", inputReporterId);
       const [created] = await ctx.db
         .insert(incident)
         .values({
