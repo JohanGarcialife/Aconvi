@@ -26,19 +26,60 @@ import { db } from "@acme/db/client";
  * @see https://trpc.io/docs/server/context
  */
 
+import { eq } from "drizzle-orm";
+import { user as userSchema, session as sessionSchema } from "@acme/db/schema";
+
 export const createTRPCContext = async (opts: {
   headers: Headers;
   auth: Auth;
 }) => {
   const authApi = opts.auth.api;
-  console.log("[createTRPCContext] trpc headers Authorization:", opts.headers.get("authorization") || opts.headers.get("Authorization"));
-  const session = await authApi.getSession({
+  const authHeader = opts.headers.get("authorization") || opts.headers.get("Authorization") || "";
+  console.log("[createTRPCContext] trpc headers Authorization:", authHeader);
+  
+  let sessionResult = await authApi.getSession({
     headers: opts.headers,
   });
-  console.log("[createTRPCContext] session user:", session?.user?.id, "role:", session?.user?.role);
+
+  if (!sessionResult && authHeader.startsWith("Bearer ")) {
+    try {
+      const token = authHeader.slice(7).trim();
+      const foundSession = await db.query.session.findFirst({
+        where: eq(sessionSchema.token, token),
+      });
+
+      if (foundSession && foundSession.expiresAt > new Date()) {
+        const foundUser = await db.query.user.findFirst({
+          where: eq(userSchema.id, foundSession.userId),
+        });
+
+        if (foundUser) {
+          sessionResult = {
+            session: {
+              id: foundSession.id,
+              userId: foundSession.userId,
+              token: foundSession.token,
+              expiresAt: foundSession.expiresAt,
+            },
+            user: {
+              id: foundUser.id,
+              email: foundUser.email,
+              name: foundUser.name,
+              image: foundUser.image,
+              role: foundUser.role ?? "Vecino",
+            },
+          };
+        }
+      }
+    } catch (err) {
+      console.error("[createTRPCContext] Failed to manual resolve session:", err);
+    }
+  }
+
+  console.log("[createTRPCContext] resolved session user:", sessionResult?.user?.id, "role:", sessionResult?.user?.role);
   return {
     authApi: authApi as any,
-    session: session as {
+    session: sessionResult as {
       user: {
         id: string;
         email: string;
