@@ -68,10 +68,14 @@ export default function LoginScreen() {
       });
       const sessionData = await sessionRes.json() as {
         session?: { userId: string };
-        user?: { role?: string };
+        user?: { id: string; role?: string };
       } | null;
 
       const role = sessionData?.user?.role ?? "Vecino";
+      const userId = sessionData?.user?.id;
+      if (userId) {
+        await SecureStore.setItemAsync("expo_user_id", userId);
+      }
       const isProvider = role.toLowerCase().includes("proveedor") || role.toLowerCase() === "provider";
 
       setStep("done");

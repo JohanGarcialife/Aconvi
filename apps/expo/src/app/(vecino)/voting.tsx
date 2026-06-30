@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
+import * as SecureStore from "expo-secure-store";
 import { api, queryClient } from "~/utils/api";
 import { useQuery, useMutation } from "@tanstack/react-query";
 
@@ -15,8 +16,13 @@ const STATUS_UI = {
 
 export default function VotingScreen() {
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
-  const { data: session } = authClient.useSession();
-  const USER_ID = session?.user?.id ?? "00000000-0000-0000-0000-000000000000";
+  const [USER_ID, setUserId] = useState<string>("00000000-0000-0000-0000-000000000000");
+
+  useEffect(() => {
+    SecureStore.getItemAsync("expo_user_id").then((id) => {
+      if (id) setUserId(id);
+    }).catch(console.warn);
+  }, []);
   
   const { data: sessions, isLoading } = useQuery(api.voting.all.queryOptions({ tenantId: TENANT_ID }));
   

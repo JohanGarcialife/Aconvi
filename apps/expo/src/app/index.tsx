@@ -63,8 +63,13 @@ export default function RootIndex() {
         if (!sessionData?.user) {
           console.log("[RootIndex] Token invalid/expired → clearing and going to login");
           await SecureStore.deleteItemAsync("expo_session_token").catch(() => {});
+          await SecureStore.deleteItemAsync("expo_user_id").catch(() => {});
           router.replace("/login");
           return;
+        }
+
+        if (sessionData.user.id) {
+          await SecureStore.setItemAsync("expo_user_id", sessionData.user.id);
         }
 
         // 3. Navegar por rol
@@ -80,6 +85,7 @@ export default function RootIndex() {
       } catch (e: any) {
         console.log("[RootIndex] Error:", e.message, "→ login");
         await SecureStore.deleteItemAsync("expo_session_token").catch(() => {});
+        await SecureStore.deleteItemAsync("expo_user_id").catch(() => {});
         router.replace("/login");
       }
     };

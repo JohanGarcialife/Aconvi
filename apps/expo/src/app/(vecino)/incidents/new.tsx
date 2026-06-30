@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import { useRouter, Stack } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as FileSystem from "expo-file-system/legacy";
+import * as SecureStore from "expo-secure-store";
 import { api, queryClient } from "~/utils/api";
 import { authClient } from "~/utils/auth";
 import { useMutation } from "@tanstack/react-query";
@@ -53,8 +54,19 @@ const CATEGORIES = [
 
 export default function NewIncidentScreen() {
   const router = useRouter();
-  const { data: session } = authClient.useSession();
-  const userId = session?.user?.id;
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    SecureStore.getItemAsync("expo_user_id").then((id) => {
+      if (id) {
+        setUserId(id);
+        console.log("[NewIncidentScreen] Loaded user ID:", id);
+      }
+    }).catch(err => {
+      console.warn("[NewIncidentScreen] Failed to load user ID from SecureStore:", err);
+    });
+  }, []);
+
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [categoryError, setCategoryError] = useState(false); // Bug 2: track missing-category error
   const [description, setDescription] = useState("");

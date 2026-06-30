@@ -1,7 +1,9 @@
+import { useState, useEffect } from "react";
 import { Tabs } from "expo-router";
 import { View, Text, Platform } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as SecureStore from "expo-secure-store";
 import { api } from "~/utils/api";
 import { authClient } from "~/utils/auth";
 
@@ -62,8 +64,14 @@ function TabIcon({
 }
 
 export default function VecinoLayout() {
-  const { data: session } = authClient.useSession();
-  const userId = session?.user?.id;
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    SecureStore.getItemAsync("expo_user_id").then((id) => {
+      if (id) setUserId(id);
+    }).catch(console.warn);
+  }, []);
+
   const insets = useSafeAreaInsets();
   const bottomPad = Math.max(insets.bottom, 8);
   const { data: incidents } = useQuery(
