@@ -1,11 +1,46 @@
 import { eq, desc, and } from "drizzle-orm";
 import { z } from "zod";
+import { join } from "path";
+import { writeFileSync, existsSync, mkdirSync } from "fs";
 
 import { incident, incidentNote, provider, incidentHistory, user } from "@acme/db/schema";
 import { sendPushToUser } from "./notification";
 import { emitWebSocketEvent } from "../utils/ws";
 
 import { createTRPCRouter, publicProcedure } from "../trpc";
+
+// Save base64 image data to the local file system on the Next.js server
+function saveBase64Image(base64Data: string): string | undefined {
+  try {
+    const matches = base64Data.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) {
+      return base64Data; // Already a URL or direct string
+    }
+
+    const fileType = matches[1];
+    const base64ImageBytes = matches[2];
+    
+    let extension = "jpg";
+    if (fileType?.includes("png")) extension = "png";
+    if (fileType?.includes("webp")) extension = "webp";
+
+    const filename = `incident_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${extension}`;
+    
+    // nextjs/public/uploads path
+    const uploadDir = join(process.cwd(), "public", "uploads");
+    if (!existsSync(uploadDir)) {
+      mkdirSync(uploadDir, { recursive: true });
+    }
+
+    const filePath = join(uploadDir, filename);
+    writeFileSync(filePath, Buffer.from(base64ImageBytes!, "base64"));
+    
+    return `/uploads/${filename}`;
+  } catch (err) {
+    console.error("[saveBase64Image] Error saving uploaded image file:", err);
+    return undefined;
+  }
+}
 
 // Demo fallback author when no session is present
 const DEMO_AUTHOR_ID = "test-user-jluis-1776971864823";
@@ -40,6 +75,9 @@ export const incidentRouter = createTRPCRouter({
     )
     .query(({ ctx, input }) => {
       return ctx.db.query.incident.findMany({
+        columns: {
+          photoUrl: false, // Bypasses sending heavy base64 strings in listings
+        },
         where: and(
           eq(incident.organizationId, input.tenantId),
           input.status ? eq(incident.status, input.status) : undefined,
@@ -107,10 +145,18 @@ export const incidentRouter = createTRPCRouter({
       // Priority: session user ID (from Bearer token) > client-sent reporterId > demo fallback
       const resolvedReporterId = ctx.session?.user?.id ?? inputReporterId ?? DEMO_AUTHOR_ID;
       console.log("[incident.create] resolvedReporterId:", resolvedReporterId, "session:", ctx.session?.user?.id, "input:", inputReporterId);
+
+      // Save base64 image data to the local file system on the Next.js server
+      let resolvedPhotoUrl = data.photoUrl;
+      if (resolvedPhotoUrl && resolvedPhotoUrl.startsWith("data:image/")) {
+        resolvedPhotoUrl = saveBase64Image(resolvedPhotoUrl);
+      }
+
       const [created] = await ctx.db
         .insert(incident)
         .values({
           ...data,
+          photoUrl: resolvedPhotoUrl,
           title: sanitizedTitle,
           description: sanitizedDescription,
           organizationId: tenantId,
