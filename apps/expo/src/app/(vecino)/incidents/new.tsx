@@ -44,7 +44,7 @@ const TENANT_ID = "org_aconvi_demo";
 
 // ─── Categories — matching the client mockup (6 tiles) ────────────────────────
 const CATEGORIES = [
-  { id: "electricidad", label: "No funciona", icon: "⚡" },
+  { id: "electricidad", label: "Instalaciones", icon: "⚡" },
   { id: "agua",         label: "Agua",         icon: "💧" },
   { id: "acceso",       label: "Acceso",        icon: "🔑" },
   { id: "limpieza",     label: "Limpieza",      icon: "🧹" },
@@ -112,7 +112,9 @@ export default function NewIncidentScreen() {
         return [optimistic, ...old];
       });
       resetForm();
-      router.replace("/(vecino)/incidents");
+      // Navigate directly to the new incident's detail so photo and data
+      // load immediately from the byId query — no waiting for list refresh.
+      router.replace(`/(vecino)/incidents/${created.id}` as any);
       // Background sync to fill relations (reporter, provider, history…)
       void queryClient.invalidateQueries(api.incident.all.queryFilter());
     },
@@ -233,7 +235,7 @@ export default function NewIncidentScreen() {
   };
 
   const isLoading = createIncident.isPending;
-  const canSubmit = !!selectedCategory && !isLoading;
+  const canSubmit = !!selectedCategory && description.trim().length > 0 && !isLoading;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
@@ -261,8 +263,14 @@ export default function NewIncidentScreen() {
         {/* ── Title ──────────────────────────────────────────────────────── */}
         <Text style={styles.pageTitle}>¿Qué ocurre?</Text>
 
-        {/* ── Category grid (2×3) ────────────────────────────────────────── */}
-        {/* Bug 2: show error hint when user tried to submit without selecting a category */}
+        {/* ── Category grid (2×3) ─────────────────────────────────────────────── */}
+        {/* Persistent hint — visible whenever no category is selected */}
+        {!selectedCategory && (
+          <Text style={styles.categoryHintText}>
+            📂 Selecciona una categoría para continuar.
+          </Text>
+        )}
+        {/* Error hint shown only after failed submit attempt */}
         {categoryError && !selectedCategory && (
           <Text style={styles.categoryErrorText}>⚠️ Selecciona una categoría</Text>
         )}
@@ -323,7 +331,7 @@ export default function NewIncidentScreen() {
         <TextInput
           ref={descInputRef}
           style={styles.descInput}
-          placeholder="Añade detalles o indica ubicación exacta..."
+          placeholder="Describe el problema (obligatorio)..."
           placeholderTextColor="#94a3b8"
           multiline
           value={description}
@@ -340,7 +348,12 @@ export default function NewIncidentScreen() {
           }}
         />
 
-        {/* ── Submit ─────────────────────────────────────────────────────── */}
+        {/* ── Submit ────────────────────────────────────────────────── */}
+        {!canSubmit && !isLoading && (
+          <Text style={styles.submitHintText}>
+            {!selectedCategory ? "Selecciona una categoría para continuar." : "Añade una descripción para continuar."}
+          </Text>
+        )}
         <TouchableOpacity
           style={[styles.submitBtn, !canSubmit && styles.submitBtnDisabled]}
           onPress={handleSubmit}
@@ -436,6 +449,21 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginBottom: 8,
     textAlign: "center",
+  },
+  categoryHintText: {
+    color: PRIMARY,
+    fontSize: 13,
+    fontWeight: "600",
+    marginBottom: 8,
+    textAlign: "center",
+    opacity: 0.8,
+  },
+  submitHintText: {
+    color: MUTED,
+    fontSize: 13,
+    textAlign: "center",
+    marginBottom: 8,
+    fontStyle: "italic",
   },
   categoryIcon: { fontSize: 30 },
   categoryLabel: {

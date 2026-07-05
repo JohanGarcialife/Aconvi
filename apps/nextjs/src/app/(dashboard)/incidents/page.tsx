@@ -11,7 +11,7 @@ import { useSocketClient } from "~/hooks/useSocketClient";
 
 const TENANT_ID = "org_aconvi_demo";
 
-type Status = "RECIBIDA" | "EN_REVISION" | "AGENDADA" | "EN_CURSO" | "RESUELTA" | "RECHAZADA";
+type Status = "RECIBIDA" | "EN_REVISION" | "AGENDADA" | "EN_CURSO" | "RESUELTA" | "RECHAZADA" | "CERRADA";
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   RECIBIDA:    { label: "Sin asignar",  cls: "bg-amber-50 text-amber-700 border border-amber-200" },
@@ -20,6 +20,7 @@ const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   EN_CURSO:    { label: "En curso",     cls: "bg-cyan-50 text-cyan-700 border border-cyan-200" },
   RESUELTA:    { label: "Resuelta",     cls: "bg-emerald-50 text-emerald-700 border border-emerald-200" },
   RECHAZADA:   { label: "No procede",   cls: "bg-red-50 text-red-700 border border-red-200" },
+  CERRADA:     { label: "Cerrada",      cls: "bg-slate-100 text-slate-600 border border-slate-300" },
 };
 
 const PRIORITY_COLOR: Record<string, string> = {
@@ -29,7 +30,7 @@ const PRIORITY_COLOR: Record<string, string> = {
   BAJA: "bg-slate-300",
 };
 
-const STEPS = ["RECIBIDA", "EN_REVISION", "AGENDADA", "EN_CURSO", "RESUELTA"];
+const STEPS = ["RECIBIDA", "EN_REVISION", "AGENDADA", "EN_CURSO", "RESUELTA", "CERRADA"];
 
 function StatusBadge({ status }: { status: string }) {
   const s = STATUS_LABEL[status] ?? { label: status, cls: "bg-slate-100 text-slate-600" };
@@ -127,6 +128,21 @@ export default function IncidentsPage() {
   const addNote = useMutation(
     trpc.incident.addNote.mutationOptions({ onSuccess: () => { refetch().catch(() => null); } })
   );
+  const closeIncident = useMutation(
+    trpc.incident.closeIncident.mutationOptions({
+      onSuccess: (updated: any) => {
+        queryClient.setQueryData(
+          trpc.incident.all.queryOptions({ tenantId: TENANT_ID }).queryKey,
+          (old: any) => Array.isArray(old)
+            ? old.map((i: any) => i.id === updated.id ? { ...i, ...updated } : i)
+            : old,
+        );
+        refetch().catch(() => null);
+        showToast("✅ Incidencia cerrada y vecino notificado");
+      },
+      onError: () => showToast("❌ Error al cerrar", false),
+    })
+  );
 
   // Close user menu on outside click
   useEffect(() => {
@@ -216,6 +232,12 @@ export default function IncidentsPage() {
     } catch { showToast("❌ Error", false); }
   };
 
+  const handleClose = async () => {
+    if (!selected) return;
+    // @ts-ignore – tRPC mutateAsync types lag
+    await closeIncident.mutateAsync({ tenantId: TENANT_ID, id: selected.id });
+  };
+
 
   const handleAddNote = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -226,11 +248,13 @@ export default function IncidentsPage() {
   };
 
   const FILTERS = [
-    { key: "ALL", label: "Todas" },
-    { key: "RECIBIDA", label: "Pendientes" },
-    { key: "EN_REVISION", label: "En revisión" },
-    { key: "EN_CURSO", label: "En curso" },
-    { key: "RESUELTA", label: "Resueltas" },
+    { key: "ALL",        label: "Todas" },
+    { key: "RECIBIDA",   label: "Pendientes" },
+    { key: "EN_REVISION",label: "En revisión" },
+    { key: "AGENDADA",   label: "Agendadas" },
+    { key: "EN_CURSO",   label: "En curso" },
+    { key: "RESUELTA",   label: "Resueltas" },
+    { key: "CERRADA",    label: "Cerradas" },
   ];
 
   return (
@@ -546,12 +570,24 @@ export default function IncidentsPage() {
                   </>
                 )}
                 
-              {/* Simulation Actions — replaced with informational message */}
-                {(selected.status === "EN_REVISION" || selected.status === "EN_CURSO") && (
+              {/* Informational message for provider-managed statuses */}
+                {(selected.status === "EN_REVISION" || selected.status === "AGENDADA" || selected.status === "EN_CURSO") && (
                   <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-500">
                     <span>📱</span>
                     <span>El proveedor gestionará esto desde la app móvil</span>
                   </div>
+                )}
+
+                {/* AF: close incident after reviewing provider's completed work */}
+                {selected.status === "RESUELTA" && (
+                  <button
+                    onClick={handleClose}
+                    disabled={closeIncident.isPending}
+                    className="flex items-center gap-1.5 rounded-xl bg-slate-800 px-5 py-2.5 text-sm font-bold text-white hover:bg-slate-900 disabled:opacity-40 transition-colors"
+                  >
+                    <CheckCircle2 size={15} />
+                    {closeIncident.isPending ? "Cerrando..." : "✅ Cerrar incidencia"}
+                  </button>
                 )}
               </div>
 

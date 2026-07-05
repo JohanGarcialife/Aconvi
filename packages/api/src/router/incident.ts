@@ -60,6 +60,7 @@ const INCIDENT_STATUSES = [
   "EN_CURSO",
   "RESUELTA",
   "RECHAZADA",
+  "CERRADA",
 ] as const;
 
 function sanitizeText(str: string): string {
@@ -409,7 +410,7 @@ export const incidentRouter = createTRPCRouter({
       });
     }),
 
-  // ─── Provider: accept job (→ EN_CURSO) ────────────────────────────────────
+  // ─── Provider: accept job (→ AGENDADA) ────────────────────────────────────
   providerAccept: publicProcedure
     .input(
       z.object({
@@ -425,7 +426,7 @@ export const incidentRouter = createTRPCRouter({
       const [updated] = await ctx.db
         .update(incident)
         .set({ 
-          status: "EN_CURSO", 
+          status: "AGENDADA", 
           providerId: input.providerId,
           estimatedCost: input.estimatedCost,
           estimatedDays: input.estimatedDays,
@@ -463,15 +464,15 @@ export const incidentRouter = createTRPCRouter({
         actorName: "Proveedor",
         action: "STATUS_CHANGED",
         previousStatus: "EN_REVISION",
-        newStatus: "EN_CURSO",
-        comment: input.notes ? `Notas: ${input.notes}` : "Trabajo aceptado",
+        newStatus: "AGENDADA",
+        comment: input.notes ? `Notas: ${input.notes}` : "Trabajo agendado",
       });
 
       // Fire-and-forget push to vecino
       if (updated.reporterId) {
         void sendPushToUser(ctx.db, updated.reporterId, {
-          title: "🔧 Tu incidencia está en reparación",
-          body: `El especialista ha aceptado trabajar en "${updated.title}".`,
+          title: "📅 Tu cita ha sido agendada",
+          body: `Un especialista ha aceptado tu incidencia "${updated.title}" y coordinará la visita.`,
           data: { type: "new_incident", incidentId: updated.id },
         }).catch(console.error);
       }
@@ -570,6 +571,18 @@ export const incidentRouter = createTRPCRouter({
 
       if (!inc) throw new Error("Incidencia no encontrada");
 
+      // Update status to EN_CURSO — provider is now on site
+      const [arrivedInc] = await ctx.db
+        .update(incident)
+        .set({ status: "EN_CURSO" })
+        .where(
+          and(
+            eq(incident.id, input.id),
+            eq(incident.organizationId, input.tenantId),
+          ),
+        )
+        .returning();
+
       // Add internal note recording arrival
       await ctx.db.insert(incidentNote).values({
         incidentId: input.id,
@@ -582,24 +595,70 @@ export const incidentRouter = createTRPCRouter({
         incidentId: input.id,
         actorName: "Proveedor",
         action: "ARRIVED",
-        previousStatus: "EN_CURSO",
+        previousStatus: "AGENDADA",
         newStatus: "EN_CURSO",
-        comment: "Proveedor llegó al lugar",
+        comment: "Proveedor llegó al lugar e inicia el trabajo",
       });
 
       // Fire-and-forget push to vecino
       if (inc.reporterId) {
         void sendPushToUser(ctx.db, inc.reporterId, {
-          title: "📍 Tu técnico ha llegado",
-          body: `El especialista ha llegado a atender "${inc.title}".`,
+          title: "🔧 Tu técnico ha llegado y está trabajando",
+          body: `El especialista ha llegado y está atendiendo "${inc.title}".`,
           data: { type: "new_incident", incidentId: inc.id },
         }).catch(console.error);
       }
 
       // Fire-and-forget: WS event to tenant room
-      void emitWebSocketEvent(input.tenantId, "incident-updated", inc);
+      void emitWebSocketEvent(input.tenantId, "incident-updated", arrivedInc ?? inc);
 
-      return inc;
+      return arrivedInc ?? inc;
+    }),
+
+  // ─── AF: close incident (RESUELTA → CERRADA) ─────────────────────────────
+  closeIncident: publicProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        tenantId: z.string().min(1),
+        closingComment: z.string().max(1000).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [updated] = await ctx.db
+        .update(incident)
+        .set({ status: "CERRADA" })
+        .where(
+          and(
+            eq(incident.id, input.id),
+            eq(incident.organizationId, input.tenantId),
+          ),
+        )
+        .returning();
+
+      if (!updated) throw new Error("No se pudo cerrar la incidencia.");
+
+      // Log history
+      await ctx.db.insert(incidentHistory).values({
+        incidentId: updated.id,
+        actorName: "Administrador de Finca",
+        action: "STATUS_CHANGED",
+        previousStatus: "RESUELTA",
+        newStatus: "CERRADA",
+        comment: input.closingComment || "Incidencia revisada y cerrada por el administrador",
+      });
+
+      // Notify vecino
+      if (updated.reporterId) {
+        void sendPushToUser(ctx.db, updated.reporterId, {
+          title: "✅ Incidencia cerrada",
+          body: `Tu incidencia "${updated.title}" ha sido revisada y cerrada oficialmente.`,
+          data: { type: "new_incident", incidentId: updated.id },
+        }).catch(console.error);
+      }
+
+      void emitWebSocketEvent(input.tenantId, "incident-updated", updated);
+      return updated;
     }),
 
   // ─── Neighbor: submit rating (feedback) ──────────────────────────────────

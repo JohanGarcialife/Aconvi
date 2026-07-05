@@ -27,12 +27,13 @@ const TENANT_ID = "org_aconvi_demo";
 
 // ─── Human-readable status ────────────────────────────────────────────────────
 const STATUS_MAP: Record<string, { label: string; icon: string; color: string; bg: string }> = {
-  RECIBIDA:    { label: "Enviada",        icon: "✉️",  color: "#92400e", bg: "#fef3c7" },
-  EN_REVISION: { label: "Revisando",      icon: "🔍",  color: "#1e40af", bg: "#dbeafe" },
-  AGENDADA:    { label: "Agendada",       icon: "📅",  color: "#5b21b6", bg: "#ede9fe" },
-  EN_CURSO:    { label: "En reparación",  icon: "🔧",  color: "#065f46", bg: "#d1fae5" },
-  RESUELTA:    { label: "Resuelta",       icon: "✅",  color: "#065f46", bg: "#d1fae5" },
-  RECHAZADA:   { label: "Rechazada",      icon: "✕",   color: "#991b1b", bg: "#fee2e2" },
+  RECIBIDA:    { label: "Enviada",              icon: "✉️",  color: "#92400e", bg: "#fef3c7" },
+  EN_REVISION: { label: "Revisando",            icon: "🔍",  color: "#1e40af", bg: "#dbeafe" },
+  AGENDADA:    { label: "Agendada",             icon: "📅",  color: "#5b21b6", bg: "#ede9fe" },
+  EN_CURSO:    { label: "En reparación",        icon: "🔧",  color: "#065f46", bg: "#d1fae5" },
+  RESUELTA:    { label: "Pendiente de cierre",  icon: "🕒",  color: "#b45309", bg: "#fef3c7" },
+  RECHAZADA:   { label: "Rechazada",            icon: "✕",   color: "#991b1b", bg: "#fee2e2" },
+  CERRADA:     { label: "Cerrada",              icon: "✅",  color: "#065f46", bg: "#d1fae5" },
 };
 
 // ─── Timeline steps ───────────────────────────────────────────────────────────
@@ -55,7 +56,10 @@ function buildTimeline(history: any[], currentStatus: string): TimelineEntry[] {
       return { key: h.id, label: "Técnico asignado", detail: `El especialista ha sido asignado a la tarea.`, icon: "👤", date: dateStr };
     }
     if (h.action === "COMPLETED" || h.newStatus === "RESUELTA") {
-      return { key: h.id, label: "Resuelta", detail: "El técnico ha completado el trabajo.", icon: "✅", date: dateStr };
+      return { key: h.id, label: "Resuelta", detail: "El técnico ha completado el trabajo. Pendiente de revisión por el administrador.", icon: "✅", date: dateStr };
+    }
+    if (h.newStatus === "CERRADA") {
+      return { key: h.id, label: "Cerrada", detail: "El administrador ha revisado y cerrado la incidencia oficialmente.", icon: "🔒", date: dateStr };
     }
     if (h.action === "ARRIVED") {
       return { key: h.id, label: "Técnico en el lugar", detail: "El especialista ha llegado y está evaluando la incidencia.", icon: "📍", date: dateStr };
@@ -82,10 +86,11 @@ function buildTimeline(history: any[], currentStatus: string): TimelineEntry[] {
 
 // ─── "Próximo paso" config ────────────────────────────────────────────────────
 const NEXT_STEP: Record<string, { title: string; detail: string }> = {
-  RECIBIDA:    { title: "Revisión del administrador",    detail: "Estamos revisando tu solicitud y te avisaremos pronto." },
-  EN_REVISION: { title: "Asignación de técnico",        detail: "Un especialista será asignado a tu incidencia." },
-  AGENDADA:    { title: "Inicio de la reparación",      detail: "El técnico comenzará en la fecha acordada." },
-  EN_CURSO:    { title: "Finalización de la reparación", detail: "Te avisaremos cuando esté completado." },
+  RECIBIDA:    { title: "Revisión del administrador",        detail: "Estamos revisando tu solicitud y te avisaremos pronto." },
+  EN_REVISION: { title: "Asignación de técnico",           detail: "Un especialista será asignado a tu incidencia." },
+  AGENDADA:    { title: "Inicio de la reparación",         detail: "El técnico comenzará en la fecha acordada." },
+  EN_CURSO:    { title: "Finalización de la reparación",   detail: "Te avisaremos cuando esté completado." },
+  RESUELTA:    { title: "Revisión del administrador",        detail: "El administrador de finca está revisando el trabajo realizado antes de cerrar el expediente." },
 };
 
 export default function IncidentDetailScreen() {
@@ -132,7 +137,7 @@ export default function IncidentDetailScreen() {
   const nextStep = NEXT_STEP[incident.status];
   const displayId = `#INC-${id.slice(0, 8).toUpperCase()}`;
   const createdDate = format(new Date(incident.createdAt), "d 'de' MMMM, HH:mm", { locale: es });
-  const isResolved = incident.status === "RESUELTA";
+  const isResolved = incident.status === "RESUELTA" || incident.status === "CERRADA";
   const isRejected = incident.status === "RECHAZADA";
 
   return (

@@ -27,6 +27,7 @@ import { useRouter, Stack, useLocalSearchParams } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import NetInfo from "@react-native-community/netinfo";
+import * as FileSystem from "expo-file-system/legacy";
 import { api, queryClient } from "~/utils/api";
 import { useQuery, useMutation } from "@tanstack/react-query";
 
@@ -82,13 +83,12 @@ export default function CompleteJobScreen() {
   const [isSyncing, setIsSyncing] = useState(false);
   const appState = useRef(AppState.currentState);
 
-  // ─── Fetch incident details ───────────────────────────────────────────────
-  const { data: incident } = useQuery(
-    api.incident.byId.queryOptions(
-      { id: params.incidentId ?? "", tenantId: DEMO_TENANT_ID },
-      { enabled: !!params.incidentId }
-    )
-  );
+  // ─── Fetch incident details ──────────────────────────────────────────────────
+  const { data: incident } = useQuery({
+    ...api.incident.byId.queryOptions({ id: params.incidentId ?? "", tenantId: DEMO_TENANT_ID }),
+    enabled: !!params.incidentId,
+    refetchInterval: 5000,
+  });
 
   // ─── tRPC mutation ────────────────────────────────────────────────────────
   const completeMutation = useMutation(
@@ -214,9 +214,21 @@ export default function CompleteJobScreen() {
         });
 
     if (!result.canceled && result.assets[0]) {
-      setPhotoUri(result.assets[0].uri);
-      if (result.assets[0].base64) {
-        setPhotoBase64(`data:image/jpeg;base64,${result.assets[0].base64}`);
+      const asset = result.assets[0];
+      setPhotoUri(asset.uri);
+      if (asset.base64) {
+        // Picker returned base64 directly — use it
+        setPhotoBase64(`data:image/jpeg;base64,${asset.base64}`);
+      } else {
+        // Fallback: read the file from disk (common on some Android builds)
+        try {
+          const b64 = await FileSystem.readAsStringAsync(asset.uri, {
+            encoding: "base64" as const,
+          });
+          setPhotoBase64(`data:image/jpeg;base64,${b64}`);
+        } catch (err) {
+          console.warn("[complete] FileSystem base64 fallback failed:", err);
+        }
       }
     }
   };
