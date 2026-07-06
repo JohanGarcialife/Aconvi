@@ -5,6 +5,7 @@ import { Platform, Alert } from "react-native";
 import Constants from "expo-constants";
 import { trpc, queryClient } from "../utils/api";
 import { useMutation } from "@tanstack/react-query";
+import { authClient } from "./auth";
 
 // Configure how notifications appear when app is in foreground
 Notifications.setNotificationHandler({
@@ -21,6 +22,9 @@ export function usePushNotifications() {
     useState<Notifications.PermissionStatus | null>(null);
   const notificationListener = useRef<Notifications.EventSubscription | null>(null);
   const responseListener = useRef<Notifications.EventSubscription | null>(null);
+
+  const { data: session } = authClient.useSession();
+  const userId = session?.user?.id;
 
   // tRPC mutation to register token in backend
   const registerToken = useMutation({
@@ -48,8 +52,6 @@ export function usePushNotifications() {
           return;
         }
         setExpoPushToken(token);
-        // Store in backend
-        registerToken.mutate({ token, platform: "expo" } as any);
       })
       .catch((err) => {
         console.error("[Push] Error in registerForPushNotificationsAsync:", err);
@@ -75,6 +77,16 @@ export function usePushNotifications() {
       responseListener.current?.remove();
     };
   }, []);
+
+  // Reactively register token when user logs in or swaps accounts
+  useEffect(() => {
+    if (!expoPushToken || !userId) {
+      console.log("[Push] Skipping register: token or userId missing", { token: !!expoPushToken, userId: !!userId });
+      return;
+    }
+    console.log("[Push] Registering token for user", userId);
+    registerToken.mutate({ token: expoPushToken, platform: "expo" } as any);
+  }, [expoPushToken, userId]);
 
   return { expoPushToken, permissionStatus };
 }
