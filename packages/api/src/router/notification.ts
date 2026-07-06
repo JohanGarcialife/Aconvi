@@ -146,12 +146,23 @@ export const notificationRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
 
-      // Upsert: if this exact token is already stored, don't duplicate
+      // Upsert: if this exact token is already stored, ensure it belongs to the current user
       const existing = await ctx.db.query.pushToken.findFirst({
         where: eq(pushToken.token, input.token),
       });
 
-      if (existing) return { ok: true };
+      if (existing) {
+        if (existing.userId === userId) {
+          return { ok: true };
+        } else {
+          // Token is currently assigned to another user (device shared/login swap), re-assign it
+          await ctx.db
+            .update(pushToken)
+            .set({ userId })
+            .where(eq(pushToken.id, existing.id));
+          return { ok: true };
+        }
+      }
 
       await ctx.db.insert(pushToken).values({
         id: crypto.randomUUID(),
