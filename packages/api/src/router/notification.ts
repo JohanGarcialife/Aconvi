@@ -33,15 +33,22 @@ export async function sendPushToUser(
   userId: string,
   notification: { title: string; body: string; data?: Record<string, string> },
 ): Promise<void> {
+  console.log("[sendPushToUser] Querying push tokens for userId:", userId);
   const tokens = await db.query.pushToken.findMany({
     where: eq(pushToken.userId, userId),
   });
+  console.log("[sendPushToUser] Found tokens count:", tokens.length);
 
   for (const tok of tokens) {
+    console.log("[sendPushToUser] Dispatching token platform:", tok.platform, "token:", tok.token);
     if (tok.platform === "expo") {
-      await sendExpoPush(tok.token, notification).catch(console.error);
+      await sendExpoPush(tok.token, notification).catch((err) => {
+        console.error("[sendPushToUser] sendExpoPush failed for token:", tok.token, err);
+      });
     } else if (tok.platform === "web") {
-      await sendWebPush(tok.token, notification).catch(console.error);
+      await sendWebPush(tok.token, notification).catch((err) => {
+        console.error("[sendPushToUser] sendWebPush failed for token:", tok.token, err);
+      });
     }
   }
 }

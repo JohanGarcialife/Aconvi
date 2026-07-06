@@ -286,20 +286,33 @@ export const incidentRouter = createTRPCRouter({
       if (updated.providerId) {
         const provId = updated.providerId; // narrowed: string (not null)
         void (async () => {
-          const prov = await ctx.db.query.provider.findFirst({
-            where: eq(provider.id, provId),
-          });
-          if (prov?.email) {
-            const usr = await ctx.db.query.user.findFirst({
-              where: eq(user.email, prov.email),
+          console.log("[PushAssign] Triggered IIFE for providerId:", provId);
+          try {
+            const prov = await ctx.db.query.provider.findFirst({
+              where: eq(provider.id, provId),
             });
-            if (usr?.id) {
-              void sendPushToUser(ctx.db, usr.id, {
-                title: "📋 Nueva incidencia asignada",
-                body: `Se te ha asignado: ${updated.title}`,
-                data: { type: "job_assigned", incidentId: updated.id },
-              }).catch(console.error);
+            console.log("[PushAssign] Found provider in DB:", prov?.name, "email:", prov?.email);
+            if (prov?.email) {
+              const usr = await ctx.db.query.user.findFirst({
+                where: eq(user.email, prov.email),
+              });
+              console.log("[PushAssign] Found user in DB:", usr?.name, "id:", usr?.id);
+              if (usr?.id) {
+                console.log("[PushAssign] Calling sendPushToUser for userId:", usr.id);
+                await sendPushToUser(ctx.db, usr.id, {
+                  title: "📋 Nueva incidencia asignada",
+                  body: `Se te ha asignado: ${updated.title}`,
+                  data: { type: "job_assigned", incidentId: updated.id },
+                });
+                console.log("[PushAssign] sendPushToUser completed successfully");
+              } else {
+                console.warn("[PushAssign] No user found for provider email:", prov.email);
+              }
+            } else {
+              console.warn("[PushAssign] Provider has no email address configured");
             }
+          } catch (err) {
+            console.error("[PushAssign] Failed in push notification promise chain:", err);
           }
         })();
       }
