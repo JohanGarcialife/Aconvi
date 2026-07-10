@@ -16,6 +16,14 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "~/utils/api";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { getBaseUrl } from "~/utils/base-url";
+
+/** Converts a relative /uploads/... path to an absolute URL. Already-absolute URLs are returned unchanged. */
+const resolvePhotoUrl = (url: string | null | undefined): string | null => {
+  if (!url) return null;
+  if (url.startsWith("http")) return url;
+  return `${getBaseUrl()}${url}`;
+};
 
 const PRIMARY = "#4aa19b";
 const DARK = "#111827";
@@ -161,9 +169,9 @@ export default function IncidentDetailScreen() {
         <View style={s.incidentCard}>
           {/* Thumbnail */}
           <View style={s.incidentThumb}>
-            {(incident as any).photoUrl ? (
+            {resolvePhotoUrl((incident as any).photoUrl) ? (
               <Image
-                source={{ uri: (incident as any).photoUrl }}
+                source={{ uri: resolvePhotoUrl((incident as any).photoUrl)! }}
                 style={s.incidentThumbImg}
                 resizeMode="cover"
               />
@@ -319,16 +327,16 @@ export default function IncidentDetailScreen() {
             )}
 
             {/* Photos */}
-            {(incident as any).photoUrl && (
+            {resolvePhotoUrl((incident as any).photoUrl) && (
               <View style={{ marginBottom: 16 }}>
-                {(incident as any).finalPhotoUrl ? (
+                {resolvePhotoUrl((incident as any).finalPhotoUrl) ? (
                   <>
                     <Text style={[s.detailLabel, { marginBottom: 8 }]}>FOTOS</Text>
                     <View style={s.photosRow}>
                       <View style={{ flex: 1 }}>
                         <Text style={s.photoCaption}>Así estaba</Text>
                         <Image
-                          source={{ uri: (incident as any).photoUrl }}
+                          source={{ uri: resolvePhotoUrl((incident as any).photoUrl)! }}
                           style={s.photoImg}
                           resizeMode="cover"
                         />
@@ -337,7 +345,7 @@ export default function IncidentDetailScreen() {
                       <View style={{ flex: 1 }}>
                         <Text style={s.photoCaption}>Después</Text>
                         <Image
-                          source={{ uri: (incident as any).finalPhotoUrl }}
+                          source={{ uri: resolvePhotoUrl((incident as any).finalPhotoUrl)! }}
                           style={s.photoImg}
                           resizeMode="cover"
                         />
@@ -348,7 +356,7 @@ export default function IncidentDetailScreen() {
                   <>
                     <Text style={[s.detailLabel, { marginBottom: 8 }]}>FOTO</Text>
                     <Image
-                      source={{ uri: (incident as any).photoUrl }}
+                      source={{ uri: resolvePhotoUrl((incident as any).photoUrl)! }}
                       style={{ width: "100%", height: 200, borderRadius: 14 }}
                       resizeMode="cover"
                     />

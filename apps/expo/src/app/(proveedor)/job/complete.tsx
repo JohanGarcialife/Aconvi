@@ -81,6 +81,7 @@ export default function CompleteJobScreen() {
   const [isOffline, setIsOffline] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isReadingPhoto, setIsReadingPhoto] = useState(false);
   const appState = useRef(AppState.currentState);
 
   // ─── Fetch incident details ──────────────────────────────────────────────────
@@ -216,9 +217,12 @@ export default function CompleteJobScreen() {
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
       setPhotoUri(asset.uri);
+      setPhotoBase64(null); // reset while reading
+      setIsReadingPhoto(true);
       if (asset.base64) {
         // Picker returned base64 directly — use it
         setPhotoBase64(`data:image/jpeg;base64,${asset.base64}`);
+        setIsReadingPhoto(false);
       } else {
         // Fallback: read the file from disk (common on some Android builds)
         try {
@@ -228,6 +232,10 @@ export default function CompleteJobScreen() {
           setPhotoBase64(`data:image/jpeg;base64,${b64}`);
         } catch (err) {
           console.warn("[complete] FileSystem base64 fallback failed:", err);
+          Alert.alert("Error al leer foto", "No se pudo procesar la imagen. Intenta de nuevo.");
+          setPhotoUri(null);
+        } finally {
+          setIsReadingPhoto(false);
         }
       }
     }
@@ -302,7 +310,7 @@ export default function CompleteJobScreen() {
     }
   };
 
-  const isLoading = completeMutation.isPending || isSyncing;
+  const isLoading = completeMutation.isPending || isSyncing || isReadingPhoto;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
@@ -388,9 +396,9 @@ export default function CompleteJobScreen() {
 
         {/* CTA */}
         <TouchableOpacity
-          style={[styles.submitButton, (!photoUri || isLoading) && { opacity: 0.5 }]}
+          style={[styles.submitButton, (!photoUri || !photoBase64 || isLoading) && { opacity: 0.5 }]}
           onPress={handleSubmit}
-          disabled={!photoUri || isLoading}
+          disabled={!photoUri || !photoBase64 || isLoading}
           activeOpacity={0.85}
         >
           {isLoading ? (

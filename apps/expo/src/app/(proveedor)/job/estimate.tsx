@@ -210,7 +210,10 @@ export default function EstimateScreen() {
           }) }]
         );
       },
-      onError: (e: any) => Alert.alert("Error", e.message),
+      onError: (e: any) => {
+        const msg = e?.message ?? e?.data?.message ?? "Error al enviar la estimación. Inténtalo de nuevo.";
+        Alert.alert("Error", msg);
+      },
     })
   );
 
