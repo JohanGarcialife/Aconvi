@@ -89,7 +89,7 @@ function ClosedScreen({ incidentTitle }: { incidentTitle: string }) {
 function ValidateContent() {
   const trpc = useTRPC();
   const searchParams = useSearchParams();
-  const incidentId = searchParams ? searchParams.get("id") : null;
+  const incidentId = searchParams ? searchParams.get("incidentId") : null;
 
   const [confirmed, setConfirmed] = useState(false);
   const [pageState, setPageState] = useState<PageState>("pending");
@@ -105,8 +105,13 @@ function ValidateContent() {
     trpc.incident.addNote.mutationOptions()
   );
 
+  const closeIncident = useMutation(
+    trpc.incident.closeIncident.mutationOptions()
+  );
+
   const handleCopyIBAN = () => {
-    copyToClipboard("ES9121000418450200051339");
+    const iban = (incident as any)?.provider?.iban ?? "ES91 2100 0418 4502 0005 1339";
+    copyToClipboard(iban);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -116,32 +121,20 @@ function ValidateContent() {
     setPageState("validating");
 
     try {
-      // 1. Add internal note to close the folder
+      // 1. Close the incident in DB (status → CERRADA + push notification to vecino)
+      // @ts-ignore
+      await closeIncident.mutateAsync({ tenantId: TENANT_ID, id: incident.id });
+
+      // 2. Add internal note
       await addNote.mutateAsync({
         tenantId: TENANT_ID,
         incidentId: incident.id,
         content: "✅ El administrador ha validado el trabajo y cerrado el expediente.",
       });
-
-      // 2. Dispatch WebSocket push notification to vecino
-      const ws = new WebSocket(
-        process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:3001"
-      );
-      ws.onopen = () => {
-        ws.send(
-          JSON.stringify({
-            event: "rating-request",
-            payload: {
-              incidentId: incident.id,
-              tenantId: TENANT_ID,
-              message: `Tu incidencia "${incident.title}" ha sido resuelta. ¿Cómo valorarías el servicio?`,
-            },
-          })
-        );
-        ws.close();
-      };
     } catch (e) {
       console.error(e);
+      setPageState("pending");
+      return;
     }
 
     setPageState("closed");
@@ -291,7 +284,7 @@ function ValidateContent() {
                   Copiar IBAN del proveedor
                 </div>
                 <p className="font-mono text-sm tracking-wide text-slate-900">
-                  ES91 2100 0418 <span className="font-bold">4502 0005 1339</span>
+                  {(incident as any).provider?.iban ?? "ES91 2100 0418 4502 0005 1339"}
                 </p>
                 <p className="mt-1 text-xs text-slate-400">
                   Titular: {incident.provider?.name ?? "Fontanería Pérez SL"}
