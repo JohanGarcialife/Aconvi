@@ -201,30 +201,30 @@ export default function VecinoHome() {
   // ── Data Fetching ──
   const { data: votings, isLoading: loadingVoting } = useQuery({
     ...api.voting.all.queryOptions({ tenantId: TENANT_ID }),
-    refetchInterval: 30000,
+    refetchInterval: 300000,
   });
   const { data: notices, isLoading: loadingNotice } = useQuery({
     ...api.notice.all.queryOptions({ tenantId: TENANT_ID }),
-    refetchInterval: 30000,
+    refetchInterval: 300000,
   });
   const { data: incidents, isLoading: loadingIncident } = useQuery({
     ...api.incident.all.queryOptions({ tenantId: TENANT_ID }),
-    refetchInterval: 30000,
+    refetchInterval: 300000,
   });
   const { data: bookings, isLoading: loadingBooking } = useQuery({
     ...api.commonArea.myBookings.queryOptions(),
-    refetchInterval: 30000,
+    refetchInterval: 300000,
   });
   
   const { data: commonAreas, isLoading: loadingCommonAreas } = useQuery({
     ...api.commonArea.all.queryOptions({ tenantId: TENANT_ID }),
-    refetchInterval: 30000,
+    refetchInterval: 300000,
   });
 
   const DEMO_AUTHOR_ID = "user_admin";
   const { data: fees, isLoading: loadingFees } = useQuery({
     ...api.fee.myFees.queryOptions({ tenantId: TENANT_ID, userId: DEMO_AUTHOR_ID }),
-    refetchInterval: 30000,
+    refetchInterval: 300000,
   });
 
   // ── Computed Values ──

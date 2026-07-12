@@ -27,7 +27,7 @@ export default function JobInProgressScreen() {
   const { data: incident } = useQuery({
     ...api.incident.byId.queryOptions({ id: params.incidentId ?? "", tenantId: DEMO_TENANT_ID }),
     enabled: !!params.incidentId,
-    refetchInterval: 30000,
+    refetchInterval: 300000,
   });
 
   // ─── Mutation: register provider arrival on site ──────────────────────────
