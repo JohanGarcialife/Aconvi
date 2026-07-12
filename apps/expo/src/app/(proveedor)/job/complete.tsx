@@ -88,7 +88,7 @@ export default function CompleteJobScreen() {
   const { data: incident } = useQuery({
     ...api.incident.byId.queryOptions({ id: params.incidentId ?? "", tenantId: DEMO_TENANT_ID }),
     enabled: !!params.incidentId,
-    refetchInterval: 5000,
+    refetchInterval: 30000,
   });
 
   // ─── tRPC mutation ────────────────────────────────────────────────────────
