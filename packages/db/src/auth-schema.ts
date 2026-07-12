@@ -142,6 +142,7 @@ export const provider = pgTable("provider", {
   priceRangeMax: integer("price_range_max"),
   phone: varchar("phone", { length: 32 }),
   email: varchar("email", { length: 256 }),
+  iban: varchar("iban", { length: 34 }),
   createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
     .defaultNow()

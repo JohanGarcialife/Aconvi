@@ -77,6 +77,9 @@ export default function IncidentsPage() {
   const [noteText, setNoteText] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [showCloseModal, setShowCloseModal] = useState(false);
+  const [closeComment, setCloseComment] = useState("");
+  const [closeIban, setCloseIban] = useState("");
   const userMenuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const { data: session } = authClient.useSession();
@@ -232,10 +235,18 @@ export default function IncidentsPage() {
     } catch { showToast("❌ Error", false); }
   };
 
-  const handleClose = async () => {
+  const handleClose = () => {
     if (!selected) return;
-    // @ts-ignore – tRPC mutateAsync types lag
+    setCloseComment("");
+    setCloseIban("");
+    setShowCloseModal(true);
+  };
+
+  const confirmClose = async () => {
+    if (!selected) return;
+    // @ts-ignore
     await closeIncident.mutateAsync({ tenantId: TENANT_ID, id: selected.id });
+    setShowCloseModal(false);
   };
 
 
@@ -264,6 +275,130 @@ export default function IncidentsPage() {
         <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-xl px-5 py-3 text-sm font-semibold text-white shadow-lg transition-all
           ${toast.ok ? "bg-slate-900" : "bg-red-600"}`}>
           {toast.msg}
+        </div>
+      )}
+
+      {/* ── Close Incident Modal ─────────────────────────────────────────── */}
+      {showCloseModal && selected && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="relative mx-4 flex w-full max-w-2xl flex-col rounded-2xl bg-white shadow-2xl overflow-hidden max-h-[90vh]">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 bg-slate-50 shrink-0">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Cierre de incidencia</h2>
+                <p className="text-xs text-slate-500 mt-0.5">{selected.title}</p>
+              </div>
+              <button
+                onClick={() => setShowCloseModal(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-colors text-lg font-light"
+              >×</button>
+            </div>
+
+            {/* Scrollable body */}
+            <div className="overflow-y-auto px-6 py-5 space-y-5">
+
+              {/* Before / After photos */}
+              <div>
+                <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">Verificación fotográfica</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="mb-1 text-xs font-semibold text-slate-500">Antes</p>
+                    {selected.photoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={selected.photoUrl} alt="Foto inicial" className="h-40 w-full rounded-xl object-cover border border-slate-200" />
+                    ) : (
+                      <div className="flex h-40 items-center justify-center rounded-xl bg-slate-100 text-xs text-slate-400">Sin foto</div>
+                    )}
+                  </div>
+                  <div>
+                    <p className="mb-1 text-xs font-semibold text-emerald-600">Después (proveedor)</p>
+                    {(selected as any).finalPhotoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={(selected as any).finalPhotoUrl} alt="Foto final" className="h-40 w-full rounded-xl object-cover border-2 border-emerald-300" />
+                    ) : (
+                      <div className="flex h-40 items-center justify-center rounded-xl bg-slate-100 text-xs text-slate-400">Sin foto de cierre</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Provider & cost summary */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs text-slate-400 mb-1">Proveedor</p>
+                  <p className="text-sm font-semibold text-slate-800">{selected.provider?.name ?? "—"}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs text-slate-400 mb-1">Coste estimado</p>
+                  <p className="text-sm font-semibold text-slate-800">
+                    {(selected as any).estimatedCost != null ? `${(selected as any).estimatedCost} €` : "—"}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs text-slate-400 mb-1">Tiempo transcurrido</p>
+                  <p className="text-sm font-semibold text-slate-800">
+                    {selected.createdAt
+                      ? (() => {
+                          const diff = Date.now() - new Date(selected.createdAt).getTime();
+                          const days = Math.floor(diff / 86400000);
+                          const hours = Math.floor((diff % 86400000) / 3600000);
+                          return days > 0 ? `${days}d ${hours}h` : `${hours}h`;
+                        })()
+                      : "—"}
+                  </p>
+                </div>
+              </div>
+
+              {/* IBAN */}
+              <div>
+                <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">
+                  IBAN del proveedor <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={closeIban}
+                  onChange={e => setCloseIban(e.target.value.toUpperCase())}
+                  placeholder="ES00 0000 0000 0000 0000 0000"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 font-mono text-sm text-slate-800 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 transition-all"
+                />
+                <p className="mt-1 text-xs text-slate-400">Necesario para registrar el pago al proveedor.</p>
+              </div>
+
+              {/* Final comment */}
+              <div>
+                <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Comentario final (opcional)
+                </label>
+                <textarea
+                  value={closeComment}
+                  onChange={e => setCloseComment(e.target.value)}
+                  rows={3}
+                  placeholder="Anota cualquier observación antes de cerrar el expediente..."
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 transition-all resize-none"
+                />
+              </div>
+            </div>
+
+            {/* Footer actions */}
+            <div className="flex shrink-0 items-center justify-between border-t border-slate-200 bg-slate-50 px-6 py-4">
+              <button
+                onClick={() => setShowCloseModal(false)}
+                className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmClose}
+                disabled={!closeIban.trim() || closeIncident.isPending}
+                className="flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-2.5 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-40 transition-colors"
+              >
+                {closeIncident.isPending
+                  ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> Cerrando...</>
+                  : <><CheckCircle2 size={15} /> Confirmar cierre</>
+                }
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -581,14 +716,14 @@ export default function IncidentsPage() {
                 {/* AF: close incident after reviewing provider's completed work */}
                 {selected.status === "RESUELTA" && (
                   <button
-                    onClick={handleClose}
-                    disabled={closeIncident.isPending}
-                    className="flex items-center gap-1.5 rounded-xl bg-slate-800 px-5 py-2.5 text-sm font-bold text-white hover:bg-slate-900 disabled:opacity-40 transition-colors"
+                    onClick={() => router.push(`/incidents/${selected.id}/close`)}
+                    className="flex items-center gap-1.5 rounded-xl bg-slate-800 px-5 py-2.5 text-sm font-bold text-white hover:bg-slate-900 transition-colors"
                   >
                     <CheckCircle2 size={15} />
-                    {closeIncident.isPending ? "Cerrando..." : "✅ Cerrar incidencia"}
+                    ✅ Revisar y cerrar expediente
                   </button>
                 )}
+
               </div>
 
               {selected.status === "RECIBIDA" && (
