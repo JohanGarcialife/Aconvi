@@ -20,8 +20,16 @@ import { getBaseUrl } from "~/utils/base-url";
 /** Converts a relative /uploads/... path to an absolute URL. Already-absolute URLs are returned unchanged. */
 const resolvePhotoUrl = (url: string | null | undefined): string | null => {
   if (!url) return null;
-  if (url.startsWith("http")) return url;
-  return `${getBaseUrl()}${url}`;
+  if (
+    url.startsWith("http") ||
+    url.startsWith("file:") ||
+    url.startsWith("ph:") ||
+    url.startsWith("data:")
+  ) {
+    return url;
+  }
+  const path = url.startsWith("/") ? url : `/${url}`;
+  return `${getBaseUrl()}${path}`;
 };
 
 const PRIMARY = "#4aa19b";
