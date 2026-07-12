@@ -15,6 +15,14 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "~/utils/api";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { getBaseUrl } from "~/utils/base-url";
+
+/** Converts a relative /uploads/... path to an absolute URL. Already-absolute URLs are returned unchanged. */
+const resolvePhotoUrl = (url: string | null | undefined): string | null => {
+  if (!url) return null;
+  if (url.startsWith("http")) return url;
+  return `${getBaseUrl()}${url}`;
+};
 
 const PRIMARY = "#4aa19b";
 const DARK = "#111827";
@@ -68,9 +76,9 @@ export default function VecinoIncidentsScreen() {
       >
         {/* Thumbnail */}
         <View style={styles.thumb}>
-          {(item as any).photoUrl ? (
+          {resolvePhotoUrl((item as any).photoUrl) ? (
             <Image
-              source={{ uri: (item as any).photoUrl }}
+              source={{ uri: resolvePhotoUrl((item as any).photoUrl)! }}
               style={styles.thumbImg}
               resizeMode="cover"
             />
@@ -82,7 +90,8 @@ export default function VecinoIncidentsScreen() {
                   (item as any).category === "electricidad" ? "⚡" :
                   (item as any).category === "acceso" ? "🔑" :
                   (item as any).category === "limpieza" ? "🧹" :
-                  (item as any).category === "ruidos" ? "🔊" : "⚠️"
+                  (item as any).category === "ruidos" ? "🔊" :
+                  (item as any).category === "instalaciones" ? "🔧" : "⚠️"
                 }
               </Text>
             </View>
