@@ -716,7 +716,7 @@ export default function IncidentsPage() {
                 {/* AF: close incident after reviewing provider's completed work */}
                 {selected.status === "RESUELTA" && (
                   <button
-                    onClick={() => router.push(`/incidents/${selected.id}/close`)}
+                    onClick={() => router.push(`/incidents/validate?incidentId=${selected.id}`)}
                     className="flex items-center gap-1.5 rounded-xl bg-slate-800 px-5 py-2.5 text-sm font-bold text-white hover:bg-slate-900 transition-colors"
                   >
                     <CheckCircle2 size={15} />
