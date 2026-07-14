@@ -54,8 +54,7 @@ export function usePushNotifications() {
         setExpoPushToken(token);
       })
       .catch((err) => {
-        console.error("[Push] Error in registerForPushNotificationsAsync:", err);
-        Alert.alert("Error de Permisos/FCM", "No se pudo obtener el token de notificaciones: " + (err?.message ?? "Error desconocido"));
+        console.warn("[Push] Error in registerForPushNotificationsAsync:", err);
       });
 
     // Listener: receives notification while app is open

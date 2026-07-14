@@ -203,15 +203,13 @@ export default function CompleteJobScreen() {
           mediaTypes: "images",
           quality: 0.3,
           base64: true,
-          allowsEditing: true,
-          aspect: [4, 3],
+          allowsEditing: false,
         })
       : await ImagePicker.launchImageLibraryAsync({
           mediaTypes: "images",
           quality: 0.3,
           base64: true,
-          allowsEditing: true,
-          aspect: [4, 3],
+          allowsEditing: false,
         });
 
     if (!result.canceled && result.assets[0]) {

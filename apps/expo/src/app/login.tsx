@@ -109,19 +109,23 @@ export default function LoginScreen() {
               },
               body: JSON.stringify({ token: tokenData.data, platform: "expo" }),
             });
-            const result = await res.json() as { ok: boolean; error?: string };
-            if (result.ok) {
-              console.log("[Push] Token registered successfully via REST.");
+            const contentType = res.headers.get("content-type") ?? "";
+            if (contentType.includes("application/json")) {
+              const result = await res.json() as { ok: boolean; error?: string };
+              if (result.ok) {
+                console.log("[Push] Token registered successfully via REST.");
+              } else {
+                console.error("[Push] REST registration failed:", result.error);
+              }
             } else {
-              console.error("[Push] REST registration failed:", result.error);
-              Alert.alert("Error de Registro", "No se pudo guardar el token: " + (result.error ?? "Error desconocido"));
+              const text = await res.text();
+              console.warn("[Push] REST registration returned non-JSON:", text);
             }
           } else {
             console.warn("[Push] getExpoPushTokenAsync returned no data.");
           }
         } catch (err: any) {
           console.warn("[Push] Could not register push token after login:", err);
-          Alert.alert("Error de Registro", "No se pudo obtener el token de notificaciones: " + (err?.message ?? "Error desconocido"));
         }
       })();
 
