@@ -17,6 +17,20 @@ import { api, queryClient } from "~/utils/api";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getBaseUrl } from "~/utils/base-url";
 
+const resolvePhotoUrl = (url: string | null | undefined): string | null => {
+  if (!url) return null;
+  if (
+    url.startsWith("http") ||
+    url.startsWith("file:") ||
+    url.startsWith("ph:") ||
+    url.startsWith("data:")
+  ) {
+    return url;
+  }
+  const path = url.startsWith("/") ? url : `/${url}`;
+  return `${getBaseUrl()}${path}`;
+};
+
 const PRIMARY = "#4aa19b";
 const DARK = "#0f172a";
 const MUTED = "#64748b";
@@ -462,9 +476,9 @@ export default function ProveedorJobScreen() {
 
         {/* Incident photo */}
         <View style={styles.photoWrapper}>
-          {activeIncident.photoUrl ? (
+          {resolvePhotoUrl(activeIncident.photoUrl) ? (
             <Image
-              source={{ uri: activeIncident.photoUrl }}
+              source={{ uri: resolvePhotoUrl(activeIncident.photoUrl)! }}
               style={styles.photo}
               resizeMode="cover"
             />

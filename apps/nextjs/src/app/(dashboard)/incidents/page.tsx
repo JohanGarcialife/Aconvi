@@ -42,8 +42,8 @@ function Timeline({ status }: { status: string }) {
   return (
     <div className="flex items-center gap-0 my-5">
       {STEPS.map((step, i) => {
-        const done = idx > i;
-        const active = idx === i;
+        const done = idx > i || (idx === i && i === STEPS.length - 1);
+        const active = idx === i && i < STEPS.length - 1;
         const label = STATUS_LABEL[step]?.label ?? step;
         return (
           <div key={step} className="flex items-center flex-1 last:flex-none">
@@ -550,7 +550,7 @@ export default function IncidentsPage() {
                 <div className="flex items-center gap-2 shrink-0">
                   <StatusBadge status={selected.status} />
                   {selected.status === "RESUELTA" && (
-                    <Link href={`/incidents/validate?id=${selected.id}`}
+                    <Link href={`/incidents/validate?incidentId=${selected.id}`}
                       className="flex items-center gap-1 rounded-lg bg-teal-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-teal-600">
                       Validar <ArrowRight size={12} />
                     </Link>

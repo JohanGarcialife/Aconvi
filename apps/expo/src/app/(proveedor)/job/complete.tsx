@@ -21,6 +21,8 @@ import {
   AppStateStatus,
   TextInput,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, Stack, useLocalSearchParams } from "expo-router";
@@ -187,6 +189,25 @@ export default function CompleteJobScreen() {
 
   const [photoBase64, setPhotoBase64] = useState<string | null>(null);
 
+  // ─── Upload photo to dedicated endpoint (avoids large tRPC body) ─────────
+  const uploadPhotoToServer = async (base64Data: string): Promise<string | null> => {
+    try {
+      const { getBaseUrl } = await import("~/utils/base-url");
+      const res = await fetch(`${getBaseUrl()}/api/upload-photo`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ base64: base64Data }),
+      });
+      if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+      const json = await res.json() as { url?: string; error?: string };
+      if (!json.url) throw new Error(json.error ?? "No URL returned");
+      return json.url;
+    } catch (err) {
+      console.error("[complete] uploadPhotoToServer error:", err);
+      return null;
+    }
+  };
+
   // ─── Cámara ───────────────────────────────────────────────────────────────
   const handlePickPhoto = async (useCamera: boolean) => {
     const permission = useCamera
@@ -277,7 +298,7 @@ export default function CompleteJobScreen() {
         providerId,
         tenantId: DEMO_TENANT_ID,
         notes: notes || "Trabajo completado",
-        photoUri: photoBase64, // Guardamos la foto serializada en la cola offline
+        photoUri: photoBase64,
         createdAt: Date.now(),
       };
       await addToQueue(job);
@@ -297,13 +318,20 @@ export default function CompleteJobScreen() {
         }) }],
       );
     } else {
-      // ── Online: enviar directamente ──────────────────────────────────
+      // ── Online: upload photo first, then send only the URL via tRPC ──
+      // This avoids sending a large base64 payload through tRPC (which can hit
+      // Next.js 4 MB body limit and cause a JSON parse error on the client).
+      const uploadedUrl = await uploadPhotoToServer(photoBase64);
+      if (!uploadedUrl) {
+        Alert.alert("Error al subir foto", "No se pudo subir la foto. Verifica tu conexión e inténtalo de nuevo.");
+        return;
+      }
       completeMutation.mutate({
         id: incidentId,
         tenantId: DEMO_TENANT_ID,
         providerId,
         completionNote: notes || "Trabajo completado satisfactoriamente",
-        finalPhotoUrl: photoBase64,
+        finalPhotoUrl: uploadedUrl,
       });
     }
   };
@@ -314,6 +342,11 @@ export default function CompleteJobScreen() {
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
       <Stack.Screen options={{ title: "Cerrar trabajo", headerBackTitle: "Regresar" }} />
 
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+      >
       <ScrollView
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
@@ -414,6 +447,7 @@ export default function CompleteJobScreen() {
             : "El vecino recibirá una notificación cuando valides el trabajo."}
         </Text>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
