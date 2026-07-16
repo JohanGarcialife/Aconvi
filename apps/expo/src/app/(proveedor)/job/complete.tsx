@@ -26,7 +26,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, Stack, useLocalSearchParams } from "expo-router";
-import * as ImagePicker from "expo-image-picker";
+import * as ImagePicker from "~/utils/safe-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import NetInfo from "~/utils/safe-netinfo";
 import * as FileSystem from "expo-file-system/legacy";
