@@ -2,7 +2,7 @@ import { QueryClient, onlineManager } from "@tanstack/react-query";
 import { createTRPCClient, httpBatchLink, loggerLink } from "@trpc/client";
 import { createTRPCOptionsProxy } from "@trpc/tanstack-react-query";
 import superjson from "superjson";
-import NetInfo from "@react-native-community/netinfo";
+import NetInfo from "./safe-netinfo";
 
 import type { AppRouter } from "@acme/api";
 

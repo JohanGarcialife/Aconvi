@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, Stack, useLocalSearchParams } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import NetInfo from "@react-native-community/netinfo";
+import NetInfo from "~/utils/safe-netinfo";
 import { api, queryClient } from "~/utils/api";
 import { useMutation } from "@tanstack/react-query";
 
