@@ -11,6 +11,8 @@ import {
   Image,
   Keyboard,
   Animated,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -273,13 +275,16 @@ export default function NewIncidentScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* automaticallyAdjustKeyboardInsets handles keyboard safely with edge-to-edge mode */}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior="padding"
+        keyboardVerticalOffset={0}
+      >
       <ScrollView
         ref={scrollRef}
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets={true}
       >
         {/* ── Title ──────────────────────────────────────────────────────── */}
         <Text style={styles.pageTitle}>¿Qué ocurre?</Text>
@@ -388,6 +393,7 @@ export default function NewIncidentScreen() {
           )}
         </TouchableOpacity>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

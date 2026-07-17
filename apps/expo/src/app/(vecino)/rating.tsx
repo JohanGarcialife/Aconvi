@@ -9,6 +9,8 @@ import {
   ActivityIndicator,
   Image,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
@@ -114,11 +116,14 @@ export default function RatingScreen() {
     <SafeAreaView style={s.safe} edges={["top", "bottom"]}>
       <Stack.Screen options={{ headerShown: false }} />
 
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "padding"}
+      >
       <ScrollView
         contentContainerStyle={s.scroll}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets={true}
       >
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <View style={s.headerSection}>
@@ -265,6 +270,7 @@ export default function RatingScreen() {
 
         <Text style={s.privacyNote}>🔒 Tu evaluación es anónima y segura</Text>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

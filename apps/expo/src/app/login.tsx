@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   Image,
   Alert,
@@ -141,11 +143,13 @@ export default function LoginScreen() {
   };
 
   return (
+    <KeyboardAvoidingView
+      style={styles.root}
+      behavior={Platform.OS === "ios" ? "padding" : "padding"}
+    >
       <ScrollView
-        style={styles.root}
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets={true}
       >
         {/* Logo */}
         <View style={styles.logoWrap}>
@@ -199,6 +203,7 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
