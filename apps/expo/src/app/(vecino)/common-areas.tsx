@@ -9,6 +9,8 @@ import {
   Modal,
   TextInput,
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -126,6 +128,10 @@ function BookingModal({
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "padding"}
+      >
       <View style={styles.modalContainer}>
         {/* Header */}
         <View style={styles.modalHeader}>
@@ -231,6 +237,7 @@ function BookingModal({
           </View>
         )}
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

@@ -85,6 +85,7 @@ export default function CompleteJobScreen() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isReadingPhoto, setIsReadingPhoto] = useState(false);
   const appState = useRef(AppState.currentState);
+  const scrollRef = useRef<ScrollView>(null);
 
   // ─── Fetch incident details ──────────────────────────────────────────────────
   const { data: incident } = useQuery({
@@ -348,6 +349,7 @@ export default function CompleteJobScreen() {
         keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -408,6 +410,12 @@ export default function CompleteJobScreen() {
           onChangeText={setNotes}
           textAlignVertical="top"
           maxLength={500}
+          onFocus={() => {
+            // Scroll to end so the TextInput + button are visible above keyboard
+            setTimeout(() => {
+              scrollRef.current?.scrollToEnd({ animated: true });
+            }, 150);
+          }}
         />
 
         {/* Checklist */}
