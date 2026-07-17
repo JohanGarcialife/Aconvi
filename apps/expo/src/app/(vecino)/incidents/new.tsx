@@ -202,6 +202,25 @@ export default function NewIncidentScreen() {
     }
     setCategoryError(false);
 
+    // ─── Upload photo to dedicated endpoint (avoids large tRPC body) ─────────
+    const uploadPhotoToServer = async (base64Data: string): Promise<string | null> => {
+      try {
+        const { getBaseUrl } = await import("~/utils/base-url");
+        const res = await fetch(`${getBaseUrl()}/api/upload-photo`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ base64: base64Data }),
+        });
+        if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+        const json = await res.json() as { url?: string; error?: string };
+        if (!json.url) throw new Error(json.error ?? "No URL returned");
+        return json.url;
+      } catch (err) {
+        console.error("[new] uploadPhotoToServer error:", err);
+        return null;
+      }
+    };
+
     const catLabel = CATEGORIES.find((c) => c.id === selectedCategory)?.label ?? "Incidencia";
     const cleanDesc = sanitizeText(description.trim());
     const finalTitle = cleanDesc
@@ -211,15 +230,22 @@ export default function NewIncidentScreen() {
 
     // Read base64 from disk ONLY at submit time — never stored in React state
     // or React Query cache to avoid OOM when persist-client serializes to AsyncStorage.
-    let photoUrl: string | undefined;
+    let finalPhotoUrl: string | undefined;
     if (photoUri) {
       try {
         const b64 = await FileSystem.readAsStringAsync(photoUri, {
           encoding: "base64" as const,
         });
-        photoUrl = `data:image/jpeg;base64,${b64}`;
+        const base64Payload = `data:image/jpeg;base64,${b64}`;
+        // Upload photo to server first
+        const uploadedUrl = await uploadPhotoToServer(base64Payload);
+        if (!uploadedUrl) {
+          Alert.alert("Error al subir foto", "No se pudo subir la foto del reporte. Verifica tu conexión e inténtalo de nuevo.");
+          return;
+        }
+        finalPhotoUrl = uploadedUrl;
       } catch (err) {
-        console.warn("Could not read photo file:", err);
+        console.warn("Could not process photo file:", err);
       }
     }
 
@@ -229,7 +255,7 @@ export default function NewIncidentScreen() {
       description: finalDescription,
       category: selectedCategory,
       priority: "MEDIA",
-      ...(photoUrl ? { photoUrl } : {}),
+      ...(finalPhotoUrl ? { photoUrl: finalPhotoUrl } : {}),
       ...(userId ? { reporterId: userId } : {}),
     });
   };
