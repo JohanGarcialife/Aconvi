@@ -1,20 +1,3 @@
-import { NativeModules } from "react-native";
-
-// Mock RNCNetInfo on NativeModules if it doesn't exist
-if (!NativeModules.RNCNetInfo) {
-  NativeModules.RNCNetInfo = {
-    getCurrentState: () =>
-      Promise.resolve({
-        type: "wifi",
-        isConnected: true,
-        isInternetReachable: true,
-        details: { isConnectionExpensive: false },
-      }),
-    addListener: () => {},
-    removeListeners: () => {},
-  };
-}
-
 let NetInfo: any;
 
 try {
