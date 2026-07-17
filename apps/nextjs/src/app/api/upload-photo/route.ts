@@ -49,17 +49,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No base64 provided" }, { status: 400 });
     }
 
+    // Try to save to filesystem (works locally and on self-hosted servers)
     const url = saveBase64Image(body.base64);
-    if (!url) {
-      return NextResponse.json({ error: "Failed to save image" }, { status: 500 });
+    if (url) {
+      return NextResponse.json({ url });
     }
 
-    return NextResponse.json({ url });
+    // Fallback for serverless environments (Vercel) where filesystem is read-only:
+    // Return the base64 data URL directly so the client can store it.
+    // The data URL will be stored as finalPhotoUrl in the database and renders
+    // correctly via <img src="data:..."> in browsers and React Native Image.
+    if (body.base64.startsWith("data:image/")) {
+      return NextResponse.json({ url: body.base64 });
+    }
+
+    return NextResponse.json({ error: "Failed to save image" }, { status: 500 });
   } catch (err) {
     console.error("[upload-photo] Error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
+
 
 // OPTIONS for CORS
 export async function OPTIONS() {

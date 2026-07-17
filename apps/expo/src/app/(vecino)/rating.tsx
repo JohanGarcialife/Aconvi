@@ -118,6 +118,7 @@ export default function RatingScreen() {
         contentContainerStyle={s.scroll}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets={true}
       >
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <View style={s.headerSection}>
