@@ -17,6 +17,7 @@ import { api } from "~/utils/api";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { getBaseUrl } from "~/utils/base-url";
+import NewIncidentScreen from "./new";
 
 /** Converts a relative /uploads/... path to an absolute URL. Already-absolute URLs are returned unchanged. */
 const resolvePhotoUrl = (url: string | null | undefined): string | null => {
@@ -115,9 +116,15 @@ export default function IncidentDetailScreen() {
   const [activeTab, setActiveTab] = useState<"seguimiento" | "detalles">("seguimiento");
   const [notifEnabled, setNotifEnabled] = useState(true);
 
+  if (id === "new") {
+    return <NewIncidentScreen />;
+  }
+
+  const isUuid = !!id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
   const { data: incident, isLoading } = useQuery({
     ...api.incident.byId.queryOptions({ id: id as string, tenantId: TENANT_ID }),
-    enabled: !!id,
+    enabled: isUuid,
     refetchInterval: 300_000,
   });
 
