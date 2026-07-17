@@ -545,7 +545,7 @@ const styles = StyleSheet.create({
   countdownLabel: { fontSize: 14, color: MUTED, textAlign: "center", marginBottom: 6 },
   countdown: { fontSize: 44, fontWeight: "800", color: URGENT_RED, letterSpacing: 2, fontVariant: ["tabular-nums"], marginBottom: 20 },
   photoWrapper: { width: "100%", borderRadius: 16, overflow: "hidden", marginBottom: 16 },
-  photo: { width: "100%", aspectRatio: 4 / 3, borderRadius: 16 },
+  photo: { width: "100%", height: 220, borderRadius: 16 },
   photoPlaceholder: { backgroundColor: "#f1f5f9", alignItems: "center", justifyContent: "center" },
   description: { fontSize: 15, color: MUTED, textAlign: "center", marginBottom: 20, lineHeight: 22 },
   acceptButton: { flexDirection: "row", backgroundColor: PRIMARY, borderRadius: 14, paddingVertical: 18, paddingHorizontal: 32, alignItems: "center", justifyContent: "center", gap: 10, width: "100%", marginBottom: 12, shadowColor: PRIMARY, shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
