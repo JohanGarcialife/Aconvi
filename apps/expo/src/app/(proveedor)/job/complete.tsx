@@ -38,6 +38,31 @@ const DARK = "#0f172a";
 const MUTED = "#64748b";
 const BORDER = "#e2e8f0";
 
+function useElapsedTimer(startTimestamp?: string | Date | null) {
+  const getElapsedSeconds = () => {
+    if (!startTimestamp) return 0;
+    const startMs = new Date(startTimestamp).getTime();
+    const nowMs = Date.now();
+    return Math.max(0, Math.floor((nowMs - startMs) / 1000));
+  };
+
+  const [elapsed, setElapsed] = useState(getElapsedSeconds);
+
+  useEffect(() => {
+    setElapsed(getElapsedSeconds());
+    if (!startTimestamp) return;
+    const interval = setInterval(() => {
+      setElapsed(getElapsedSeconds());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [startTimestamp]);
+
+  const h = Math.floor(elapsed / 3600).toString().padStart(2, "0");
+  const m = Math.floor((elapsed % 3600) / 60).toString().padStart(2, "0");
+  const s = (elapsed % 60).toString().padStart(2, "0");
+  return `${h}:${m}:${s}`;
+}
+
 const OFFLINE_QUEUE_KEY = "aconvi_offline_complete_queue";
 const DEMO_TENANT_ID = "org_aconvi_demo";
 
@@ -549,4 +574,19 @@ const styles = StyleSheet.create({
   },
   submitButtonText: { color: "#fff", fontSize: 17, fontWeight: "700" },
   offlineNote: { fontSize: 11, color: MUTED, textAlign: "center", lineHeight: 16 },
+  timerBadge: {
+    backgroundColor: "#ecfdf5",
+    borderColor: "#a7f3d0",
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    marginBottom: 16,
+    alignSelf: "flex-start",
+  },
+  timerBadgeText: {
+    color: "#047857",
+    fontSize: 13,
+    fontWeight: "700",
+  },
 });
