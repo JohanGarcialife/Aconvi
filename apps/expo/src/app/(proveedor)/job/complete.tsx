@@ -364,6 +364,13 @@ export default function CompleteJobScreen() {
 
   const isLoading = completeMutation.isPending || isSyncing || isReadingPhoto;
 
+  const arrivalTimestamp = (incident as any)?.startedAt ?? 
+    (incident as any)?.history?.find((h: any) => h.action === "ARRIVED")?.createdAt ??
+    (incident as any)?.assignedAt ??
+    (incident as any)?.createdAt;
+
+  const elapsedTime = useElapsedTimer(arrivalTimestamp);
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
       <Stack.Screen options={{ title: "Cerrar trabajo", headerBackTitle: "Regresar" }} />
@@ -396,6 +403,12 @@ export default function CompleteJobScreen() {
                 : `☁️ ${pendingCount} trabajo${pendingCount > 1 ? "s" : ""} pendiente${pendingCount > 1 ? "s" : ""} de subir. Pulsa para sincronizar.`}
             </Text>
           </TouchableOpacity>
+        )}
+
+        {arrivalTimestamp && (
+          <View style={{ backgroundColor: "#F0FDF4", paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginBottom: 16, borderWidth: 1, borderColor: "#BBF7D0", alignSelf: "flex-start" }}>
+            <Text style={{ color: "#166534", fontWeight: "700", fontSize: 15 }}>⏱️ Tiempo de intervención: {elapsedTime}</Text>
+          </View>
         )}
 
         <Text style={styles.title}>Foto del trabajo finalizado</Text>

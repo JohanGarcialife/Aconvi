@@ -68,9 +68,19 @@ export default function JobInProgressScreen() {
     })
   );
 
+  const isArrived = incident?.status === "EN_CURSO" || !!(incident as any)?.startedAt || arrivedMutation.isSuccess;
+
   const handleArrived = async () => {
+    if (isArrived) {
+      // Provider is already on site with live timer running — proceed to photo upload & completion
+      router.push({
+        pathname: "/(proveedor)/job/complete",
+        params: { incidentId: params.incidentId, providerId: params.providerId },
+      });
+      return;
+    }
+
     setArrivedLoading(true);
-    // Call backend to log arrival (push to vecino + history entry)
     if (params.incidentId && params.providerId) {
       try {
         await arrivedMutation.mutateAsync({
@@ -78,10 +88,7 @@ export default function JobInProgressScreen() {
           tenantId: DEMO_TENANT_ID,
           providerId: params.providerId,
         });
-        router.push({
-          pathname: "/(proveedor)/job/complete",
-          params: { incidentId: params.incidentId, providerId: params.providerId },
-        });
+        // Stay on screen to show live timer!
       } catch {
         // Handled by onError Alert
       }
@@ -96,25 +103,26 @@ export default function JobInProgressScreen() {
 
   // Find arrival timestamp from startedAt or history
   const arrivalTimestamp = (incident as any)?.startedAt ?? 
-    (incident as any)?.history?.find((h: any) => h.action === "ARRIVED")?.createdAt;
+    (incident as any)?.history?.find((h: any) => h.action === "ARRIVED")?.createdAt ??
+    (isArrived ? new Date() : null);
 
   const elapsedTime = useElapsedTimer(arrivalTimestamp);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
-      <Stack.Screen options={{ title: "En camino", headerBackTitle: "Regresar" }} />
+      <Stack.Screen options={{ title: isArrived ? "Intervención en curso" : "En camino", headerBackTitle: "Regresar" }} />
 
       <View style={styles.container}>
         {/* Status illustration */}
         <View style={styles.illustration}>
-          <Text style={styles.illustrationEmoji}>🚗</Text>
+          <Text style={styles.illustrationEmoji}>{isArrived ? "🔧" : "🚗"}</Text>
           <View style={styles.illustrationDots}>
             {[0, 1, 2, 3, 4].map((i) => (
               <View
                 key={i}
                 style={[
                   styles.dot,
-                  i < 3 && { backgroundColor: PRIMARY },
+                  i < (isArrived ? 5 : 3) && { backgroundColor: PRIMARY },
                   { opacity: 1 - i * 0.15 },
                 ]}
               />
@@ -123,10 +131,10 @@ export default function JobInProgressScreen() {
           <Text style={styles.illustrationEmoji}>🏢</Text>
         </View>
 
-        <Text style={styles.title}>OT en curso</Text>
+        <Text style={styles.title}>{isArrived ? "Intervención en sitio" : "OT en curso"}</Text>
         {arrivalTimestamp && (
-          <View style={{ backgroundColor: "#F0FDF4", paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20, marginBottom: 12, borderWidth: 1, borderColor: "#BBF7D0" }}>
-            <Text style={{ color: "#166534", fontWeight: "700", fontSize: 15 }}>⏱️ Tiempo de intervención: {elapsedTime}</Text>
+          <View style={{ backgroundColor: "#F0FDF4", paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginBottom: 12, borderWidth: 1, borderColor: "#BBF7D0" }}>
+            <Text style={{ color: "#166534", fontWeight: "700", fontSize: 16 }}>⏱️ Tiempo de intervención: {elapsedTime}</Text>
           </View>
         )}
         <Text style={styles.subtitle}>
@@ -152,7 +160,7 @@ export default function JobInProgressScreen() {
             done: true, 
             label: `Estimación enviada (${incident?.estimatedCost ? `${incident.estimatedCost} €` : "155 €"})` 
           },
-          { done: false, label: "Llegada confirmada" },
+          { done: isArrived, label: "Llegada confirmada" },
           { done: false, label: "Trabajo finalizado" },
         ].map((step, i) => (
           <View key={i} style={styles.stepRow}>
@@ -169,7 +177,7 @@ export default function JobInProgressScreen() {
 
         {/* CTA */}
         <TouchableOpacity
-          style={[styles.arrivedButton, arrivedLoading && { opacity: 0.7 }]}
+          style={[styles.arrivedButton, arrivedLoading && { opacity: 0.7 }, isArrived && { backgroundColor: PRIMARY }]}
           onPress={handleArrived}
           disabled={arrivedLoading}
           activeOpacity={0.85}
@@ -177,7 +185,9 @@ export default function JobInProgressScreen() {
           {arrivedLoading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.arrivedButtonText}>📍 Ya estoy aquí</Text>
+            <Text style={styles.arrivedButtonText}>
+              {isArrived ? "📸 Finalizar trabajo y subir foto" : "📍 Ya estoy aquí"}
+            </Text>
           )}
         </TouchableOpacity>
 
