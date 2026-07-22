@@ -19,6 +19,7 @@ async function broadcastToWS(event: string, data: unknown): Promise<void> {
         "x-internal-secret": process.env.WS_INTERNAL_SECRET ?? "aconvi-dev",
       },
       body: JSON.stringify({ event, data }),
+      signal: AbortSignal.timeout(2000),
     });
   } catch {
     // WS server may be down (dev) — non-fatal

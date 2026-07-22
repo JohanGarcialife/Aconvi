@@ -317,14 +317,18 @@ export const incidentRouter = createTRPCRouter({
         })();
       }
 
-      // Log history
-      await ctx.db.insert(incidentHistory).values({
-        incidentId: updated.id,
-        actorName: "Administrador / Agente",
-        action: "ASSIGNED",
-        newStatus: "EN_REVISION",
-        comment: "Se asignó un proveedor",
-      });
+      // Log history safely
+      try {
+        await ctx.db.insert(incidentHistory).values({
+          incidentId: updated.id,
+          actorName: "Administrador / Agente",
+          action: "ASSIGNED",
+          newStatus: "EN_REVISION",
+          comment: "Se asignó un proveedor",
+        });
+      } catch (err) {
+        console.error("[assignProvider] Error inserting history:", err);
+      }
 
       // Fire-and-forget: WS event to tenant room
       void emitWebSocketEvent(input.tenantId, "incident-updated", updated);

@@ -53,6 +53,7 @@ export async function emitWebSocketEvent(
         "x-internal-secret": secret,
       },
       body: JSON.stringify({ event: wsEvent, data: wsData }),
+      signal: AbortSignal.timeout(2000),
     });
 
     if (!res.ok) {
