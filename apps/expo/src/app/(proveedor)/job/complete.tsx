@@ -162,7 +162,7 @@ export default function CompleteJobScreen() {
 
   // ─── NetInfo: detectar recuperación de conexión ───────────────────────────
   useEffect(() => {
-    const unsubscribe = NetInfo.addEventListener((state) => {
+    const unsubscribe = NetInfo.addEventListener((state: any) => {
       const connected = !!state.isConnected && !!state.isInternetReachable;
       setIsOffline(!connected);
       if (connected) {

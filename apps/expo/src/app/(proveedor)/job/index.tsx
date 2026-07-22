@@ -1,3 +1,4 @@
+import { AppState } from "react-native";
 import { useState, useEffect } from "react";
 import {
   View,
@@ -40,14 +41,29 @@ const URGENT_RED = "#ef4444";
 const DEMO_PROVIDER_ID = ""; // will be populated from query
 const DEMO_TENANT_ID = "org_aconvi_demo";
 
-// ─── Countdown timer ──────────────────────────────────────────────────────────
-function useCountdown(initialSeconds: number) {
-  const [seconds, setSeconds] = useState(initialSeconds);
+// ─── Dynamic Countdown Timer based on Server Timestamp ──────────────────────
+function useDynamicCountdown(targetTimestamp?: string | Date | null, durationMinutes = 120) {
+  const getRemainingSeconds = () => {
+    if (!targetTimestamp) return 7200; // default 2h fallback
+    const startMs = new Date(targetTimestamp).getTime();
+    const targetMs = startMs + durationMinutes * 60 * 1000;
+    const nowMs = Date.now();
+    const diffSec = Math.max(0, Math.floor((targetMs - nowMs) / 1000));
+    return diffSec;
+  };
+
+  const [seconds, setSeconds] = useState(getRemainingSeconds);
+
   useEffect(() => {
-    if (seconds <= 0) return;
-    const timer = setInterval(() => setSeconds((s) => s - 1), 1000);
+    setSeconds(getRemainingSeconds());
+    const timer = setInterval(() => {
+      const remaining = getRemainingSeconds();
+      setSeconds(remaining);
+      if (remaining <= 0) clearInterval(timer);
+    }, 1000);
     return () => clearInterval(timer);
-  }, [seconds]);
+  }, [targetTimestamp]);
+
   const h = Math.floor(seconds / 3600).toString().padStart(2, "0");
   const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, "0");
   const s = (seconds % 60).toString().padStart(2, "0");
@@ -66,9 +82,9 @@ function priorityLabel(p: string) {
 function statusLabelAndColor(status: string) {
   switch (status) {
     case "RECIBIDA":
-      return { label: "Recibida", color: "#3b82f6", bgColor: "#eff6ff" };
+      return { label: "Sin asignar", color: "#3b82f6", bgColor: "#eff6ff" };
     case "EN_REVISION":
-      return { label: "En Revisión", color: "#d97706", bgColor: "#fef3c7" };
+      return { label: "Asignada", color: "#d97706", bgColor: "#fef3c7" };
     case "AGENDADA":
       return { label: "Agendada", color: "#a855f7", bgColor: "#faf5ff" };
     case "EN_CURSO":
@@ -184,7 +200,17 @@ export default function ProveedorJobScreen() {
     })
   );
 
-  const countdown = useCountdown(1 * 3600 + 42 * 60 + 5);
+  // Auto refresh when coming back to foreground
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") {
+        void refetchIncidents();
+      }
+    });
+    return () => subscription.remove();
+  }, [refetchIncidents]);
+
+  const countdown = useDynamicCountdown(activeIncident?.assignedAt ?? activeIncident?.createdAt);
 
   const handleAccept = () => {
     if (!activeIncident || !providerId) return;
@@ -469,7 +495,7 @@ export default function ProveedorJobScreen() {
         <View style={styles.divider} />
 
         {/* Countdown */}
-        <Text style={styles.countdownLabel}>Tiempo para aceptar</Text>
+        <Text style={styles.countdownLabel}>Tiempo para responder</Text>
         <Text style={[styles.countdown, countdown === "00:00:00" && { color: URGENT_RED }]}>
           {countdown}
         </Text>
@@ -520,14 +546,14 @@ export default function ProveedorJobScreen() {
           ) : (
             <>
               <Text style={styles.acceptButtonIcon}>✓</Text>
-              <Text style={styles.acceptButtonText}>ACEPTAR Y AVISAR</Text>
+              <Text style={styles.acceptButtonText}>ACEPTAR</Text>
             </>
           )}
         </TouchableOpacity>
 
         {/* Decline */}
         <TouchableOpacity style={styles.declineButton} onPress={handleDecline}>
-          <Text style={styles.declineButtonText}>No puedo atenderlo</Text>
+          <Text style={styles.declineButtonText}>No puedo atenderla</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

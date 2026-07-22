@@ -15,7 +15,7 @@ type Status = "RECIBIDA" | "EN_REVISION" | "AGENDADA" | "EN_CURSO" | "RESUELTA" 
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   RECIBIDA:    { label: "Sin asignar",  cls: "bg-amber-50 text-amber-700 border border-amber-200" },
-  EN_REVISION: { label: "En revisión",  cls: "bg-blue-50 text-blue-700 border border-blue-200" },
+  EN_REVISION: { label: "Asignada",     cls: "bg-blue-50 text-blue-700 border border-blue-200" },
   AGENDADA:    { label: "Agendada",     cls: "bg-violet-50 text-violet-700 border border-violet-200" },
   EN_CURSO:    { label: "En curso",     cls: "bg-cyan-50 text-cyan-700 border border-cyan-200" },
   RESUELTA:    { label: "Resuelta",     cls: "bg-emerald-50 text-emerald-700 border border-emerald-200" },
@@ -668,26 +668,51 @@ export default function IncidentsPage() {
                   {(selected.history ?? []).length > 1 && (
                     <div className="absolute left-2 top-2 bottom-4 w-0.5 bg-slate-200" />
                   )}
-                  {(selected.history ?? []).map((h: any) => (
-                    <div key={h.id} className="relative flex gap-3">
-                      <div className={`absolute -left-3 top-1 h-3 w-3 rounded-full border-2 border-white z-10
-                        ${h.action === "CREATED" ? "bg-blue-500" : h.action === "ASSIGNED" ? "bg-violet-500" : h.action === "COMPLETED" ? "bg-emerald-500" : "bg-teal-500"}`} />
-                      <div>
-                        <p className="text-sm font-semibold text-slate-800">
-                          {h.actorName}{" "}
-                          <span className="font-normal text-slate-500">
-                            {h.action === "CREATED" ? "reportó la incidencia" : `→ ${h.newStatus}`}
-                          </span>
-                        </p>
-                        {h.comment && (
-                          <p className="mt-1 inline-block rounded-lg border border-slate-100 bg-slate-50 px-3 py-1.5 text-xs text-slate-600">{h.comment}</p>
-                        )}
-                        <p className="mt-0.5 text-xs text-slate-400">
-                          {new Date(h.createdAt).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                        </p>
+                  {(selected.history ?? []).map((h: any) => {
+                    const statusName = STATUS_LABEL[h.newStatus]?.label ?? h.newStatus;
+                    let actionText = `→ ${statusName}`;
+                    let dotColor = "bg-teal-500";
+
+                    if (h.action === "CREATED") {
+                      actionText = "reportó la incidencia";
+                      dotColor = "bg-blue-500";
+                    } else if (h.action === "ASSIGNED") {
+                      actionText = "asignó un proveedor";
+                      dotColor = "bg-violet-500";
+                    } else if (h.action === "PROVIDER_ACCEPTED") {
+                      actionText = "aceptó el trabajo (Agendada)";
+                      dotColor = "bg-purple-500";
+                    } else if (h.action === "ARRIVED") {
+                      actionText = "confirmó llegada en el sitio (En curso)";
+                      dotColor = "bg-cyan-500";
+                    } else if (h.action === "COMPLETED") {
+                      actionText = "finalizó el trabajo (Resuelta)";
+                      dotColor = "bg-emerald-500";
+                    } else if (h.action === "RATED") {
+                      actionText = "valoró el servicio";
+                      dotColor = "bg-amber-500";
+                    }
+
+                    return (
+                      <div key={h.id} className="relative flex gap-3">
+                        <div className={`absolute -left-3 top-1 h-3 w-3 rounded-full border-2 border-white z-10 ${dotColor}`} />
+                        <div>
+                          <p className="text-sm font-semibold text-slate-800">
+                            {h.actorName}{" "}
+                            <span className="font-normal text-slate-500">
+                              {actionText}
+                            </span>
+                          </p>
+                          {h.comment && (
+                            <p className="mt-1 inline-block rounded-lg border border-slate-100 bg-slate-50 px-3 py-1.5 text-xs text-slate-600">{h.comment}</p>
+                          )}
+                          <p className="mt-0.5 text-xs text-slate-400">
+                            {new Date(h.createdAt).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>

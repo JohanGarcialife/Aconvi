@@ -114,6 +114,7 @@ export const incident = pgTable("incident", (t) => ({
   rating: t.integer("rating"),
   ratingComment: t.text("rating_comment"),
   assignedAt: t.timestamp("assigned_at", { mode: "date", withTimezone: true }),
+  startedAt: t.timestamp("started_at", { mode: "date", withTimezone: true }),
   resolvedAt: t.timestamp("resolved_at", { mode: "date", withTimezone: true }),
   rejectedAt: t.timestamp("rejected_at", { mode: "date", withTimezone: true }),
   createdAt: t.timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),

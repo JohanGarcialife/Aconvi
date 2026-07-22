@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  AppState,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, Stack, useLocalSearchParams } from "expo-router";
@@ -17,6 +18,31 @@ const DARK = "#0f172a";
 const MUTED = "#64748b";
 const BORDER = "#e2e8f0";
 const DEMO_TENANT_ID = "org_aconvi_demo";
+
+function useElapsedTimer(startTimestamp?: string | Date | null) {
+  const getElapsedSeconds = () => {
+    if (!startTimestamp) return 0;
+    const startMs = new Date(startTimestamp).getTime();
+    const nowMs = Date.now();
+    return Math.max(0, Math.floor((nowMs - startMs) / 1000));
+  };
+
+  const [elapsed, setElapsed] = useState(getElapsedSeconds);
+
+  useEffect(() => {
+    setElapsed(getElapsedSeconds());
+    if (!startTimestamp) return;
+    const interval = setInterval(() => {
+      setElapsed(getElapsedSeconds());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [startTimestamp]);
+
+  const h = Math.floor(elapsed / 3600).toString().padStart(2, "0");
+  const m = Math.floor((elapsed % 3600) / 60).toString().padStart(2, "0");
+  const s = (elapsed % 60).toString().padStart(2, "0");
+  return `${h}:${m}:${s}`;
+}
 
 export default function JobInProgressScreen() {
   const router = useRouter();
@@ -68,6 +94,12 @@ export default function JobInProgressScreen() {
     setArrivedLoading(false);
   };
 
+  // Find arrival timestamp from startedAt or history
+  const arrivalTimestamp = (incident as any)?.startedAt ?? 
+    (incident as any)?.history?.find((h: any) => h.action === "ARRIVED")?.createdAt;
+
+  const elapsedTime = useElapsedTimer(arrivalTimestamp);
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
       <Stack.Screen options={{ title: "En camino", headerBackTitle: "Regresar" }} />
@@ -92,6 +124,11 @@ export default function JobInProgressScreen() {
         </View>
 
         <Text style={styles.title}>OT en curso</Text>
+        {arrivalTimestamp && (
+          <View style={{ backgroundColor: "#F0FDF4", paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20, marginBottom: 12, borderWidth: 1, borderColor: "#BBF7D0" }}>
+            <Text style={{ color: "#166534", fontWeight: "700", fontSize: 15 }}>⏱️ Tiempo de intervención: {elapsedTime}</Text>
+          </View>
+        )}
         <Text style={styles.subtitle}>
           {incident?.organization?.name ?? "Residencial El Lago"}{"\n"}Av. de Andalucía, 105
         </Text>

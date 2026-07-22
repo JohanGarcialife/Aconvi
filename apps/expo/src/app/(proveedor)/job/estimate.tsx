@@ -248,7 +248,7 @@ export default function EstimateScreen() {
   // ─── NetInfo listener ─────────────────────────────────────────────────────
   useEffect(() => {
     loadEstimateQueue().then((q) => setPendingCount(q.length));
-    const unsub = NetInfo.addEventListener((state) => {
+    const unsub = NetInfo.addEventListener((state: any) => {
       const connected = !!state.isConnected && !!state.isInternetReachable;
       setIsOffline(!connected);
       if (connected) void syncEstimateQueue();

@@ -18,7 +18,7 @@ import { getBaseUrl } from "./base-url";
 onlineManager.setOnline(true);
 
 onlineManager.setEventListener((setOnline) => {
-  return NetInfo.addEventListener((state) => {
+  return NetInfo.addEventListener((state: any) => {
     // isConnected !== false covers: true (connected) and null (unknown/checking)
     // We only go offline when isConnected is explicitly false.
     const isOnline = state.isConnected !== false;

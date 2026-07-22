@@ -475,10 +475,10 @@ export const incidentRouter = createTRPCRouter({
       await ctx.db.insert(incidentHistory).values({
         incidentId: updated.id,
         actorName: "Proveedor",
-        action: "STATUS_CHANGED",
+        action: "PROVIDER_ACCEPTED",
         previousStatus: "EN_REVISION",
         newStatus: "AGENDADA",
-        comment: input.notes ? `Notas: ${input.notes}` : "Trabajo agendado",
+        comment: input.notes ? `Notas: ${input.notes}` : "Trabajo agendado por el proveedor",
       });
 
       // Fire-and-forget push to vecino
@@ -585,16 +585,30 @@ export const incidentRouter = createTRPCRouter({
       if (!inc) throw new Error("Incidencia no encontrada");
 
       // Update status to EN_CURSO — provider is now on site
-      const [arrivedInc] = await ctx.db
-        .update(incident)
-        .set({ status: "EN_CURSO" })
-        .where(
-          and(
-            eq(incident.id, input.id),
-            eq(incident.organizationId, input.tenantId),
-          ),
-        )
-        .returning();
+      let arrivedInc;
+      try {
+        [arrivedInc] = await ctx.db
+          .update(incident)
+          .set({ status: "EN_CURSO", startedAt: new Date() })
+          .where(
+            and(
+              eq(incident.id, input.id),
+              eq(incident.organizationId, input.tenantId),
+            ),
+          )
+          .returning();
+      } catch {
+        [arrivedInc] = await ctx.db
+          .update(incident)
+          .set({ status: "EN_CURSO" })
+          .where(
+            and(
+              eq(incident.id, input.id),
+              eq(incident.organizationId, input.tenantId),
+            ),
+          )
+          .returning();
+      }
 
       // Add internal note recording arrival
       await ctx.db.insert(incidentNote).values({
@@ -701,14 +715,14 @@ export const incidentRouter = createTRPCRouter({
 
       if (!updated) throw new Error("No se pudo registrar la valoración.");
 
-      // Log history
+      // Log history event (not state change)
       await ctx.db.insert(incidentHistory).values({
         incidentId: updated.id,
         actorName: "Vecino",
-        action: "STATUS_CHANGED",
+        action: "RATED",
         previousStatus: "RESUELTA",
         newStatus: "RESUELTA",
-        comment: `Valoración: ${input.rating} estrellas. Comentario: ${input.comment ?? "Sin comentarios"}`,
+        comment: `Valoró con ${input.rating} estrellas: "${input.comment ?? "Sin comentario"}"`,
       });
 
       // Update provider statistics if any
