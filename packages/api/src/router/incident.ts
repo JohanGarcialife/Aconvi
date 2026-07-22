@@ -73,6 +73,29 @@ function sanitizeText(str: string): string {
   return str.split('').map(c => map[c] || c).join('');
 }
 
+let columnsEnsured = false;
+async function ensureIncidentColumns(db: any) {
+  if (columnsEnsured) return;
+  try {
+    const { sql } = await import("drizzle-orm");
+    await db.execute(sql`
+      ALTER TABLE incident ADD COLUMN IF NOT EXISTS started_at timestamp with time zone;
+      ALTER TABLE incident ADD COLUMN IF NOT EXISTS final_photo_url text;
+      ALTER TABLE incident ADD COLUMN IF NOT EXISTS category varchar(64) DEFAULT 'otro';
+      ALTER TABLE incident ADD COLUMN IF NOT EXISTS assigned_at timestamp with time zone;
+      ALTER TABLE incident ADD COLUMN IF NOT EXISTS resolved_at timestamp with time zone;
+      ALTER TABLE incident ADD COLUMN IF NOT EXISTS rejected_at timestamp with time zone;
+      ALTER TABLE incident ADD COLUMN IF NOT EXISTS estimated_cost real;
+      ALTER TABLE incident ADD COLUMN IF NOT EXISTS estimated_days integer;
+      ALTER TABLE incident ADD COLUMN IF NOT EXISTS rating integer;
+      ALTER TABLE incident ADD COLUMN IF NOT EXISTS rating_comment text;
+    `);
+    columnsEnsured = true;
+  } catch (err) {
+    console.error("[ensureIncidentColumns] Error running self-healing migration:", err);
+  }
+}
+
 export const incidentRouter = createTRPCRouter({
   // ─── List (public) ────────────────────────────────────────────────────────
   all: publicProcedure
@@ -83,6 +106,8 @@ export const incidentRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
+      await ensureIncidentColumns(ctx.db);
+
       const results = await ctx.db.query.incident.findMany({
         where: and(
           eq(incident.organizationId, input.tenantId),
@@ -112,7 +137,9 @@ export const incidentRouter = createTRPCRouter({
   // ─── Single detail (public) ──────────────────────────────────────────────
   byId: publicProcedure
     .input(z.object({ id: z.string().uuid(), tenantId: z.string().min(1) }))
-    .query(({ ctx, input }) => {
+    .query(async ({ ctx, input }) => {
+      await ensureIncidentColumns(ctx.db);
+
       return ctx.db.query.incident.findFirst({
         where: and(
           eq(incident.id, input.id),
