@@ -1,5 +1,5 @@
 import { AppState } from "react-native";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -173,12 +173,32 @@ export default function ProveedorJobScreen() {
   // State to track selected incident
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
 
+  // Helper to handle incident selection based on its current status
+  const handleSelectIncident = useCallback((i: any) => {
+    if (i.status === "AGENDADA") {
+      router.push({
+        pathname: "/(proveedor)/job/inprogress",
+        params: { incidentId: i.id, providerId: providerId ?? DEMO_PROVIDER_ID },
+      });
+    } else if (i.status === "EN_CURSO") {
+      router.push({
+        pathname: "/(proveedor)/job/complete",
+        params: { incidentId: i.id, providerId: providerId ?? DEMO_PROVIDER_ID },
+      });
+    } else {
+      setSelectedIncidentId(i.id);
+    }
+  }, [router, providerId]);
+
   // Sync selectedIncidentId with router parameter if present
   useEffect(() => {
-    if (incidentId) {
-      setSelectedIncidentId(incidentId);
+    if (incidentId && activeIncidents.length > 0) {
+      const found = activeIncidents.find((i: any) => i.id === incidentId);
+      if (found) {
+        handleSelectIncident(found);
+      }
     }
-  }, [incidentId]);
+  }, [incidentId, activeIncidents, handleSelectIncident]);
 
   // Use the selected active incident, or null if none is selected
   const activeIncident = selectedIncidentId
@@ -370,7 +390,7 @@ export default function ProveedorJobScreen() {
               <TouchableOpacity
                 key={i.id}
                 style={styles.card}
-                onPress={() => setSelectedIncidentId(i.id)}
+                onPress={() => handleSelectIncident(i)}
                 activeOpacity={0.7}
               >
                 <View style={styles.cardHeader}>
