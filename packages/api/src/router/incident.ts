@@ -78,18 +78,25 @@ async function ensureIncidentColumns(db: any) {
   if (columnsEnsured) return;
   try {
     const { sql } = await import("drizzle-orm");
-    await db.execute(sql`
-      ALTER TABLE incident ADD COLUMN IF NOT EXISTS started_at timestamp with time zone;
-      ALTER TABLE incident ADD COLUMN IF NOT EXISTS final_photo_url text;
-      ALTER TABLE incident ADD COLUMN IF NOT EXISTS category varchar(64) DEFAULT 'otro';
-      ALTER TABLE incident ADD COLUMN IF NOT EXISTS assigned_at timestamp with time zone;
-      ALTER TABLE incident ADD COLUMN IF NOT EXISTS resolved_at timestamp with time zone;
-      ALTER TABLE incident ADD COLUMN IF NOT EXISTS rejected_at timestamp with time zone;
-      ALTER TABLE incident ADD COLUMN IF NOT EXISTS estimated_cost real;
-      ALTER TABLE incident ADD COLUMN IF NOT EXISTS estimated_days integer;
-      ALTER TABLE incident ADD COLUMN IF NOT EXISTS rating integer;
-      ALTER TABLE incident ADD COLUMN IF NOT EXISTS rating_comment text;
-    `);
+    const statements = [
+      "ALTER TABLE incident ADD COLUMN IF NOT EXISTS started_at timestamp with time zone;",
+      "ALTER TABLE incident ADD COLUMN IF NOT EXISTS final_photo_url text;",
+      "ALTER TABLE incident ADD COLUMN IF NOT EXISTS category varchar(64) DEFAULT 'otro';",
+      "ALTER TABLE incident ADD COLUMN IF NOT EXISTS assigned_at timestamp with time zone;",
+      "ALTER TABLE incident ADD COLUMN IF NOT EXISTS resolved_at timestamp with time zone;",
+      "ALTER TABLE incident ADD COLUMN IF NOT EXISTS rejected_at timestamp with time zone;",
+      "ALTER TABLE incident ADD COLUMN IF NOT EXISTS estimated_cost real;",
+      "ALTER TABLE incident ADD COLUMN IF NOT EXISTS estimated_days integer;",
+      "ALTER TABLE incident ADD COLUMN IF NOT EXISTS rating integer;",
+      "ALTER TABLE incident ADD COLUMN IF NOT EXISTS rating_comment text;"
+    ];
+    for (const stmt of statements) {
+      try {
+        await db.execute(sql.raw(stmt));
+      } catch (e: any) {
+        console.warn("[ensureIncidentColumns] Statement warning:", e?.message);
+      }
+    }
     columnsEnsured = true;
   } catch (err) {
     console.error("[ensureIncidentColumns] Error running self-healing migration:", err);
@@ -108,30 +115,47 @@ export const incidentRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       await ensureIncidentColumns(ctx.db);
 
-      const results = await ctx.db.query.incident.findMany({
-        where: and(
-          eq(incident.organizationId, input.tenantId),
-          input.status ? eq(incident.status, input.status) : undefined,
-        ),
-        orderBy: desc(incident.createdAt),
-        with: {
-          reporter: { columns: { id: true, name: true, phoneNumber: true } },
-          assignee: { columns: { id: true, name: true } },
-          provider: true,
-          notes: {
-            with: { author: { columns: { id: true, name: true } } },
-            orderBy: (n, { asc }) => asc(n.createdAt),
+      try {
+        const results = await ctx.db.query.incident.findMany({
+          where: and(
+            eq(incident.organizationId, input.tenantId),
+            input.status ? eq(incident.status, input.status) : undefined,
+          ),
+          orderBy: desc(incident.createdAt),
+          with: {
+            reporter: { columns: { id: true, name: true, phoneNumber: true } },
+            assignee: { columns: { id: true, name: true } },
+            provider: true,
+            notes: {
+              with: { author: { columns: { id: true, name: true } } },
+              orderBy: (n, { asc }) => asc(n.createdAt),
+            },
+            history: {
+              orderBy: (h, { asc }) => asc(h.createdAt),
+            },
           },
-          history: {
-            orderBy: (h, { asc }) => asc(h.createdAt),
-          },
-        },
-      });
+        });
 
-      return results.map((r) => ({
-        ...r,
-        photoUrl: r.photoUrl?.startsWith("data:image/") ? null : r.photoUrl,
-      }));
+        return results.map((r) => ({
+          ...r,
+          photoUrl: r.photoUrl?.startsWith("data:image/") ? null : r.photoUrl,
+        }));
+      } catch (err) {
+        console.error("[incident.all] Primary query error, falling back:", err);
+        const fallbackResults = await ctx.db.query.incident.findMany({
+          where: and(
+            eq(incident.organizationId, input.tenantId),
+            input.status ? eq(incident.status, input.status) : undefined,
+          ),
+          orderBy: desc(incident.createdAt),
+        });
+        return fallbackResults.map((r) => ({
+          ...r,
+          photoUrl: r.photoUrl?.startsWith("data:image/") ? null : r.photoUrl,
+          notes: [],
+          history: [],
+        }));
+      }
     }),
 
   // ─── Single detail (public) ──────────────────────────────────────────────
