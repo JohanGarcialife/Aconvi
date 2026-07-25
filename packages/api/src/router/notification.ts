@@ -104,6 +104,8 @@ async function sendExpoPush(
       title: notification.title,
       body: notification.body,
       data: notification.data ?? {},
+      priority: "high" as const,
+      channelId: "default",
     },
   ];
 
