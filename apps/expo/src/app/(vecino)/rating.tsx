@@ -26,6 +26,15 @@ const DARK = "#111827";
 const MUTED = "#6B7280";
 const BORDER = "#E5E7EB";
 const BG = "#F9FAFB";
+const BASE_URL = "https://aconvi.com";
+
+/** Turn relative /uploads/... paths into full URLs for Image component */
+function resolvePhotoUri(url?: string | null): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith("http")) return url;
+  if (url.startsWith("/")) return `${BASE_URL}${url}`;
+  return url;
+}
 
 const TENANT_ID = "org_aconvi_demo";
 
@@ -101,7 +110,7 @@ export default function RatingScreen() {
             ))}
           </View>
           <TouchableOpacity
-            style={s.submitBtn}
+            style={[s.submitBtn, { alignSelf: "stretch", marginHorizontal: 0 }]}
             onPress={() => router.replace("/(vecino)/incidents")}
             activeOpacity={0.88}
           >
@@ -154,25 +163,31 @@ export default function RatingScreen() {
           ) : null}
 
           {/* Photos: before → after */}
-          {incident && (incident as any).photoUrl && (
+          {incident && ((incident as any).photoUrl || (incident as any).finalPhotoUrl) && (
             <View style={s.photosRow}>
               <View style={s.photoWrap}>
                 <Text style={s.photoCaption}>Así estaba el problema</Text>
+                {resolvePhotoUri((incident as any).photoUrl) ? (
                 <Image
-                  source={{ uri: (incident as any).photoUrl }}
+                  source={{ uri: resolvePhotoUri((incident as any).photoUrl)! }}
                   style={s.photoImg}
                   resizeMode="cover"
                 />
+                ) : (
+                  <View style={[s.photoImg, s.photoPlaceholder]}>
+                    <Text style={{ fontSize: 13, color: MUTED, textAlign: "center" }}>Sin foto</Text>
+                  </View>
+                )}
               </View>
               <View style={s.photoArrowWrap}>
                 <Text style={s.photoArrow}>→</Text>
               </View>
               <View style={s.photoWrap}>
                 <Text style={s.photoCaption}>Así lo ha dejado el técnico</Text>
-                {(incident as any).finalPhotoUrl ? (
+                {resolvePhotoUri((incident as any).finalPhotoUrl) ? (
                   <>
                     <Image
-                      source={{ uri: (incident as any).finalPhotoUrl }}
+                      source={{ uri: resolvePhotoUri((incident as any).finalPhotoUrl)! }}
                       style={s.photoImg}
                       resizeMode="cover"
                     />
