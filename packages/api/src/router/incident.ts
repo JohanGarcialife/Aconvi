@@ -53,6 +53,30 @@ function saveBase64Image(base64Data: string): string | undefined {
 // Demo fallback author when no session is present
 const DEMO_AUTHOR_ID = "test-user-jluis-1776971864823";
 
+// OT expiration duration in minutes (2 hours)
+const OT_EXPIRATION_MINUTES = 120;
+
+/** Prevent duplicate consecutive history entries with the same newStatus */
+async function insertHistoryIfNotDuplicate(db: any, entry: {
+  incidentId: string;
+  actorName: string;
+  action: string;
+  previousStatus?: string;
+  newStatus: string;
+  comment?: string;
+}) {
+  const lastEntry = await db.query.incidentHistory.findFirst({
+    where: eq(incidentHistory.incidentId, entry.incidentId),
+    orderBy: desc(incidentHistory.createdAt),
+  });
+  // Skip if last entry has same newStatus (prevents duplicates like double AGENDADA)
+  if (lastEntry && lastEntry.newStatus === entry.newStatus && lastEntry.action === entry.action) {
+    console.log(`[History] Skipping duplicate: ${entry.action} -> ${entry.newStatus}`);
+    return;
+  }
+  await db.insert(incidentHistory).values(entry);
+}
+
 const INCIDENT_STATUSES = [
   "RECIBIDA",
   "EN_REVISION",
@@ -280,7 +304,7 @@ export const incidentRouter = createTRPCRouter({
       if (!updated) throw new Error("No se pudo actualizar el estado de la incidencia.");
 
       if (previous.status !== updated.status) {
-        await ctx.db.insert(incidentHistory).values({
+        await insertHistoryIfNotDuplicate(ctx.db, {
           incidentId: updated.id,
           actorName: "Administrador / Agente",
           action: "STATUS_CHANGED",
@@ -491,6 +515,35 @@ export const incidentRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      // Server-side OT expiration check
+      const current = await ctx.db.query.incident.findFirst({
+        where: and(
+          eq(incident.id, input.id),
+          eq(incident.organizationId, input.tenantId),
+        ),
+      });
+      if (!current) throw new Error("Incidencia no encontrada.");
+
+      const assignedAt = (current as any).assignedAt ?? current.createdAt;
+      const expiryMs = new Date(assignedAt).getTime() + OT_EXPIRATION_MINUTES * 60 * 1000;
+      if (Date.now() > expiryMs) {
+        // Expired: revert to RECIBIDA so admin can reassign
+        await ctx.db
+          .update(incident)
+          .set({ status: "RECIBIDA", providerId: null })
+          .where(eq(incident.id, input.id));
+        await insertHistoryIfNotDuplicate(ctx.db, {
+          incidentId: input.id,
+          actorName: "Sistema",
+          action: "OT_EXPIRED",
+          previousStatus: current.status,
+          newStatus: "RECIBIDA",
+          comment: "Orden de trabajo expirada. Devuelta al administrador para reasignacion.",
+        });
+        void emitWebSocketEvent(input.tenantId, "incident-updated", { ...current, status: "RECIBIDA" });
+        throw new Error("La orden de trabajo ha expirado. Contacte al administrador para una nueva asignacion.");
+      }
+
       const [updated] = await ctx.db
         .update(incident)
         .set({ 
@@ -527,7 +580,7 @@ export const incidentRouter = createTRPCRouter({
       }
 
       // Log history
-      await ctx.db.insert(incidentHistory).values({
+      await insertHistoryIfNotDuplicate(ctx.db, {
         incidentId: updated.id,
         actorName: "Proveedor",
         action: "PROVIDER_ACCEPTED",
@@ -584,7 +637,6 @@ export const incidentRouter = createTRPCRouter({
       const noteContent = [
         "✅ Trabajo completado",
         input.completionNote,
-        input.finalPhotoUrl ? `Foto final: ${input.finalPhotoUrl}` : null,
       ]
         .filter(Boolean)
         .join(" · ");

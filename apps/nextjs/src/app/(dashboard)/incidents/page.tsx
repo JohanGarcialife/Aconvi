@@ -622,10 +622,16 @@ export default function IncidentsPage() {
                   {(selected.notes ?? []).map((n: any) => {
                     // Detect base64 image data embedded in note content
                     const base64Match = n.content?.match(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/);
-                    // Extract non-image text (everything before the base64 blob)
-                    const textPart = base64Match
-                      ? n.content.replace(base64Match[0], "").trim()
-                      : n.content;
+                    // Detect /uploads/... image path in note content
+                    const uploadsMatch = n.content?.match(/(?:Foto final:\s*)?(\/uploads\/[^\s"']+\.(jpg|jpeg|png|webp|gif))/i);
+                    // Extract non-image text
+                    let textPart = n.content;
+                    if (base64Match) textPart = textPart.replace(base64Match[0], "").trim();
+                    if (uploadsMatch) textPart = textPart.replace(uploadsMatch[0], "").replace(/Foto final:\s*/gi, "").trim();
+                    // Clean up trailing separators
+                    textPart = textPart?.replace(/[·\s]+$/, "").replace(/^[·\s]+/, "").trim();
+
+                    const imageUrl = base64Match?.[0] ?? (uploadsMatch ? uploadsMatch[1] : null);
 
                     return (
                       <div key={n.id} className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
@@ -634,9 +640,9 @@ export default function IncidentsPage() {
                             {textPart}
                           </p>
                         )}
-                        {base64Match && (
+                        {imageUrl && (
                           <img
-                            src={base64Match[0]}
+                            src={imageUrl}
                             alt="Foto del proveedor"
                             className="mt-2 w-full max-w-xs rounded-lg object-cover"
                             style={{ maxHeight: 240 }}

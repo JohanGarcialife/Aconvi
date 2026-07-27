@@ -67,7 +67,7 @@ function useDynamicCountdown(targetTimestamp?: string | Date | null, durationMin
   const h = Math.floor(seconds / 3600).toString().padStart(2, "0");
   const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, "0");
   const s = (seconds % 60).toString().padStart(2, "0");
-  return `${h}:${m}:${s}`;
+  return { formatted: `${h}:${m}:${s}`, isExpired: seconds <= 0 };
 }
 
 // ─── Priority label ────────────────────────────────────────────────────────────
@@ -230,7 +230,7 @@ export default function ProveedorJobScreen() {
     return () => subscription.remove();
   }, [refetchIncidents]);
 
-  const countdown = useDynamicCountdown(activeIncident?.assignedAt ?? activeIncident?.createdAt);
+  const { formatted: countdown, isExpired } = useDynamicCountdown(activeIncident?.assignedAt ?? activeIncident?.createdAt);
 
   const handleAccept = () => {
     if (!activeIncident || !providerId) return;
@@ -519,6 +519,11 @@ export default function ProveedorJobScreen() {
         <Text style={[styles.countdown, countdown === "00:00:00" && { color: URGENT_RED }]}>
           {countdown}
         </Text>
+        {isExpired && (
+          <View style={{ backgroundColor: '#FEF2F2', padding: 12, borderRadius: 12, marginTop: 8, marginBottom: 8 }}>
+            <Text style={{ color: '#991B1B', fontSize: 13, fontWeight: '600', textAlign: 'center' }}>Tiempo expirado. Contacte al administrador para una nueva asignación.</Text>
+          </View>
+        )}
 
         {/* Incident photo */}
         <View style={styles.photoWrapper}>
@@ -556,9 +561,9 @@ export default function ProveedorJobScreen() {
 
         {/* CTA */}
         <TouchableOpacity
-          style={[styles.acceptButton, acceptMutation.isPending && { opacity: 0.7 }]}
+          style={[styles.acceptButton, (acceptMutation.isPending || isExpired) && { opacity: 0.4 }]}
           onPress={handleAccept}
-          disabled={acceptMutation.isPending}
+          disabled={acceptMutation.isPending || isExpired}
           activeOpacity={0.85}
         >
           {acceptMutation.isPending ? (

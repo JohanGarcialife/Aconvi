@@ -120,7 +120,8 @@ export default function IncidentDetailScreen() {
   const { data: incident, isLoading } = useQuery({
     ...api.incident.byId.queryOptions({ id: id as string, tenantId: TENANT_ID }),
     enabled: isUuid,
-    refetchInterval: 300_000,
+    refetchInterval: 10_000,
+    refetchOnWindowFocus: true,
   });
 
   // ─── Loading ───────────────────────────────────────────────────────────────
