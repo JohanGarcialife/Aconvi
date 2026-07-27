@@ -198,7 +198,9 @@ export default function LoginScreen() {
             {step === "loading" ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.btnText}>Iniciar sesión</Text>
+              <Text style={styles.btnText} numberOfLines={1}>
+                Iniciar sesión
+              </Text>
             )}
           </TouchableOpacity>
         </View>
@@ -229,12 +231,21 @@ const styles = StyleSheet.create({
   btn: {
     backgroundColor: TEAL,
     borderRadius: 10,
-    padding: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
     alignItems: "center",
+    justifyContent: "center",
     marginTop: 8,
+    minHeight: 52,
   },
   btnDisabled: { opacity: 0.6 },
-  btnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  btnText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+    textAlign: "center",
+    includeFontPadding: false,
+  },
   error: {
     color: "#dc2626",
     fontSize: 13,
