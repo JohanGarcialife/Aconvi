@@ -238,6 +238,24 @@ export const incidentRouter = createTRPCRouter({
         resolvedPhotoUrl = saveBase64Image(resolvedPhotoUrl);
       }
 
+      // Deduplication guard: prevent duplicate creation within 15 seconds
+      const recentDuplicate = await ctx.db.query.incident.findFirst({
+        where: and(
+          eq(incident.organizationId, tenantId),
+          eq(incident.reporterId, resolvedReporterId),
+          eq(incident.title, sanitizedTitle),
+        ),
+        orderBy: desc(incident.createdAt),
+      });
+
+      if (recentDuplicate) {
+        const timeDiffMs = Date.now() - new Date(recentDuplicate.createdAt).getTime();
+        if (timeDiffMs < 15000) {
+          console.log(`[incident.create] Suppressed duplicate creation (${timeDiffMs}ms ago) for "${sanitizedTitle}"`);
+          return recentDuplicate;
+        }
+      }
+
       const [created] = await ctx.db
         .insert(incident)
         .values({

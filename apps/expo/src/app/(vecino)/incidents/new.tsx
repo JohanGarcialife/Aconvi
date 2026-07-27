@@ -101,9 +101,12 @@ export default function NewIncidentScreen() {
     setPhotoUri(null);
   };
 
+  const [isUploading, setIsUploading] = useState(false);
+
   const createIncident = useMutation({
     ...api.incident.create.mutationOptions(),
     onSuccess: (created) => {
+      setIsUploading(false);
       // Inject the new incident at the top of the cache immediately —
       // the user sees it the instant they land on the list, no waiting for refetch.
       const queryKey = api.incident.all.queryOptions({ tenantId: TENANT_ID }).queryKey;
@@ -120,6 +123,7 @@ export default function NewIncidentScreen() {
       void queryClient.invalidateQueries(api.incident.all.queryFilter());
     },
     onError: (e: any) => {
+      setIsUploading(false);
       // Bug 3: "JSON Parse error: Unexpected character: o" means the server returned
       // a non-JSON response (e.g. plain text "ok" or HTML error page).
       // Treat parse errors as a transient network/server issue with a user-friendly message.
@@ -191,6 +195,8 @@ export default function NewIncidentScreen() {
 
   // ─── Submit ─────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
+    if (isUploading || createIncident.isPending) return;
+
     // Bug 2: show explicit error when category is missing instead of silent no-op
     if (!selectedCategory) {
       setCategoryError(true);
@@ -202,6 +208,7 @@ export default function NewIncidentScreen() {
       return;
     }
     setCategoryError(false);
+    setIsUploading(true);
 
     // ─── Upload photo to dedicated endpoint (avoids large tRPC body) ─────────
     const uploadPhotoToServer = async (base64Data: string): Promise<string | null> => {
@@ -241,6 +248,7 @@ export default function NewIncidentScreen() {
         // Upload photo to server first
         const uploadedUrl = await uploadPhotoToServer(base64Payload);
         if (!uploadedUrl) {
+          setIsUploading(false);
           Alert.alert("Error al subir foto", "No se pudo subir la foto del reporte. Verifica tu conexión e inténtalo de nuevo.");
           return;
         }
@@ -261,7 +269,7 @@ export default function NewIncidentScreen() {
     });
   };
 
-  const isLoading = createIncident.isPending;
+  const isLoading = createIncident.isPending || isUploading;
   const canSubmit = !!selectedCategory && description.trim().length > 0 && !isLoading;
 
   return (
