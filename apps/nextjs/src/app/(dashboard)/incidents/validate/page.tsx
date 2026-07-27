@@ -28,7 +28,6 @@ function copyToClipboard(text: string) {
 
 // ─── "Closed" confirmation screen ────────────────────────────────────────────
 function ClosedScreen({
-  incidentId,
   incidentTitle,
   initialRating,
   initialComment,
@@ -38,37 +37,6 @@ function ClosedScreen({
   initialRating?: number | null;
   initialComment?: string | null;
 }) {
-  const trpc = useTRPC();
-  const [rating, setRating] = useState<number>(initialRating ?? 0);
-  const [hoveredRating, setHoveredRating] = useState<number>(0);
-  const [comment, setComment] = useState<string>(initialComment ?? "");
-  const [submitted, setSubmitted] = useState<boolean>(!!initialRating);
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-
-  const submitRating = useMutation(trpc.incident.submitRating.mutationOptions());
-
-  const handleRate = async (newRating: number) => {
-    setRating(newRating);
-    if (!incidentId) return;
-
-    setIsSubmitting(true);
-    try {
-      await submitRating.mutateAsync({
-        tenantId: TENANT_ID,
-        id: incidentId,
-        rating: newRating,
-        comment: comment.trim() || undefined,
-      });
-      setSubmitted(true);
-    } catch (e) {
-      console.error("[Rating] Failed to submit rating:", e);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const activeRating = hoveredRating || rating;
-
   return (
     <div className="flex flex-1 items-center justify-center bg-slate-50">
       <div className="max-w-md w-full text-center px-8 py-12">
@@ -80,68 +48,64 @@ function ClosedScreen({
         <h2 className="text-2xl font-bold text-slate-900 mb-2">
           Expediente cerrado
         </h2>
-        <p className="text-slate-500 text-sm mb-6 leading-relaxed">
+        <p className="text-slate-500 text-sm mb-8 leading-relaxed">
           La incidencia ha sido validada y archivada correctamente.{" "}
           <span className="font-semibold text-slate-700">
-            Puedes valorar el servicio a continuación o el vecino podrá hacerlo desde la app móvil.
-          </span>
+            El vecino ha recibido una notificación push
+          </span>{" "}
+          para valorar el servicio desde la aplicación móvil.
         </p>
 
-        {/* Interactive rating card */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm mb-8 transition-all">
-          <div className="flex items-start gap-3 mb-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-500/10">
+        {initialRating ? (
+          /* Real rating submitted by the vecino from mobile app */
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5 text-left shadow-sm mb-8">
+            <div className="flex items-center gap-2 mb-2">
               <Star className="h-5 w-5 text-amber-500 fill-amber-500" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-slate-900">
-                Valoración del Servicio
-              </p>
-              <p className="text-xs text-slate-600 mt-0.5 leading-snug">
-                Tu incidencia "{incidentTitle}" ha sido resuelta.
-                ¿Cómo valorarías la atención prestada?
+              <p className="text-xs font-bold uppercase tracking-wider text-amber-900">
+                Valoración del Vecino
               </p>
             </div>
-          </div>
-
-          {/* Interactive stars */}
-          <div className="flex items-center justify-center gap-2 py-3 bg-slate-50 rounded-xl border border-slate-100 mb-3">
-            {[1, 2, 3, 4, 5].map((star) => (
-              <button
-                key={star}
-                type="button"
-                onClick={() => void handleRate(star)}
-                onMouseEnter={() => setHoveredRating(star)}
-                onMouseLeave={() => setHoveredRating(0)}
-                disabled={isSubmitting}
-                className="p-1 transition-transform hover:scale-125 focus:outline-none disabled:opacity-50"
-                title={`Valorar ${star} de 5 estrellas`}
-              >
+            <div className="flex items-center gap-1 my-1">
+              {[1, 2, 3, 4, 5].map((s) => (
                 <Star
-                  className={`h-7 w-7 transition-colors cursor-pointer ${
-                    star <= activeRating
-                      ? "fill-amber-400 text-amber-400 drop-shadow-sm"
-                      : "text-slate-300 hover:text-amber-200"
-                  }`}
+                  key={s}
+                  className={`h-5 w-5 ${s <= initialRating ? "fill-amber-400 text-amber-400" : "text-slate-300"}`}
                 />
-              </button>
-            ))}
-          </div>
-
-          {rating > 0 && (
-            <div className="text-center mb-2">
-              <span className="text-xs font-bold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
-                {rating === 5 ? "⭐⭐⭐⭐⭐ Excelente" : rating === 4 ? "⭐⭐⭐⭐ Muy bueno" : rating === 3 ? "⭐⭐⭐ Regular" : rating === 2 ? "⭐⭐ Malo" : "⭐ Muy malo"}
+              ))}
+              <span className="ml-2 text-sm font-bold text-slate-800">
+                {initialRating} / 5
               </span>
             </div>
-          )}
-
-          {submitted && (
-            <p className="text-xs text-emerald-600 font-semibold text-center mt-1">
-              ✓ Valoración registrada con éxito ({rating}/5 estrellas)
-            </p>
-          )}
-        </div>
+            {initialComment && (
+              <p className="mt-2 text-sm italic text-slate-700 bg-white/70 p-3 rounded-xl border border-amber-100">
+                "{initialComment}"
+              </p>
+            )}
+          </div>
+        ) : (
+          /* Push notification preview sent to neighbor */
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm mb-8">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                <Bell className="h-5 w-5 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-slate-900">
+                  Aconvi · Enviado al vecino
+                </p>
+                <p className="text-xs text-slate-600 mt-0.5 leading-snug">
+                  Tu incidencia "{incidentTitle}" ha sido resuelta.
+                  ¿Cómo valorarías el servicio?
+                </p>
+                <div className="flex gap-1 mt-2">
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <Star key={s} className="h-4 w-4 text-slate-300" />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <Link
           href="/incidents"
