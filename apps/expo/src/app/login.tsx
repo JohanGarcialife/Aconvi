@@ -49,11 +49,22 @@ export default function LoginScreen() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: username.trim().toLowerCase(), pin: pin.trim() }),
       });
-      const data = await res.json() as { ok: boolean; sessionToken?: string; error?: string };
 
-      if (!data.ok || !data.sessionToken) {
+      const contentType = res.headers.get("content-type") ?? "";
+      let data: { ok?: boolean; sessionToken?: string; error?: string } = {};
+      if (contentType.includes("application/json")) {
+        data = (await res.json()) as { ok?: boolean; sessionToken?: string; error?: string };
+      } else {
+        const text = await res.text();
+        console.warn("[MobileLogin] Non-JSON response received:", text);
         setStep("error");
-        setErrorMsg(data.error ?? "Error de autenticación.");
+        setErrorMsg("PIN o usuario incorrecto.");
+        return;
+      }
+
+      if (!res.ok || !data.ok || !data.sessionToken) {
+        setStep("error");
+        setErrorMsg(data.error ?? "PIN o usuario incorrecto.");
         return;
       }
 
@@ -138,7 +149,12 @@ export default function LoginScreen() {
       }
     } catch (e: any) {
       setStep("error");
-      setErrorMsg(e.message ?? "Error de red.");
+      const msg = String(e?.message ?? "");
+      if (msg.includes("JSON") || msg.includes("Unexpected") || msg.includes("SyntaxError")) {
+        setErrorMsg("PIN o usuario incorrecto.");
+      } else {
+        setErrorMsg("Error de conexión. Verifica tu internet.");
+      }
     }
   };
 
