@@ -27,7 +27,48 @@ function copyToClipboard(text: string) {
 }
 
 // ─── "Closed" confirmation screen ────────────────────────────────────────────
-function ClosedScreen({ incidentTitle }: { incidentTitle: string }) {
+function ClosedScreen({
+  incidentId,
+  incidentTitle,
+  initialRating,
+  initialComment,
+}: {
+  incidentId?: string;
+  incidentTitle: string;
+  initialRating?: number | null;
+  initialComment?: string | null;
+}) {
+  const trpc = useTRPC();
+  const [rating, setRating] = useState<number>(initialRating ?? 0);
+  const [hoveredRating, setHoveredRating] = useState<number>(0);
+  const [comment, setComment] = useState<string>(initialComment ?? "");
+  const [submitted, setSubmitted] = useState<boolean>(!!initialRating);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+
+  const submitRating = useMutation(trpc.incident.submitRating.mutationOptions());
+
+  const handleRate = async (newRating: number) => {
+    setRating(newRating);
+    if (!incidentId) return;
+
+    setIsSubmitting(true);
+    try {
+      await submitRating.mutateAsync({
+        tenantId: TENANT_ID,
+        id: incidentId,
+        rating: newRating,
+        comment: comment.trim() || undefined,
+      });
+      setSubmitted(true);
+    } catch (e) {
+      console.error("[Rating] Failed to submit rating:", e);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const activeRating = hoveredRating || rating;
+
   return (
     <div className="flex flex-1 items-center justify-center bg-slate-50">
       <div className="max-w-md w-full text-center px-8 py-12">
@@ -39,43 +80,72 @@ function ClosedScreen({ incidentTitle }: { incidentTitle: string }) {
         <h2 className="text-2xl font-bold text-slate-900 mb-2">
           Expediente cerrado
         </h2>
-        <p className="text-slate-500 text-sm mb-8 leading-relaxed">
+        <p className="text-slate-500 text-sm mb-6 leading-relaxed">
           La incidencia ha sido validada y archivada correctamente.{" "}
           <span className="font-semibold text-slate-700">
-            El vecino ha recibido una notificación push
-          </span>{" "}
-          para valorar el servicio.
+            Puedes valorar el servicio a continuación o el vecino podrá hacerlo desde la app móvil.
+          </span>
         </p>
 
-        {/* Notification preview card */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm mb-8">
-          <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
-              <Bell className="h-5 w-5 text-primary" />
+        {/* Interactive rating card */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm mb-8 transition-all">
+          <div className="flex items-start gap-3 mb-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-500/10">
+              <Star className="h-5 w-5 text-amber-500 fill-amber-500" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-slate-900">
-                Aconvi · Enviado ahora
+                Valoración del Servicio
               </p>
               <p className="text-xs text-slate-600 mt-0.5 leading-snug">
                 Tu incidencia "{incidentTitle}" ha sido resuelta.
-                ¿Cómo valorarías el servicio?
+                ¿Cómo valorarías la atención prestada?
               </p>
-              <div className="flex gap-1 mt-2">
-                {[1, 2, 3, 4, 5].map((s) => (
-                  <Star
-                    key={s}
-                    className={`h-4 w-4 ${s <= 4 ? "fill-amber-400 text-amber-400" : "text-slate-200"}`}
-                  />
-                ))}
-              </div>
             </div>
           </div>
+
+          {/* Interactive stars */}
+          <div className="flex items-center justify-center gap-2 py-3 bg-slate-50 rounded-xl border border-slate-100 mb-3">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <button
+                key={star}
+                type="button"
+                onClick={() => void handleRate(star)}
+                onMouseEnter={() => setHoveredRating(star)}
+                onMouseLeave={() => setHoveredRating(0)}
+                disabled={isSubmitting}
+                className="p-1 transition-transform hover:scale-125 focus:outline-none disabled:opacity-50"
+                title={`Valorar ${star} de 5 estrellas`}
+              >
+                <Star
+                  className={`h-7 w-7 transition-colors cursor-pointer ${
+                    star <= activeRating
+                      ? "fill-amber-400 text-amber-400 drop-shadow-sm"
+                      : "text-slate-300 hover:text-amber-200"
+                  }`}
+                />
+              </button>
+            ))}
+          </div>
+
+          {rating > 0 && (
+            <div className="text-center mb-2">
+              <span className="text-xs font-bold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
+                {rating === 5 ? "⭐⭐⭐⭐⭐ Excelente" : rating === 4 ? "⭐⭐⭐⭐ Muy bueno" : rating === 3 ? "⭐⭐⭐ Regular" : rating === 2 ? "⭐⭐ Malo" : "⭐ Muy malo"}
+              </span>
+            </div>
+          )}
+
+          {submitted && (
+            <p className="text-xs text-emerald-600 font-semibold text-center mt-1">
+              ✓ Valoración registrada con éxito ({rating}/5 estrellas)
+            </p>
+          )}
         </div>
 
         <Link
           href="/incidents"
-          className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-bold text-white hover:bg-primary/90 transition-colors"
+          className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-bold text-white hover:bg-primary/90 transition-colors shadow-sm"
         >
           <ArrowLeft className="h-4 w-4" />
           Volver a incidencias
@@ -163,7 +233,12 @@ function ValidateContent() {
     return (
       <div className="flex h-screen flex-col bg-slate-50">
         <TopBar />
-        <ClosedScreen incidentTitle={incident.title} />
+        <ClosedScreen
+          incidentId={incident.id}
+          incidentTitle={incident.title}
+          initialRating={(incident as any).rating}
+          initialComment={(incident as any).ratingComment}
+        />
       </div>
     );
   }
