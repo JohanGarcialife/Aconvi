@@ -64,7 +64,7 @@ type TimelineEntry = {
 
 function buildTimeline(history: any[], currentStatus: string): TimelineEntry[] {
   const entries: TimelineEntry[] = (history ?? []).map((h) => {
-    const dateStr = format(new Date(h.createdAt), "d 'de' MMMM, HH:mm", { locale: es });
+    const dateStr = format(new Date(h.createdAt), "d 'de' MMMM '•' HH:mm", { locale: es });
     if (h.action === "CREATED") {
       return { key: h.id, label: "Incidencia recibida", detail: "Hemos recibido tu incidencia.", icon: "✉️", date: dateStr };
     }
