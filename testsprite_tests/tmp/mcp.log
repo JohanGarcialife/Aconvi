@@ -1,0 +1,6 @@
+{"timestamp":"2026-07-27T21:18:49.237Z","level":"debug","message":"Generate code and execute params","context":{"projectName":"cisnerol","projectPath":"/Users/johan/Desktop/Proyectos/cisnerol","testIds":[],"serverMode":"development"}}
+{"timestamp":"2026-07-27T21:18:49.248Z","level":"error","message":"checkPortListening tcp error: 3000 localhost\nAggregateError"}
+{"timestamp":"2026-07-27T21:18:49.751Z","level":"error","message":"checkPortListening tcp error: 3000 localhost\nAggregateError"}
+{"timestamp":"2026-07-27T21:18:50.255Z","level":"error","message":"checkPortListening tcp error: 3000 localhost\nAggregateError"}
+{"timestamp":"2026-07-27T21:18:50.759Z","level":"error","message":"checkPortListening tcp error: 3000 localhost\nAggregateError"}
+{"timestamp":"2026-07-27T21:18:51.261Z","level":"info","message":"checkPortListening tcp failed, trying http fallback: 3000 localhost"}

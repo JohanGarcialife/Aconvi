@@ -1,0 +1,96 @@
+version: "2"
+type: frontend
+tech_stack:
+  - TypeScript
+  - Next.js
+  - React
+  - Expo (React Native)
+  - Tailwind CSS
+  - tRPC
+  - Drizzle ORM
+  - Socket.IO
+routes:
+  - path: /login
+    file: apps/nextjs/src/app/login/page.tsx
+    auth_required: false
+    description: Login de administrador y vecinos
+  - path: /incidents
+    file: apps/nextjs/src/app/(dashboard)/incidents/page.tsx
+    auth_required: true
+    description: Panel de gestión de incidencias para administradores
+  - path: /notices
+    file: apps/nextjs/src/app/(dashboard)/notices/page.tsx
+    auth_required: true
+    description: Publicación de avisos y comunicados comunitarios
+  - path: /voting
+    file: apps/nextjs/src/app/(dashboard)/voting/page.tsx
+    auth_required: true
+    description: Gestión de votaciones y juntas comunitarias
+features:
+  - name: Historial en Tiempo Real
+    description: Refresco automático e inmediato del historial de la incidencia sin recargar la pantalla
+    files:
+      - apps/expo/src/app/(vecino)/incidents/[id].tsx
+      - packages/api/src/router/incident.ts
+    entry_route: /incidents
+    user_interactions:
+      - Abrir detalle de incidencia
+      - Observar la lista de actividades e historial
+      - Verificar actualización automática cada 10 segundos
+    api_calls:
+      - method: GET
+        endpoint: /trpc/incident.byId
+    auth_required: true
+  - name: Eliminación de Estados Duplicados
+    description: Prevención de entradas consecutivas con el mismo estado en la línea de tiempo
+    files:
+      - packages/api/src/router/incident.ts
+    entry_route: /incidents
+    user_interactions:
+      - Aceptar orden de trabajo o cambiar estado
+      - Consultar historial de actividad sin duplicados
+    api_calls:
+      - method: POST
+        endpoint: /trpc/incident.updateStatus
+    auth_required: true
+  - name: Expiración de Orden de Trabajo (OT)
+    description: Deshabilitación del botón de aceptar tras 2 horas de inactividad del proveedor y retorno a estado RECIBIDA
+    files:
+      - apps/expo/src/app/(proveedor)/job/index.tsx
+      - packages/api/src/router/incident.ts
+    entry_route: /incidents
+    user_interactions:
+      - Visualizar temporizador de 2 horas en pantalla del proveedor
+      - Verificar banner de expiración y botón deshabilitado cuando expira
+    api_calls:
+      - method: POST
+        endpoint: /trpc/incident.providerAccept
+    auth_required: true
+  - name: Valoración del Servicio
+    description: Calificación de 1 a 5 estrellas con comentarios registrada como evento en la incidencia
+    files:
+      - apps/expo/src/app/(vecino)/rating.tsx
+      - packages/api/src/router/incident.ts
+    entry_route: /incidents
+    user_interactions:
+      - Tocar botón de valorar el servicio
+      - Seleccionar estrellas y escribir comentario
+      - Presionar enviar valoración
+    api_calls:
+      - method: POST
+        endpoint: /trpc/incident.submitRating
+    auth_required: true
+  - name: Visualización de Fotografía Final
+    description: Muestra la foto de cierre como imagen renderizada en el panel web y no como ruta de texto
+    files:
+      - apps/nextjs/src/app/(dashboard)/incidents/page.tsx
+      - packages/api/src/router/incident.ts
+    entry_route: /incidents
+    user_interactions:
+      - Abrir incidencia resuelta en panel del Administrador
+      - Ver fotografía de cierre en cuadro de imagen
+    api_calls:
+      - method: GET
+        endpoint: /trpc/incident.byId
+    auth_required: true
+known_limitations: []

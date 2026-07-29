@@ -414,12 +414,12 @@ export default function VecinoHome() {
                 <Text style={styles.cardTitleSmall}>{latestIncident.title}</Text>
                 <Text style={styles.mutedText}>
                   Estado: {
-                    latestIncident.status === "EN_REVISION" ? "Asignada" :
-                    latestIncident.status === "RECIBIDA" ? "Sin asignar" :
-                    latestIncident.status === "AGENDADA" ? "Agendada" :
-                    latestIncident.status === "EN_CURSO" ? "En curso" :
-                    latestIncident.status === "RESUELTA" ? "Resuelta" :
-                    latestIncident.status === "CERRADA" ? "Cerrada" :
+                    latestIncident.status === "EN_REVISION" ? "Profesional asignado" :
+                    latestIncident.status === "RECIBIDA" ? "Incidencia recibida" :
+                    latestIncident.status === "AGENDADA" ? "Intervención confirmada" :
+                    latestIncident.status === "EN_CURSO" ? "En intervención" :
+                    latestIncident.status === "RESUELTA" ? "Intervención finalizada" :
+                    latestIncident.status === "CERRADA" ? "Incidencia cerrada" :
                     latestIncident.status === "RECHAZADA" ? "No procede" : latestIncident.status
                   } · {format(new Date(latestIncident.createdAt), "dd MMM", { locale: es })}
                 </Text>

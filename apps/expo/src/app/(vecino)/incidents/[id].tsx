@@ -43,13 +43,13 @@ const TENANT_ID = "org_aconvi_demo";
 
 // ─── Human-readable status ────────────────────────────────────────────────────
 const STATUS_MAP: Record<string, { label: string; icon: string; color: string; bg: string }> = {
-  RECIBIDA:    { label: "Sin asignar",          icon: "✉️",  color: "#92400e", bg: "#fef3c7" },
-  EN_REVISION: { label: "Asignada",             icon: "👤",  color: "#1e40af", bg: "#dbeafe" },
-  AGENDADA:    { label: "Agendada",             icon: "📅",  color: "#5b21b6", bg: "#ede9fe" },
-  EN_CURSO:    { label: "En reparación",        icon: "🔧",  color: "#065f46", bg: "#d1fae5" },
-  RESUELTA:    { label: "Resuelta",             icon: "🕒",  color: "#b45309", bg: "#fef3c7" },
-  RECHAZADA:   { label: "No procede",           icon: "✕",   color: "#991b1b", bg: "#fee2e2" },
-  CERRADA:     { label: "Cerrada",              icon: "✅",  color: "#065f46", bg: "#d1fae5" },
+  RECIBIDA:    { label: "Incidencia recibida",     icon: "✉️",  color: "#92400e", bg: "#fef3c7" },
+  EN_REVISION: { label: "Profesional asignado",     icon: "👤",  color: "#1e40af", bg: "#dbeafe" },
+  AGENDADA:    { label: "Intervención confirmada",  icon: "📅",  color: "#5b21b6", bg: "#ede9fe" },
+  EN_CURSO:    { label: "En intervención",           icon: "🔧",  color: "#065f46", bg: "#d1fae5" },
+  RESUELTA:    { label: "Intervención finalizada",  icon: "🕒",  color: "#b45309", bg: "#fef3c7" },
+  RECHAZADA:   { label: "No procede",               icon: "✕",   color: "#991b1b", bg: "#fee2e2" },
+  CERRADA:     { label: "Incidencia cerrada",        icon: "✅",  color: "#065f46", bg: "#d1fae5" },
 };
 
 // ─── Timeline steps ───────────────────────────────────────────────────────────
@@ -66,28 +66,28 @@ function buildTimeline(history: any[], currentStatus: string): TimelineEntry[] {
   const entries: TimelineEntry[] = (history ?? []).map((h) => {
     const dateStr = format(new Date(h.createdAt), "d 'de' MMMM, HH:mm", { locale: es });
     if (h.action === "CREATED") {
-      return { key: h.id, label: "Sin asignar", detail: "Hemos recibido tu solicitud.", icon: "✉️", date: dateStr };
+      return { key: h.id, label: "Incidencia recibida", detail: "Hemos recibido tu incidencia.", icon: "✉️", date: dateStr };
     }
     if (h.action === "ASSIGNED" || (h.newStatus === "EN_REVISION" && h.action !== "PROVIDER_ACCEPTED")) {
-      return { key: h.id, label: "Asignada", detail: "Se ha asignado un proveedor especialista.", icon: "👤", date: dateStr };
+      return { key: h.id, label: "Profesional asignado", detail: "Hemos asignado un profesional para atender la incidencia.", icon: "👤", date: dateStr };
     }
     if (h.action === "PROVIDER_ACCEPTED" || h.newStatus === "AGENDADA") {
-      return { key: h.id, label: "Agendada", detail: "El proveedor aceptó la orden de trabajo.", icon: "📅", date: dateStr };
+      return { key: h.id, label: "Intervención confirmada", detail: "El profesional ha confirmado la intervención.", icon: "📅", date: dateStr };
     }
     if (h.action === "ARRIVED") {
-      return { key: h.id, label: "Técnico en el lugar", detail: "El especialista ha llegado y está atendiendo la incidencia.", icon: "📍", date: dateStr };
+      return { key: h.id, label: "En intervención", detail: "El profesional ya está atendiendo la incidencia.", icon: "📍", date: dateStr };
     }
     if (h.newStatus === "EN_CURSO") {
-      return { key: h.id, label: "En reparación", detail: "El técnico está trabajando en la solución.", icon: "🔧", date: dateStr };
+      return { key: h.id, label: "En intervención", detail: "El profesional ya está atendiendo la incidencia.", icon: "🔧", date: dateStr };
     }
     if (h.action === "COMPLETED" || h.newStatus === "RESUELTA") {
-      return { key: h.id, label: "Resuelta", detail: "El técnico ha finalizado el trabajo. Pendiente de validación.", icon: "✅", date: dateStr };
+      return { key: h.id, label: "Intervención finalizada", detail: "La intervención ha finalizado.", icon: "✅", date: dateStr };
     }
     if (h.action === "RATED") {
-      return { key: h.id, label: "Valoración registrada", detail: h.comment ?? "Vecino valoró la atención recibida.", icon: "⭐", date: dateStr };
+      return { key: h.id, label: "Valoración enviada", detail: h.comment ?? "Gracias por compartir tu valoración.", icon: "⭐", date: dateStr };
     }
     if (h.newStatus === "CERRADA") {
-      return { key: h.id, label: "Cerrada", detail: "El administrador ha validado y cerrado la incidencia oficialmente.", icon: "🔒", date: dateStr };
+      return { key: h.id, label: "Incidencia cerrada", detail: "El administrador ha validado la actuación y ha cerrado la incidencia.", icon: "🔒", date: dateStr };
     }
     return { key: h.id, label: h.action, detail: h.comment ?? "", icon: "•", date: dateStr };
   });
@@ -102,11 +102,11 @@ function buildTimeline(history: any[], currentStatus: string): TimelineEntry[] {
 
 // ─── "Próximo paso" config ────────────────────────────────────────────────────
 const NEXT_STEP: Record<string, { title: string; detail: string }> = {
-  RECIBIDA:    { title: "Asignación de proveedor",           detail: "El administrador asignará un proveedor especialista a tu solicitud." },
-  EN_REVISION: { title: "Aceptación del técnico",            detail: "El especialista asignado revisará y aceptará la orden de trabajo." },
-  AGENDADA:    { title: "Llegada del técnico",               detail: "El especialista irá al lugar e iniciará la reparación." },
-  EN_CURSO:    { title: "Finalización de la reparación",     detail: "Te avisaremos cuando el técnico termine el trabajo." },
-  RESUELTA:    { title: "Validación del administrador",       detail: "El administrador revisará el trabajo antes de cerrar la incidencia." },
+  RECIBIDA:    { title: "Asignación de profesional",       detail: "El administrador asignará un profesional para atender tu incidencia." },
+  EN_REVISION: { title: "Confirmación de intervención",     detail: "El profesional asignado confirmará la intervención." },
+  AGENDADA:    { title: "Inicio de intervención",           detail: "El profesional acudirá al lugar e iniciará la intervención." },
+  EN_CURSO:    { title: "Finalización de intervención",     detail: "Te avisaremos cuando el profesional finalice la intervención." },
+  RESUELTA:    { title: "Validación del administrador",     detail: "El administrador revisará la actuación antes de cerrar la incidencia." },
 };
 
 export default function IncidentDetailScreen() {
@@ -157,6 +157,7 @@ export default function IncidentDetailScreen() {
   const displayId = `#INC-${id.slice(0, 8).toUpperCase()}`;
   const createdDate = format(new Date(incident.createdAt), "d 'de' MMMM, HH:mm", { locale: es });
   const isResolved = incident.status === "RESUELTA" || incident.status === "CERRADA";
+  const canRate = incident.status === "CERRADA" && !incident.rating;
   const isRejected = incident.status === "RECHAZADA";
 
   return (
@@ -271,7 +272,7 @@ export default function IncidentDetailScreen() {
             )}
 
             {/* ── Rating CTA ────────────────────────────────────────────────── */}
-            {isResolved && (
+            {canRate && (
               <TouchableOpacity
                 style={s.rateBtn}
                 onPress={() => router.push(`/(vecino)/rating?incidentId=${id}`)}

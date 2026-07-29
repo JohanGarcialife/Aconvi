@@ -1,0 +1,945 @@
+[
+  {
+    "id": "TC001",
+    "title": "Accept an assigned incident and move it to scheduled",
+    "description": "This verifies that a service provider can accept an assigned work order before the deadline and see it progress to scheduled.",
+    "category": "Incident Status Progression",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the credentials for a service provider"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the incidents area"
+      },
+      {
+        "type": "action",
+        "description": "Open an assigned incident"
+      },
+      {
+        "type": "action",
+        "description": "Accept the work order"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the incident is shown in a scheduled state"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the incident history includes the acceptance update"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC002",
+    "title": "Review an incident list and open a detail view",
+    "description": "This verifies that a signed-in user can open the incidents area, review available incidents, and access an incident detail with its current status and timeline.",
+    "category": "Incidence Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the username field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the incidents area"
+      },
+      {
+        "type": "action",
+        "description": "Open an incident from the list"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the incident detail view is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the current incident status and timeline are displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC003",
+    "title": "Resolve an incident with closing details",
+    "description": "This verifies that a service provider can finish an in-progress incident with closing details and move it to resolved.",
+    "category": "Incident Status Progression",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the credentials for a service provider"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the incidents area"
+      },
+      {
+        "type": "action",
+        "description": "Open an in-progress incident"
+      },
+      {
+        "type": "action",
+        "description": "Finish the work with closing details and photos"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the incident is shown in a resolved state"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the incident history includes the resolution update"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC004",
+    "title": "Follow a service request through accepted status changes",
+    "description": "This verifies that a service provider can accept an assigned work order and progress it through the expected incident statuses without duplicate consecutive states.",
+    "category": "Work Order Assignment Expiration",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the username field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the incidents area"
+      },
+      {
+        "type": "action",
+        "description": "Open an assigned work order"
+      },
+      {
+        "type": "action",
+        "description": "Accept the assignment"
+      },
+      {
+        "type": "action",
+        "description": "Update the incident through confirmed arrival, in-progress, and resolved statuses"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the incident status history is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify duplicate consecutive statuses do not appear"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC005",
+    "title": "Confirm arrival and move an incident to in progress",
+    "description": "This verifies that a service provider can confirm arrival on an active incident and see it move to in-progress.",
+    "category": "Incident Status Progression",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the credentials for a service provider"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the incidents area"
+      },
+      {
+        "type": "action",
+        "description": "Open an active incident"
+      },
+      {
+        "type": "action",
+        "description": "Confirm arrival on site"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the incident is shown in an in-progress state"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the incident history includes the arrival update"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC006",
+    "title": "Show resolved incident closing photo in admin detail view",
+    "description": "This verifies that an administrator can open a resolved incident and confirm the closing photo renders in the detail view.",
+    "category": "Incident Detail View",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the credentials for an administrator"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the incidents area"
+      },
+      {
+        "type": "action",
+        "description": "Open a resolved incident"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the incident detail is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the closing photo is displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC007",
+    "title": "Accept a work order within the deadline",
+    "description": "This verifies that a service provider can see the acceptance timer and successfully accept an assigned work order before it expires.",
+    "category": "Work Order Assignment Expiration",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the username field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the incidents area"
+      },
+      {
+        "type": "action",
+        "description": "Open an assigned work order"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the acceptance timer is displayed"
+      },
+      {
+        "type": "action",
+        "description": "Accept the assignment"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the assignment is accepted"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC008",
+    "title": "Publish a community notice",
+    "description": "This verifies that an administrator can create and publish a community notice from the notices area.",
+    "category": "Community Notices",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the credentials for an administrator"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the notices area"
+      },
+      {
+        "type": "action",
+        "description": "Create a new community notice"
+      },
+      {
+        "type": "action",
+        "description": "Enter the notice details"
+      },
+      {
+        "type": "action",
+        "description": "Publish the notice"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a success confirmation is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the new notice appears in the notices list"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC009",
+    "title": "Review a resolved incident closing photo",
+    "description": "This verifies that an administrator can open a resolved incident and view the closing photo in the incident detail.",
+    "category": "Incidence Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the username field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the incidents area"
+      },
+      {
+        "type": "action",
+        "description": "Review the incidents list filtered by role and status"
+      },
+      {
+        "type": "action",
+        "description": "Open a resolved incident"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the incident detail view is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the closing photo is displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC010",
+    "title": "Submit a rating for a completed incident",
+    "description": "This verifies that a neighbor can rate a completed incident with stars and a comment and see the feedback recorded.",
+    "category": "Service Rating and Feedback",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the credentials for a neighbor"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the incidents area"
+      },
+      {
+        "type": "action",
+        "description": "Open a resolved or closed incident"
+      },
+      {
+        "type": "action",
+        "description": "Open the rating flow"
+      },
+      {
+        "type": "action",
+        "description": "Select a star rating"
+      },
+      {
+        "type": "action",
+        "description": "Enter a comment about the service"
+      },
+      {
+        "type": "action",
+        "description": "Submit the rating"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a success confirmation is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the new rating feedback is visible in the incident detail"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC011",
+    "title": "Open the voting area and review available items",
+    "description": "An authorized user can access the voting area after signing in and see available voting items and meeting entries.",
+    "category": "Community Voting",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the login form with {{LOGIN_USER}} and {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the voting area"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify voting items and meeting entries are displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC012",
+    "title": "Open a voting item and inspect its details",
+    "description": "An authorized user can open a voting item from the voting area and view its details and participation information.",
+    "category": "Community Voting",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the login form with {{LOGIN_USER}} and {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the voting area"
+      },
+      {
+        "type": "action",
+        "description": "Open a voting item"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the voting item details are displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify participation information is displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC013",
+    "title": "See incident history refresh without reloading",
+    "description": "This verifies that an authorized user can keep an incident detail open and see the activity history refresh automatically in real time.",
+    "category": "Incident Timeline and Activity History",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the username field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the incidents area"
+      },
+      {
+        "type": "action",
+        "description": "Open an incident detail"
+      },
+      {
+        "type": "action",
+        "description": "Wait briefly while the page stays open"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the activity history is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify new history entries appear without reloading the screen"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC014",
+    "title": "Display submitted rating feedback in incident history",
+    "description": "This verifies that a neighbor returning to the incident detail can see their submitted rating and comment recorded in history.",
+    "category": "Service Rating and Feedback",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the credentials for a neighbor"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the incidents area"
+      },
+      {
+        "type": "action",
+        "description": "Open a completed incident that already has a submitted rating"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the submitted rating feedback is visible in the incident history"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the incident detail shows the recorded service feedback"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC015",
+    "title": "Submit a rating on a resolved incident",
+    "description": "This verifies that a neighbor can rate a completed incident with a comment and see the submitted feedback recorded in the incident detail.",
+    "category": "Incidence Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the username field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the incidents area"
+      },
+      {
+        "type": "action",
+        "description": "Open a resolved incident"
+      },
+      {
+        "type": "action",
+        "description": "Submit a 1-to-5 star rating with a comment"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a rating submission confirmation is visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the submitted feedback is recorded in the incident detail"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC016",
+    "title": "See a voting item with participation details after opening it",
+    "description": "An authorized user can navigate from the voting area into a voting item and confirm the item includes its participation information.",
+    "category": "Community Voting",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the login form with {{LOGIN_USER}} and {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the voting area"
+      },
+      {
+        "type": "action",
+        "description": "Open a voting item"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the voting item details are displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify participation information is displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC017",
+    "title": "Publish a community notice and find it in the list",
+    "description": "This verifies that an administrator can create and publish a community notice and then see it appear in the notices list.",
+    "category": "Incidence Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the username field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the notices area"
+      },
+      {
+        "type": "action",
+        "description": "Create a new community notice"
+      },
+      {
+        "type": "action",
+        "description": "Publish the notice"
+      },
+      {
+        "type": "action",
+        "description": "Return to the notices list"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the notices list is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the published notice appears in the list"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC018",
+    "title": "Browse voting items and open one for details",
+    "description": "This verifies that an authorized user can open the voting area, review available items, and inspect a voting item’s details and participation information.",
+    "category": "Voting Area",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the credentials for an authorized user"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the voting area"
+      },
+      {
+        "type": "action",
+        "description": "Review the available voting items and meeting entries"
+      },
+      {
+        "type": "action",
+        "description": "Open a voting item"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the voting item details are visible"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the participation information is visible"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC019",
+    "title": "Review available voting items after signing in",
+    "description": "An authorized user can sign in and verify that the voting area shows the current set of voting items.",
+    "category": "Community Voting",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the login form with {{LOGIN_USER}} and {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the voting area"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify voting items are displayed"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC020",
+    "title": "Prevent duplicate consecutive incident statuses",
+    "description": "This verifies that incident history does not record duplicate consecutive statuses when a provider repeats a progression action.",
+    "category": "Incident Status Progression",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the credentials for a service provider"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the incidents area"
+      },
+      {
+        "type": "action",
+        "description": "Open an incident that is already in the relevant active state"
+      },
+      {
+        "type": "action",
+        "description": "Repeat the same status progression action once more"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the incident history does not show a duplicate consecutive status entry"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the current incident state remains unchanged"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC021",
+    "title": "Browse meeting entries in the voting area",
+    "description": "An authorized user can review meeting entries from the voting area without needing to open a specific voting item.",
+    "category": "Community Voting",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the login form with {{LOGIN_USER}} and {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the voting area"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify meeting entries are displayed"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC022",
+    "title": "Browse voting items and inspect participation details",
+    "description": "This verifies that an authorized user can open the voting area, review available voting items or meeting entries, and inspect a voting item's details and participation information.",
+    "category": "Incidence Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the username field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the voting area"
+      },
+      {
+        "type": "action",
+        "description": "Review the available voting items or meeting entries"
+      },
+      {
+        "type": "action",
+        "description": "Open a voting item"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the voting item detail view is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify participation information is displayed"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC023",
+    "title": "See an expired work order as unavailable",
+    "description": "This verifies that a service provider opening an expired assigned work order sees acceptance disabled and the assignment unavailable.",
+    "category": "Work Order Assignment Expiration",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the username field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the incidents area"
+      },
+      {
+        "type": "action",
+        "description": "Open an assigned work order after the acceptance window has elapsed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify acceptance is disabled"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the assignment is no longer available"
+      }
+    ],
+    "priority": "Low"
+  }
+]

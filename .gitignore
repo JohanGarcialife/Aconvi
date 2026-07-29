@@ -63,3 +63,5 @@ temp_pdf/
 magic-link.txt
 
 .pdfvenv/
+
+testsprite_tests/tmp/config.json

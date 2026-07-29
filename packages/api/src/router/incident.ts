@@ -1,4 +1,4 @@
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { join } from "path";
 import { writeFileSync, existsSync, mkdirSync } from "fs";
@@ -331,9 +331,18 @@ export const incidentRouter = createTRPCRouter({
         });
 
         if (updated.reporterId) {
+          const statusLabels: Record<string, string> = {
+            RECIBIDA: "Incidencia recibida",
+            EN_REVISION: "Profesional asignado",
+            AGENDADA: "Intervención confirmada",
+            EN_CURSO: "En intervención",
+            RESUELTA: "Intervención finalizada",
+            CERRADA: "Incidencia cerrada",
+            RECHAZADA: "No procede",
+          };
           void sendPushToUser(ctx.db, updated.reporterId, {
-            title: "Actualización de incidencia",
-            body: `Tu reporte "${updated.title}" cambió de estado a ${updated.status}.`,
+            title: statusLabels[updated.status] ?? "Actualización de incidencia",
+            body: `Tu incidencia "${updated.title}" ha cambiado de estado.`,
             data: { type: "new_incident", incidentId: updated.id },
           }).catch(console.error);
         }
@@ -429,8 +438,8 @@ export const incidentRouter = createTRPCRouter({
       // Fire-and-forget push to vecino
       if (updated.reporterId) {
         void sendPushToUser(ctx.db, updated.reporterId, {
-          title: "Proveedor asignado",
-          body: `Hemos asignado un especialista a tu incidencia: "${updated.title}".`,
+          title: "Profesional asignado",
+          body: `Hemos asignado un profesional para atender tu incidencia: "${updated.title}".`,
           data: { type: "new_incident", incidentId: updated.id },
         }).catch(console.error);
       }
@@ -610,8 +619,8 @@ export const incidentRouter = createTRPCRouter({
       // Fire-and-forget push to vecino
       if (updated.reporterId) {
         void sendPushToUser(ctx.db, updated.reporterId, {
-          title: "📅 Tu cita ha sido agendada",
-          body: `Un especialista ha aceptado tu incidencia "${updated.title}" y coordinará la visita.`,
+          title: "Intervención confirmada",
+          body: `El profesional ha confirmado la intervención para "${updated.title}".`,
           data: { type: "new_incident", incidentId: updated.id },
         }).catch(console.error);
       }
@@ -678,8 +687,8 @@ export const incidentRouter = createTRPCRouter({
       // Fire-and-forget push to vecino
       if (updated.reporterId) {
         void sendPushToUser(ctx.db, updated.reporterId, {
-          title: "✅ Tu incidencia ha sido resuelta",
-          body: `${updated.title} — El proveedor ha completado el trabajo.`,
+          title: "Intervención finalizada",
+          body: `La intervención para "${updated.title}" ha finalizado.`,
           data: { type: "new_incident", incidentId: updated.id },
         }).catch(console.error);
       }
@@ -755,8 +764,8 @@ export const incidentRouter = createTRPCRouter({
       // Fire-and-forget push to vecino
       if (inc.reporterId) {
         void sendPushToUser(ctx.db, inc.reporterId, {
-          title: "🔧 Tu técnico ha llegado y está trabajando",
-          body: `El especialista ha llegado y está atendiendo "${inc.title}".`,
+          title: "En intervención",
+          body: `El profesional ya está atendiendo tu incidencia "${inc.title}".`,
           data: { type: "new_incident", incidentId: inc.id },
         }).catch(console.error);
       }
@@ -803,9 +812,9 @@ export const incidentRouter = createTRPCRouter({
       // Notify vecino
       if (updated.reporterId) {
         void sendPushToUser(ctx.db, updated.reporterId, {
-          title: "✅ Incidencia cerrada",
-          body: `Tu incidencia "${updated.title}" ha sido revisada y cerrada oficialmente.`,
-          data: { type: "new_incident", incidentId: updated.id },
+          title: "Incidencia cerrada",
+          body: `Tu incidencia "${updated.title}" ha sido validada y cerrada. Ya puedes valorar el servicio.`,
+          data: { type: "rating", incidentId: updated.id },
         }).catch(console.error);
       }
 
@@ -834,19 +843,26 @@ export const incidentRouter = createTRPCRouter({
           and(
             eq(incident.id, input.id),
             eq(incident.organizationId, input.tenantId),
+            eq(incident.status, "CERRADA"),
+            isNull(incident.rating),
           ),
         )
         .returning();
 
       if (!updated) throw new Error("No se pudo registrar la valoración.");
 
+      // Server-side guard: only allow rating on CERRADA incidents
+      if (updated.status !== "CERRADA") {
+        throw new Error("Solo puedes valorar incidencias cerradas.");
+      }
+
       // Log history event (not state change)
       await ctx.db.insert(incidentHistory).values({
         incidentId: updated.id,
         actorName: "Vecino",
         action: "RATED",
-        previousStatus: "RESUELTA",
-        newStatus: "RESUELTA",
+        previousStatus: "CERRADA",
+        newStatus: "CERRADA",
         comment: `Valoró con ${input.rating} estrellas: "${input.comment ?? "Sin comentario"}"`,
       });
 
@@ -856,7 +872,7 @@ export const incidentRouter = createTRPCRouter({
         const ratedIncidents = await ctx.db.query.incident.findMany({
           where: and(
             eq(incident.providerId, updated.providerId),
-            eq(incident.status, "RESUELTA"),
+            sql`${incident.status} IN ('RESUELTA', 'CERRADA')`,
           ),
         });
 

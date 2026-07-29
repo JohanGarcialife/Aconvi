@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -55,6 +55,14 @@ export default function RatingScreen() {
   const [comment, setComment] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
+  // Reset state when navigating to a different incident
+  useEffect(() => {
+    setRating(0);
+    setHoveredStar(0);
+    setComment("");
+    setSubmitted(false);
+  }, [incidentId]);
+
   const displayRating = hoveredStar || rating;
 
   // ─── Fetch incident for context ──────────────────────────────────────────
@@ -62,6 +70,11 @@ export default function RatingScreen() {
     ...api.incident.byId.queryOptions({ id: incidentId as string, tenantId: TENANT_ID }),
     enabled: !!incidentId,
   });
+
+  // If incident already has a rating, show the thanks screen with existing data
+  const alreadyRated = !!incident?.rating;
+  const effectiveRating = alreadyRated ? incident!.rating! : rating;
+  const effectiveSubmitted = submitted || alreadyRated;
 
   // ─── Submit mutation ─────────────────────────────────────────────────────
   const submitRating = useMutation({
@@ -90,7 +103,7 @@ export default function RatingScreen() {
     : "";
 
   // ─── Submitted state ──────────────────────────────────────────────────────
-  if (submitted) {
+  if (effectiveSubmitted) {
     return (
       <SafeAreaView style={s.safe} edges={["top", "bottom"]}>
         <Stack.Screen options={{ headerShown: false }} />
@@ -104,7 +117,7 @@ export default function RatingScreen() {
           </Text>
           <View style={s.submittedStars}>
             {[1, 2, 3, 4, 5].map((i) => (
-              <Text key={i} style={[s.starChar, { color: i <= rating ? "#F59E0B" : "#E5E7EB" }]}>
+              <Text key={i} style={[s.starChar, { color: i <= effectiveRating ? "#F59E0B" : "#E5E7EB" }]}>
                 ★
               </Text>
             ))}
@@ -115,6 +128,31 @@ export default function RatingScreen() {
             activeOpacity={0.88}
           >
             <Text style={s.submitBtnText}>Ir a mis incidencias</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Only allow rating when incident is CERRADA
+  if (incident && (incident as any).status !== "CERRADA") {
+    return (
+      <SafeAreaView style={s.safe} edges={["top", "bottom"]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={s.submittedWrap}>
+          <View style={s.submittedIcon}>
+            <Text style={{ fontSize: 44 }}>⏳</Text>
+          </View>
+          <Text style={s.submittedTitle}>Valoración no disponible</Text>
+          <Text style={s.submittedSub}>
+            Podrás valorar el servicio una vez el administrador cierre la incidencia.
+          </Text>
+          <TouchableOpacity
+            style={[s.submitBtn, { alignSelf: "stretch", marginHorizontal: 0 }]}
+            onPress={() => router.replace("/(vecino)/incidents")}
+            activeOpacity={0.88}
+          >
+            <Text style={s.submitBtnText}>Volver a mis incidencias</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -192,7 +230,7 @@ export default function RatingScreen() {
                       resizeMode="cover"
                     />
                     <View style={s.resolvedBadgeOverlay}>
-                      <Text style={s.resolvedBadgeText}>RESUELTA</Text>
+                      <Text style={s.resolvedBadgeText}>INTERVENCIÓN FINALIZADA</Text>
                     </View>
                   </>
                 ) : (
