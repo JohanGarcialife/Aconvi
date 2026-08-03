@@ -205,21 +205,6 @@ export default function ProveedorJobScreen() {
     ? activeIncidents.find((i: any) => i.id === selectedIncidentId) ?? null
     : null;
 
-  const acceptMutation = useMutation(
-    api.incident.providerAccept.mutationOptions({
-      onSuccess: () => {
-        router.push({
-          pathname: "/(proveedor)/job/estimate",
-          params: {
-            incidentId: activeIncident?.id,
-            providerId,
-          },
-        });
-      },
-      onError: (e: any) => Alert.alert("Error", e.message),
-    })
-  );
-
   // Auto refresh when coming back to foreground
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextState) => {
@@ -234,22 +219,44 @@ export default function ProveedorJobScreen() {
 
   const handleAccept = () => {
     if (!activeIncident || !providerId) return;
-
-    acceptMutation.mutate({
-      id: activeIncident.id,
-      tenantId: activeIncident.organizationId ?? tenantId,
-      providerId,
-      notes: "Trabajo aceptado por proveedor",
-    } as any);
+    router.push({
+      pathname: "/(proveedor)/job/estimate",
+      params: {
+        incidentId: activeIncident.id,
+        providerId,
+      },
+    });
   };
+
+  const rejectMutation = useMutation(
+    api.incident.providerReject.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries(api.incident.assignedToProvider.queryFilter());
+        setSelectedIncidentId(null);
+        Alert.alert("Orden rechazada", "La incidencia ha sido devuelta al administrador.");
+      },
+      onError: (e: any) => Alert.alert("Error", e.message),
+    })
+  );
 
   const handleDecline = () => {
     Alert.alert(
       "Rechazar trabajo",
-      "¿Seguro que quieres rechazar esta incidencia?",
+      "¿Seguro que quieres rechazar esta incidencia? Será devuelta al administrador.",
       [
         { text: "Cancelar", style: "cancel" },
-        { text: "Rechazar", style: "destructive", onPress: () => setSelectedIncidentId(null) },
+        {
+          text: "Rechazar",
+          style: "destructive",
+          onPress: () => {
+            if (!activeIncident || !providerId) return;
+            rejectMutation.mutate({
+              id: activeIncident.id,
+              tenantId: activeIncident.organizationId ?? "org_aconvi_demo",
+              providerId,
+            });
+          },
+        },
       ]
     );
   };
@@ -561,19 +568,15 @@ export default function ProveedorJobScreen() {
 
         {/* CTA */}
         <TouchableOpacity
-          style={[styles.acceptButton, (acceptMutation.isPending || isExpired) && { opacity: 0.4 }]}
+          style={[styles.acceptButton, isExpired && { opacity: 0.4 }]}
           onPress={handleAccept}
-          disabled={acceptMutation.isPending || isExpired}
+          disabled={isExpired}
           activeOpacity={0.85}
         >
-          {acceptMutation.isPending ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <>
-              <Text style={styles.acceptButtonIcon}>✓</Text>
-              <Text style={styles.acceptButtonText}>ACEPTAR</Text>
-            </>
-          )}
+          <>
+            <Text style={styles.acceptButtonIcon}>✓</Text>
+            <Text style={styles.acceptButtonText}>ACEPTAR</Text>
+          </>
         </TouchableOpacity>
 
         {/* Decline */}

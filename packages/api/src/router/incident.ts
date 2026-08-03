@@ -470,6 +470,63 @@ export const incidentRouter = createTRPCRouter({
       return updated;
     }),
 
+  // ─── Provider: reject assigned OT (→ RECIBIDA) ────────────────────────────
+  providerReject: publicProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        tenantId: z.string().min(1),
+        providerId: z.string().min(1),
+        reason: z.string().max(500).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Revert to RECIBIDA and clear provider assignment
+      const [updated] = await ctx.db
+        .update(incident)
+        .set({
+          status: "RECIBIDA",
+          providerId: null,
+          estimatedCost: null,
+          estimatedDays: null,
+          scheduledAt: null,
+          estimatedDuration: null,
+        })
+        .where(
+          and(
+            eq(incident.id, input.id),
+            eq(incident.organizationId, input.tenantId),
+          ),
+        )
+        .returning();
+
+      if (!updated) throw new Error("No se pudo rechazar la orden de trabajo.");
+
+      // Log history
+      await insertHistoryIfNotDuplicate(ctx.db, {
+        incidentId: updated.id,
+        actorName: "Proveedor",
+        action: "PROVIDER_REJECTED",
+        previousStatus: "EN_REVISION",
+        newStatus: "RECIBIDA",
+        comment: input.reason ? `Motivo: ${input.reason}` : "El proveedor ha rechazado la orden de trabajo.",
+      });
+
+      // Notify admin only (NOT the vecino)
+      if (updated.assigneeId) {
+        void sendPushToUser(ctx.db, updated.assigneeId, {
+          title: "Proveedor ha rechazado la OT",
+          body: `El proveedor rechazó la incidencia "${updated.title}". Puedes reasignarla a otro proveedor.`,
+          data: { type: "provider_rejected", incidentId: updated.id },
+        }).catch(console.error);
+      }
+
+      // WS event so admin dashboard updates in real-time
+      void emitWebSocketEvent(input.tenantId, "incident-updated", updated);
+
+      return updated;
+    }),
+
   // ─── Add internal note ───────────────────────────────────────────────────
   addNote: publicProcedure
     .input(
@@ -539,6 +596,8 @@ export const incidentRouter = createTRPCRouter({
         estimatedDays: z.number().int().min(0).optional(),
         estimatedCost: z.number().min(0).optional(),
         notes: z.string().max(1000).optional(),
+        scheduledAt: z.string().datetime().optional(),
+        estimatedDuration: z.string().max(32).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -578,6 +637,8 @@ export const incidentRouter = createTRPCRouter({
           providerId: input.providerId,
           estimatedCost: input.estimatedCost,
           estimatedDays: input.estimatedDays,
+          scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : undefined,
+          estimatedDuration: input.estimatedDuration,
         })
         .where(
           and(
@@ -597,6 +658,11 @@ export const incidentRouter = createTRPCRouter({
         if (input.estimatedDays !== undefined) {
           noteLines.push(`⏳ Tiempo estimado: ${input.estimatedDays === 0 ? "Hoy mismo" : `${input.estimatedDays} días`}`);
         }
+        if (input.scheduledAt) {
+          const d = new Date(input.scheduledAt);
+          noteLines.push(`📅 Programado: ${d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })} a las ${d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`);
+        }
+        if (input.estimatedDuration) noteLines.push(`⏱️ Duración estimada: ${input.estimatedDuration}`);
 
         // Use a valid user ID (fallback to demo) instead of providerId which is not in 'user' table
         await ctx.db.insert(incidentNote).values({

@@ -117,6 +117,8 @@ export const incident = pgTable("incident", (t) => ({
   startedAt: t.timestamp("started_at", { mode: "date", withTimezone: true }),
   resolvedAt: t.timestamp("resolved_at", { mode: "date", withTimezone: true }),
   rejectedAt: t.timestamp("rejected_at", { mode: "date", withTimezone: true }),
+  scheduledAt: t.timestamp("scheduled_at", { mode: "date", withTimezone: true }),
+  estimatedDuration: t.varchar("estimated_duration", { length: 32 }),
   createdAt: t.timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   updatedAt: t
     .timestamp("updated_at", { mode: "date", withTimezone: true })

@@ -10,6 +10,8 @@ import {
   PanResponder,
   Animated,
   useWindowDimensions,
+  Modal,
+  Dimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, Stack, useLocalSearchParams } from "expo-router";
@@ -28,6 +30,8 @@ interface OfflineEstimate {
   estimatedCost: number;
   estimatedDays: number;
   notes: string;
+  scheduledAt?: string;
+  estimatedDuration?: string;
   createdAt: number;
 }
 
@@ -52,8 +56,9 @@ const PRIMARY = "#4aa19b";
 const DARK = "#0f172a";
 const MUTED = "#64748b";
 const BORDER = "#e2e8f0";
+const SCREEN_HEIGHT = Dimensions.get("window").height;
 
-// ─── Custom Slider (no external package needed) ───────────────────────────────
+// ─── Custom Slider ────────────────────────────────────────────────────────────
 interface NativeSliderProps {
   value: number;
   min: number;
@@ -63,9 +68,8 @@ interface NativeSliderProps {
 }
 
 function NativeSlider({ value, min, max, step = 5, onChange }: NativeSliderProps) {
-  const TRACK_WIDTH = useWindowDimensions().width - 80; // paddings
+  const TRACK_WIDTH = useWindowDimensions().width - 80;
   const THUMB = 24;
-
   const pct = (value - min) / (max - min);
   const thumbX = useRef(new Animated.Value(pct * (TRACK_WIDTH - THUMB))).current;
   const startX = useRef(0);
@@ -92,24 +96,16 @@ function NativeSlider({ value, min, max, step = 5, onChange }: NativeSliderProps
 
   return (
     <View style={{ height: 44, justifyContent: "center" }}>
-      {/* Track */}
       <View style={[slStyles.track, { width: TRACK_WIDTH }]}>
-        {/* Fill */}
         <Animated.View
           style={[
             slStyles.fill,
-            {
-              width: Animated.add(thumbX, THUMB / 2),
-            },
+            { width: Animated.add(thumbX, THUMB / 2) },
           ]}
         />
-        {/* Thumb */}
         <Animated.View
+          style={[slStyles.thumb, { transform: [{ translateX: thumbX }] }]}
           {...panResponder.panHandlers}
-          style={[
-            slStyles.thumb,
-            { transform: [{ translateX: thumbX }] },
-          ]}
         />
       </View>
     </View>
@@ -119,14 +115,11 @@ function NativeSlider({ value, min, max, step = 5, onChange }: NativeSliderProps
 const slStyles = StyleSheet.create({
   track: {
     height: 6,
-    backgroundColor: "#cbd5e1",
     borderRadius: 3,
-    position: "relative",
+    backgroundColor: BORDER,
   },
   fill: {
     position: "absolute",
-    left: 0,
-    top: 0,
     height: 6,
     backgroundColor: PRIMARY,
     borderRadius: 3,
@@ -146,7 +139,7 @@ const slStyles = StyleSheet.create({
   },
 });
 
-// ─── Cost row with slider ─────────────────────────────────────────────────────
+// ─── Cost row ─────────────────────────────────────────────────────────────────
 interface CostRowProps {
   label: string;
   emoji: string;
@@ -179,6 +172,32 @@ function CostRow({ label, emoji, value, min, max, step, scaleMarks, onChange }: 
   );
 }
 
+// ─── Date helpers ─────────────────────────────────────────────────────────────
+const DAY_NAMES = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+const DAY_NAMES_FULL = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+const MONTH_NAMES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+const MONTH_NAMES_FULL = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+
+function generateDateChips(): { label: string; sublabel: string; date: Date }[] {
+  const chips: { label: string; sublabel: string; date: Date }[] = [];
+  const today = new Date();
+  for (let i = 0; i < 5; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+    d.setHours(0, 0, 0, 0);
+    const dayLabel = i === 0 ? "Hoy" : i === 1 ? "Mañana" : DAY_NAMES[d.getDay()]!;
+    chips.push({
+      label: dayLabel,
+      sublabel: `${d.getDate()}\n${MONTH_NAMES[d.getMonth()]}`,
+      date: d,
+    });
+  }
+  return chips;
+}
+
+const HOUR_CHIPS = ["08:00", "09:00", "10:00", "11:00", "12:00"];
+const DURATION_CHIPS = ["30 min", "1 hora", "2 horas", "Más de 2 horas"];
+
 // ─── Main screen ──────────────────────────────────────────────────────────────
 export default function EstimateScreen() {
   const router = useRouter();
@@ -192,32 +211,32 @@ export default function EstimateScreen() {
   const [pendingCount, setPendingCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
 
+  // Bottom sheet state
+  const [showSchedule, setShowSchedule] = useState(false);
+  const [selectedDateIdx, setSelectedDateIdx] = useState(1); // default: Mañana
+  const [selectedHour, setSelectedHour] = useState("10:00");
+  const [selectedDuration, setSelectedDuration] = useState("1 hora");
+  const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+
+  const dateChips = generateDateChips();
+
   const DEMO_TENANT_ID = "org_aconvi_demo";
   const total = departure + labor + materials;
 
   const acceptMutation = useMutation(
     api.incident.providerAccept.mutationOptions({
       onSuccess: () => {
-        // Invalidate so job list reflects the status change
         void queryClient.invalidateQueries(api.incident.assignedToProvider.queryFilter());
         void queryClient.invalidateQueries(api.incident.all.queryFilter());
-        Alert.alert(
-          "Estimación enviada ✓",
-          `Presupuesto de ${total}€ guardado. El administrador será notificado.`,
-          [{ text: "OK", onPress: () => router.push({
-            pathname: "/(proveedor)/job/inprogress",
-            params: { incidentId: params.incidentId, providerId: params.providerId },
-          }) }]
-        );
       },
       onError: (e: any) => {
-        const msg = e?.message ?? e?.data?.message ?? "Error al enviar la estimación. Inténtalo de nuevo.";
+        const msg = e?.message ?? "Error al enviar la estimación.";
         Alert.alert("Error", msg);
       },
     })
   );
 
-  // ─── Sync offline estimate queue ──────────────────────────────────────────
+  // ─── Offline queue sync ───────────────────────────────────────────────────
   const syncEstimateQueue = useCallback(async () => {
     const queue = await loadEstimateQueue();
     if (queue.length === 0) return;
@@ -233,6 +252,8 @@ export default function EstimateScreen() {
               estimatedCost: job.estimatedCost,
               estimatedDays: job.estimatedDays,
               notes: job.notes,
+              scheduledAt: job.scheduledAt,
+              estimatedDuration: job.estimatedDuration,
             } as any,
             { onSuccess: () => resolve(), onError: (e: any) => reject(e) },
           );
@@ -245,7 +266,6 @@ export default function EstimateScreen() {
     setIsSyncing(false);
   }, [acceptMutation]);
 
-  // ─── NetInfo listener ─────────────────────────────────────────────────────
   useEffect(() => {
     loadEstimateQueue().then((q) => setPendingCount(q.length));
     const unsub = NetInfo.addEventListener((state: any) => {
@@ -256,10 +276,29 @@ export default function EstimateScreen() {
     return () => unsub();
   }, [syncEstimateQueue]);
 
-  const handleSend = async () => {
+  // ─── Bottom sheet animation ───────────────────────────────────────────────
+  const openSheet = () => {
+    setShowSchedule(true);
+    Animated.spring(slideAnim, {
+      toValue: 0,
+      useNativeDriver: true,
+      tension: 65,
+      friction: 11,
+    }).start();
+  };
+
+  const closeSheet = () => {
+    Animated.timing(slideAnim, {
+      toValue: SCREEN_HEIGHT,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => setShowSchedule(false));
+  };
+
+  // ─── Handle "Salir ahora" send ────────────────────────────────────────────
+  const handleSendNow = async () => {
     const incidentId = params.incidentId;
     const providerId = params.providerId;
-
     if (!incidentId || !providerId) {
       Alert.alert("Estimación enviada ✓", `Presupuesto de ${total}€ enviado.`,
         [{ text: "OK", onPress: () => router.push("/(proveedor)/job/inprogress") }]
@@ -268,46 +307,128 @@ export default function EstimateScreen() {
     }
 
     if (isOffline) {
-      // ── Modo offline: guardar en cola ────────────────────────────────────
       const job: OfflineEstimate = {
         id: `offline_est_${Date.now()}`,
         incidentId,
         providerId,
         tenantId: DEMO_TENANT_ID,
         estimatedCost: total,
-        estimatedDays: goNow ? 0 : Number(days),
-        notes: goNow ? "Salida inmediata" : "Salida programada",
+        estimatedDays: 0,
+        notes: "Salida inmediata",
         createdAt: Date.now(),
       };
       await addEstimateToQueue(job);
       setPendingCount((c) => c + 1);
       Alert.alert(
         "📶 Guardado sin conexión",
-        "Tu estimación se ha guardado localmente. Se enviará automáticamente cuando recuperes señal.",
+        "Tu estimación se ha guardado localmente.",
         [{ text: "OK", onPress: () => router.push({
           pathname: "/(proveedor)/job/inprogress",
           params: { incidentId, providerId },
         }) }]
       );
     } else {
-      acceptMutation.mutate({
+      acceptMutation.mutate(
+        {
+          id: incidentId,
+          tenantId: DEMO_TENANT_ID,
+          providerId,
+          estimatedCost: total,
+          estimatedDays: 0,
+          notes: "Salida inmediata",
+        } as any,
+        {
+          onSuccess: () => {
+            Alert.alert("Estimación enviada ✓", `Presupuesto de ${total}€ guardado.`,
+              [{ text: "OK", onPress: () => router.push({
+                pathname: "/(proveedor)/job/inprogress",
+                params: { incidentId, providerId },
+              }) }]
+            );
+          },
+        }
+      );
+    }
+  };
+
+  // ─── Handle schedule confirm ──────────────────────────────────────────────
+  const handleConfirmSchedule = () => {
+    const incidentId = params.incidentId;
+    const providerId = params.providerId;
+    if (!incidentId || !providerId) return;
+
+    const selectedDate = dateChips[selectedDateIdx]!.date;
+    const [hours, minutes] = selectedHour.split(":").map(Number);
+    selectedDate.setHours(hours!, minutes!, 0, 0);
+    const scheduledAtISO = selectedDate.toISOString();
+
+    closeSheet();
+
+    if (isOffline) {
+      const job: OfflineEstimate = {
+        id: `offline_est_${Date.now()}`,
+        incidentId,
+        providerId,
+        tenantId: DEMO_TENANT_ID,
+        estimatedCost: total,
+        estimatedDays: days,
+        notes: "Salida programada",
+        scheduledAt: scheduledAtISO,
+        estimatedDuration: selectedDuration,
+        createdAt: Date.now(),
+      };
+      addEstimateToQueue(job).then(() => {
+        setPendingCount((c) => c + 1);
+        Alert.alert("📶 Guardado sin conexión", "La programación se enviará cuando recuperes señal.",
+          [{ text: "OK", onPress: () => router.push({
+            pathname: "/(proveedor)/job/inprogress",
+            params: { incidentId, providerId },
+          }) }]
+        );
+      });
+      return;
+    }
+
+    acceptMutation.mutate(
+      {
         id: incidentId,
         tenantId: DEMO_TENANT_ID,
         providerId,
         estimatedCost: total,
-        estimatedDays: goNow ? 0 : Number(days),
-        notes: goNow ? "Salida inmediata" : "Salida programada",
-      } as any);
-    }
+        estimatedDays: days,
+        notes: "Salida programada",
+        scheduledAt: scheduledAtISO,
+        estimatedDuration: selectedDuration,
+      } as any,
+      {
+        onSuccess: () => {
+          const d = selectedDate;
+          const dayName = DAY_NAMES_FULL[d.getDay()];
+          const monthName = MONTH_NAMES_FULL[d.getMonth()];
+          Alert.alert(
+            "Intervención programada ✓",
+            `${dayName}, ${d.getDate()} de ${monthName} a las ${selectedHour}\nDuración: ${selectedDuration}\nPresupuesto: ${total}€`,
+            [{ text: "OK", onPress: () => router.push({
+              pathname: "/(proveedor)/job/inprogress",
+              params: { incidentId, providerId },
+            }) }]
+          );
+        },
+      }
+    );
   };
+
+  // ─── Summary text for bottom sheet ────────────────────────────────────────
+  const selectedDate = dateChips[selectedDateIdx]?.date ?? new Date();
+  const summaryDayName = DAY_NAMES_FULL[selectedDate.getDay()];
+  const summaryMonth = MONTH_NAMES_FULL[selectedDate.getMonth()];
+  const summaryText = `${summaryDayName}, ${selectedDate.getDate()} de ${summaryMonth} a las ${selectedHour}`;
 
   const isLoading = acceptMutation.isPending || isSyncing;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
-      <Stack.Screen
-        options={{ title: "Intervención", headerBackTitle: "Regresar" }}
-      />
+      <Stack.Screen options={{ title: "Intervención", headerBackTitle: "Regresar" }} />
 
       <ScrollView
         contentContainerStyle={styles.scroll}
@@ -327,75 +448,62 @@ export default function EstimateScreen() {
             </Text>
           </TouchableOpacity>
         )}
-        {/* OT header */}
-        <Text style={styles.otTitle}>OT aceptada</Text>
-        <Text style={styles.communityName}>Residencial El Lago</Text>
-        <Text style={styles.address}>Calle Los Sauces, 345</Text>
 
-        {/* Go now / Schedule */}
+        {/* OT header */}
+        <View style={styles.otHeader}>
+          <View style={styles.otIconCircle}>
+            <Text style={{ fontSize: 28 }}>✅</Text>
+          </View>
+          <Text style={styles.otTitle}>OT aceptada</Text>
+          <Text style={styles.communityName}>Residencial El Lago</Text>
+          <Text style={styles.address}>Calle Los Sauces, 345</Text>
+        </View>
+
+        {/* Go now / Schedule toggle */}
         <Text style={styles.questionLabel}>¿Salir ahora?</Text>
         <View style={styles.toggleRow}>
           <TouchableOpacity
             style={[styles.toggleBtn, goNow && styles.toggleBtnActive]}
             onPress={() => setGoNow(true)}
           >
-            <Text style={[styles.toggleText, goNow && styles.toggleTextActive]}>
-              Salir ahora
-            </Text>
+            <Text style={[styles.toggleIcon, goNow && styles.toggleIconActive]}>🚗</Text>
+            <Text style={[styles.toggleText, goNow && styles.toggleTextActive]}>Salir ahora</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.toggleBtn, !goNow && styles.toggleBtnActive]}
-            onPress={() => setGoNow(false)}
+            onPress={() => { setGoNow(false); openSheet(); }}
           >
-            <Text style={[styles.toggleText, !goNow && styles.toggleTextActive]}>
-              Programar
-            </Text>
+            <Text style={[styles.toggleIcon, !goNow && styles.toggleIconActive]}>📅</Text>
+            <Text style={[styles.toggleText, !goNow && styles.toggleTextActive]}>Programar</Text>
           </TouchableOpacity>
         </View>
-        <Text style={styles.deadlineHint}>Antes de las 17:00</Text>
+
+        {/* Show schedule summary if programmed */}
+        {!goNow && (
+          <TouchableOpacity style={styles.scheduleSummaryCard} onPress={openSheet} activeOpacity={0.7}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Text style={{ fontSize: 18 }}>📅</Text>
+              <View>
+                <Text style={styles.scheduleSummaryLabel}>Programado:</Text>
+                <Text style={styles.scheduleSummaryText}>{summaryText}</Text>
+                <Text style={styles.scheduleSummaryDuration}>Duración estimada: {selectedDuration}</Text>
+              </View>
+            </View>
+            <Text style={{ color: PRIMARY, fontWeight: "600", fontSize: 13 }}>Cambiar ›</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Sliders */}
-        <CostRow
-          label="Desplazamiento"
-          emoji="🚗"
-          value={departure}
-          min={0}
-          max={150}
-          step={5}
-          scaleMarks={["0", "30 €", "50 €", "100 €", "150 €"]}
-          onChange={setDeparture}
-        />
-        <CostRow
-          label="Mano de obra"
-          emoji="🔧"
-          value={labor}
-          min={0}
-          max={200}
-          step={5}
-          scaleMarks={["0 €", "40 €", "80 €", "160 €", "200 €"]}
-          onChange={setLabor}
-        />
-        <CostRow
-          label="Materiales"
-          emoji="🧰"
-          value={materials}
-          min={0}
-          max={100}
-          step={5}
-          scaleMarks={["0 €", "20 €", "40 €", "80 €", "100 €"]}
-          onChange={setMaterials}
-        />
-
-        <CostRow
-          label="Plazo estimado"
-          emoji="⏳"
-          value={days}
-          min={1}
-          max={15}
-          step={1}
-          scaleMarks={["1d", "3d", "5d", "10d", "15d"]}
-          onChange={setDays}
-        />
+        <CostRow label="Desplazamiento" emoji="🚗" value={departure} min={0} max={150} step={5}
+          scaleMarks={["0", "30 €", "50 €", "100 €", "150 €"]} onChange={setDeparture} />
+        <CostRow label="Mano de obra" emoji="🔧" value={labor} min={0} max={200} step={5}
+          scaleMarks={["0 €", "40 €", "80 €", "160 €", "200 €"]} onChange={setLabor} />
+        <CostRow label="Materiales" emoji="🧰" value={materials} min={0} max={100} step={5}
+          scaleMarks={["0 €", "20 €", "40 €", "80 €", "100 €"]} onChange={setMaterials} />
+        {!goNow && (
+          <CostRow label="Plazo estimado" emoji="⏳" value={days} min={1} max={15} step={1}
+            scaleMarks={["1d", "3d", "5d", "10d", "15d"]} onChange={setDays} />
+        )}
 
         {/* Total */}
         <View style={styles.totalRow}>
@@ -408,7 +516,7 @@ export default function EstimateScreen() {
         {/* CTA */}
         <TouchableOpacity
           style={[styles.sendButton, isLoading && { opacity: 0.7 }]}
-          onPress={handleSend}
+          onPress={goNow ? handleSendNow : openSheet}
           disabled={isLoading}
           activeOpacity={0.85}
         >
@@ -416,7 +524,7 @@ export default function EstimateScreen() {
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={styles.sendButtonText}>
-              {isOffline ? "💾 Guardar sin conexión" : "Enviar estimación"}
+              {isOffline ? "💾 Guardar sin conexión" : goNow ? "Enviar estimación" : "📅 Confirmar programación"}
             </Text>
           )}
         </TouchableOpacity>
@@ -425,110 +533,267 @@ export default function EstimateScreen() {
           <Text style={styles.navLinkText}>📍 Navegar</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* ─── Schedule Bottom Sheet ─────────────────────────────────────────── */}
+      <Modal visible={showSchedule} transparent animationType="none" onRequestClose={closeSheet}>
+        <View style={bsStyles.overlay}>
+          <TouchableOpacity style={bsStyles.backdrop} activeOpacity={1} onPress={closeSheet} />
+          <Animated.View style={[bsStyles.sheet, { transform: [{ translateY: slideAnim }] }]}>
+            {/* Header */}
+            <View style={bsStyles.header}>
+              <Text style={bsStyles.headerTitle}>Programar intervención</Text>
+              <TouchableOpacity onPress={closeSheet} hitSlop={12}>
+                <Text style={bsStyles.closeX}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+              {/* 1. Date */}
+              <Text style={bsStyles.sectionLabel}>1. Selecciona la fecha</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={bsStyles.chipScroll}>
+                {dateChips.map((chip, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    style={[bsStyles.dateChip, selectedDateIdx === idx && bsStyles.dateChipActive]}
+                    onPress={() => setSelectedDateIdx(idx)}
+                  >
+                    <Text style={[bsStyles.dateChipLabel, selectedDateIdx === idx && bsStyles.dateChipLabelActive]}>
+                      {chip.label}
+                    </Text>
+                    <Text style={[bsStyles.dateChipDay, selectedDateIdx === idx && bsStyles.dateChipDayActive]}>
+                      {chip.date.getDate()}
+                    </Text>
+                    <Text style={[bsStyles.dateChipMonth, selectedDateIdx === idx && bsStyles.dateChipMonthActive]}>
+                      {MONTH_NAMES[chip.date.getMonth()]}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                <View style={bsStyles.dateChipCalendar}>
+                  <Text style={{ fontSize: 20 }}>📅</Text>
+                  <Text style={bsStyles.dateChipCalendarText}>Elegir{"\n"}fecha</Text>
+                </View>
+              </ScrollView>
+
+              {/* 2. Hour */}
+              <Text style={bsStyles.sectionLabel}>2. Selecciona la hora</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={bsStyles.chipScroll}>
+                {HOUR_CHIPS.map((h) => (
+                  <TouchableOpacity
+                    key={h}
+                    style={[bsStyles.hourChip, selectedHour === h && bsStyles.hourChipActive]}
+                    onPress={() => setSelectedHour(h)}
+                  >
+                    <Text style={[bsStyles.hourChipText, selectedHour === h && bsStyles.hourChipTextActive]}>
+                      {h}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity style={bsStyles.hourChipMore}>
+                  <Text style={{ fontSize: 16 }}>🕐</Text>
+                  <Text style={bsStyles.hourChipMoreText}>Más{"\n"}horas</Text>
+                </TouchableOpacity>
+              </ScrollView>
+
+              {/* 3. Duration */}
+              <Text style={bsStyles.sectionLabel}>3. Duración estimada</Text>
+              <View style={bsStyles.durationRow}>
+                {DURATION_CHIPS.map((d) => (
+                  <TouchableOpacity
+                    key={d}
+                    style={[bsStyles.durationChip, selectedDuration === d && bsStyles.durationChipActive]}
+                    onPress={() => setSelectedDuration(d)}
+                  >
+                    <Text style={[bsStyles.durationChipText, selectedDuration === d && bsStyles.durationChipTextActive]}>
+                      {d}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Summary */}
+              <View style={bsStyles.summaryCard}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                  <Text style={{ fontSize: 18 }}>📅</Text>
+                  <View>
+                    <Text style={bsStyles.summaryLabel}>Resumen:</Text>
+                    <Text style={bsStyles.summaryDate}>{summaryText}</Text>
+                  </View>
+                </View>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                  <Text style={{ fontSize: 18 }}>🕐</Text>
+                  <Text style={bsStyles.summaryDuration}>Duración estimada: {selectedDuration}</Text>
+                </View>
+              </View>
+            </ScrollView>
+
+            {/* Footer buttons */}
+            <View style={bsStyles.footer}>
+              <TouchableOpacity style={bsStyles.cancelBtn} onPress={closeSheet}>
+                <Text style={bsStyles.cancelBtnText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[bsStyles.confirmBtn, isLoading && { opacity: 0.7 }]}
+                onPress={handleConfirmSchedule}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={bsStyles.confirmBtnText}>Confirmar programación</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
+// ─── Main styles ──────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#fff" },
   scroll: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 40 },
   offlineBanner: {
-    backgroundColor: "#fef3c7",
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#fde68a",
+    backgroundColor: "#fef3c7", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10,
+    marginBottom: 12, borderWidth: 1, borderColor: "#fde68a",
   },
   offlineBannerText: { fontSize: 13, color: "#92400e", fontWeight: "600", textAlign: "center" },
   syncBanner: {
-    backgroundColor: "#ecfdf5",
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#bbf7d0",
+    backgroundColor: "#ecfdf5", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10,
+    marginBottom: 12, borderWidth: 1, borderColor: "#bbf7d0",
   },
   syncBannerText: { fontSize: 13, color: "#065f46", fontWeight: "600", textAlign: "center" },
-  otTitle: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: DARK,
-    textAlign: "center",
-    marginBottom: 4,
-    letterSpacing: -0.5,
+  otHeader: { alignItems: "center", marginBottom: 24 },
+  otIconCircle: {
+    width: 64, height: 64, borderRadius: 32, backgroundColor: "#ecfdf5",
+    justifyContent: "center", alignItems: "center", marginBottom: 12,
   },
-  communityName: { fontSize: 16, color: MUTED, textAlign: "center" },
-  address: { fontSize: 14, color: MUTED, textAlign: "center", marginBottom: 20 },
+  otTitle: { fontSize: 28, fontWeight: "800", color: DARK, letterSpacing: -0.5, marginBottom: 4 },
+  communityName: { fontSize: 16, color: MUTED },
+  address: { fontSize: 14, color: MUTED, marginBottom: 4 },
   questionLabel: { fontSize: 17, fontWeight: "700", color: DARK, marginBottom: 10 },
-  toggleRow: { flexDirection: "row", gap: 10, marginBottom: 6 },
+  toggleRow: { flexDirection: "row", gap: 10, marginBottom: 16 },
   toggleBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: BORDER,
-    alignItems: "center",
-    backgroundColor: "#fff",
+    flex: 1, paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, borderColor: BORDER,
+    alignItems: "center", backgroundColor: "#fff", flexDirection: "row", justifyContent: "center", gap: 6,
   },
   toggleBtnActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  toggleIcon: { fontSize: 16 },
+  toggleIconActive: {},
   toggleText: { fontSize: 15, fontWeight: "600", color: MUTED },
   toggleTextActive: { color: "#fff" },
-  deadlineHint: { fontSize: 13, color: PRIMARY, fontWeight: "600", marginBottom: 16 },
-  etaLabel: { fontSize: 14, color: MUTED, marginBottom: 12 },
+  scheduleSummaryCard: {
+    backgroundColor: "#f0fdfa", borderRadius: 12, padding: 14, marginBottom: 16,
+    borderWidth: 1, borderColor: "#ccfbf1", flexDirection: "row",
+    justifyContent: "space-between", alignItems: "center",
+  },
+  scheduleSummaryLabel: { fontSize: 12, color: MUTED, fontWeight: "600" },
+  scheduleSummaryText: { fontSize: 15, color: PRIMARY, fontWeight: "700" },
+  scheduleSummaryDuration: { fontSize: 12, color: MUTED, marginTop: 2 },
   sliderBox: {
-    backgroundColor: "#f8fafc",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: BORDER,
-    padding: 14,
-    marginBottom: 12,
+    backgroundColor: "#f8fafc", borderRadius: 16, borderWidth: 1, borderColor: BORDER,
+    padding: 14, marginBottom: 12,
   },
   sliderHeader: { flexDirection: "row", alignItems: "center", marginBottom: 4 },
   sliderEmoji: { fontSize: 18, marginRight: 8 },
   sliderLabel: { fontSize: 15, fontWeight: "600", color: DARK, flex: 1 },
   sliderBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    flexDirection: "row", alignItems: "center", backgroundColor: "#fff",
+    borderWidth: 1, borderColor: BORDER, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4,
   },
   sliderBadgeText: { fontSize: 14, fontWeight: "700", color: DARK },
   scaleRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 2 },
   scaleMark: { fontSize: 10, color: MUTED },
-  totalRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginVertical: 16,
-  },
+  totalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginVertical: 16 },
   totalLabel: { fontSize: 17, fontWeight: "700", color: DARK },
-  totalBadge: {
-    backgroundColor: PRIMARY,
-    borderRadius: 12,
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-  },
+  totalBadge: { backgroundColor: PRIMARY, borderRadius: 12, paddingHorizontal: 18, paddingVertical: 8 },
   totalAmount: { color: "#fff", fontSize: 20, fontWeight: "800" },
   sendButton: {
-    backgroundColor: PRIMARY,
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: "center",
-    marginBottom: 12,
-    shadowColor: PRIMARY,
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
+    backgroundColor: PRIMARY, borderRadius: 14, paddingVertical: 16, alignItems: "center",
+    marginBottom: 12, shadowColor: PRIMARY, shadowOpacity: 0.25, shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 }, elevation: 4,
   },
   sendButtonText: { color: "#fff", fontSize: 17, fontWeight: "700" },
   navLink: { alignItems: "center", paddingVertical: 8 },
   navLinkText: { fontSize: 14, color: PRIMARY, fontWeight: "600" },
+});
+
+// ─── Bottom sheet styles ──────────────────────────────────────────────────────
+const bsStyles = StyleSheet.create({
+  overlay: { flex: 1, justifyContent: "flex-end" },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.4)" },
+  sheet: {
+    backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    maxHeight: SCREEN_HEIGHT * 0.85, paddingHorizontal: 20, paddingTop: 20,
+    shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 20, shadowOffset: { width: 0, height: -4 }, elevation: 10,
+  },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
+  headerTitle: { fontSize: 20, fontWeight: "700", color: DARK },
+  closeX: { fontSize: 22, color: MUTED, fontWeight: "600" },
+  sectionLabel: { fontSize: 15, fontWeight: "600", color: DARK, marginBottom: 10, marginTop: 8 },
+  chipScroll: { marginBottom: 8 },
+  // Date chips
+  dateChip: {
+    width: 72, height: 88, borderRadius: 14, borderWidth: 1.5, borderColor: BORDER,
+    alignItems: "center", justifyContent: "center", marginRight: 8, backgroundColor: "#fff",
+  },
+  dateChipActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  dateChipLabel: { fontSize: 12, fontWeight: "600", color: MUTED, marginBottom: 2 },
+  dateChipLabelActive: { color: "#fff" },
+  dateChipDay: { fontSize: 24, fontWeight: "800", color: DARK },
+  dateChipDayActive: { color: "#fff" },
+  dateChipMonth: { fontSize: 12, color: MUTED, fontWeight: "600" },
+  dateChipMonthActive: { color: "rgba(255,255,255,0.8)" },
+  dateChipCalendar: {
+    width: 72, height: 88, borderRadius: 14, borderWidth: 1.5, borderColor: BORDER,
+    alignItems: "center", justifyContent: "center", backgroundColor: "#f8fafc",
+  },
+  dateChipCalendarText: { fontSize: 11, color: MUTED, textAlign: "center", fontWeight: "600", marginTop: 4 },
+  // Hour chips
+  hourChip: {
+    paddingHorizontal: 18, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5,
+    borderColor: BORDER, marginRight: 8, backgroundColor: "#fff",
+  },
+  hourChipActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  hourChipText: { fontSize: 15, fontWeight: "600", color: DARK },
+  hourChipTextActive: { color: "#fff" },
+  hourChipMore: {
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, borderWidth: 1.5,
+    borderColor: BORDER, alignItems: "center", justifyContent: "center", backgroundColor: "#f8fafc",
+  },
+  hourChipMoreText: { fontSize: 11, color: MUTED, textAlign: "center", fontWeight: "600", marginTop: 2 },
+  // Duration chips
+  durationRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 },
+  durationChip: {
+    paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, borderWidth: 1.5,
+    borderColor: BORDER, backgroundColor: "#fff",
+  },
+  durationChipActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  durationChipText: { fontSize: 14, fontWeight: "600", color: DARK },
+  durationChipTextActive: { color: "#fff" },
+  // Summary
+  summaryCard: {
+    backgroundColor: "#f0fdfa", borderRadius: 14, padding: 16, marginBottom: 16,
+    borderWidth: 1, borderColor: "#ccfbf1",
+  },
+  summaryLabel: { fontSize: 12, color: MUTED, fontWeight: "600" },
+  summaryDate: { fontSize: 16, fontWeight: "700", color: PRIMARY },
+  summaryDuration: { fontSize: 14, color: MUTED },
+  // Footer
+  footer: {
+    flexDirection: "row", gap: 12, paddingVertical: 16,
+    borderTopWidth: 1, borderTopColor: BORDER,
+  },
+  cancelBtn: {
+    flex: 1, paddingVertical: 14, borderRadius: 12, borderWidth: 1.5,
+    borderColor: PRIMARY, alignItems: "center",
+  },
+  cancelBtnText: { fontSize: 15, fontWeight: "700", color: PRIMARY },
+  confirmBtn: {
+    flex: 1.5, paddingVertical: 14, borderRadius: 12, backgroundColor: PRIMARY,
+    alignItems: "center", shadowColor: PRIMARY, shadowOpacity: 0.25, shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 }, elevation: 4,
+  },
+  confirmBtnText: { fontSize: 15, fontWeight: "700", color: "#fff" },
 });
