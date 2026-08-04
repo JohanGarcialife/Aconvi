@@ -112,7 +112,9 @@ async function ensureIncidentColumns(db: any) {
       "ALTER TABLE incident ADD COLUMN IF NOT EXISTS estimated_cost real;",
       "ALTER TABLE incident ADD COLUMN IF NOT EXISTS estimated_days integer;",
       "ALTER TABLE incident ADD COLUMN IF NOT EXISTS rating integer;",
-      "ALTER TABLE incident ADD COLUMN IF NOT EXISTS rating_comment text;"
+      "ALTER TABLE incident ADD COLUMN IF NOT EXISTS rating_comment text;",
+      "ALTER TABLE incident ADD COLUMN IF NOT EXISTS scheduled_at timestamp with time zone;",
+      "ALTER TABLE incident ADD COLUMN IF NOT EXISTS estimated_duration varchar(32);"
     ];
     for (const stmt of statements) {
       try {
