@@ -97,9 +97,7 @@ function sanitizeText(str: string): string {
   return str.split('').map(c => map[c] || c).join('');
 }
 
-let columnsEnsured = false;
 async function ensureIncidentColumns(db: any) {
-  if (columnsEnsured) return;
   try {
     const { sql } = await import("drizzle-orm");
     const statements = [
@@ -227,6 +225,7 @@ export const incidentRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await ensureIncidentColumns(ctx.db);
       const { tenantId, reporterId: inputReporterId, ...data } = input;
       const sanitizedTitle = sanitizeText(data.title);
       const sanitizedDescription = sanitizeText(data.description);
@@ -297,6 +296,7 @@ export const incidentRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await ensureIncidentColumns(ctx.db);
       const previous = await ctx.db.query.incident.findFirst({
         where: and(
           eq(incident.id, input.id),
@@ -366,6 +366,7 @@ export const incidentRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await ensureIncidentColumns(ctx.db);
       const [updated] = await ctx.db
         .update(incident)
         .set({ 
@@ -458,6 +459,7 @@ export const incidentRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await ensureIncidentColumns(ctx.db);
       const [updated] = await ctx.db
         .update(incident)
         .set({ status: "RECHAZADA", rejectedAt: new Date() })
@@ -483,6 +485,7 @@ export const incidentRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await ensureIncidentColumns(ctx.db);
       // Revert to RECIBIDA and clear provider assignment
       const [updated] = await ctx.db
         .update(incident)
@@ -540,6 +543,7 @@ export const incidentRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await ensureIncidentColumns(ctx.db);
       // Verify incident belongs to tenant
       const inc = await ctx.db.query.incident.findFirst({
         where: and(
@@ -568,7 +572,8 @@ export const incidentRouter = createTRPCRouter({
         tenantId: z.string().min(1).optional(),
       }),
     )
-    .query(({ ctx, input }) => {
+    .query(async ({ ctx, input }) => {
+      await ensureIncidentColumns(ctx.db);
       return ctx.db.query.incident.findMany({
         where: and(
           eq(incident.providerId, input.providerId),
@@ -603,6 +608,7 @@ export const incidentRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await ensureIncidentColumns(ctx.db);
       // Server-side OT expiration check
       const current = await ctx.db.query.incident.findFirst({
         where: and(
@@ -711,6 +717,7 @@ export const incidentRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await ensureIncidentColumns(ctx.db);
       const [updated] = await ctx.db
         .update(incident)
         .set({
@@ -777,6 +784,7 @@ export const incidentRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await ensureIncidentColumns(ctx.db);
       const inc = await ctx.db.query.incident.findFirst({
         where: and(
           eq(incident.id, input.id),
@@ -854,6 +862,7 @@ export const incidentRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await ensureIncidentColumns(ctx.db);
       const [updated] = await ctx.db
         .update(incident)
         .set({ status: "CERRADA" })
@@ -901,6 +910,7 @@ export const incidentRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await ensureIncidentColumns(ctx.db);
       const [updated] = await ctx.db
         .update(incident)
         .set({
