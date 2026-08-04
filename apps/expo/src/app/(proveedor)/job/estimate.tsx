@@ -414,11 +414,11 @@ export default function EstimateScreen() {
           const dayName = DAY_NAMES_FULL[d.getDay()];
           const monthName = MONTH_NAMES_FULL[d.getMonth()];
           Alert.alert(
-            "Intervención programada ✓",
-            `${dayName}, ${d.getDate()} de ${monthName} a las ${selectedHour}\nDuración: ${selectedDuration}\nPresupuesto: ${total}€`,
-            [{ text: "OK", onPress: () => router.push({
-              pathname: "/(proveedor)/job/inprogress",
-              params: { incidentId, providerId },
+            "Intervención agendada ✓",
+            `Cita programada para el ${dayName}, ${d.getDate()} de ${monthName} a las ${selectedHour}\nDuración: ${selectedDuration}\nPresupuesto: ${total}€`,
+            [{ text: "OK", onPress: () => router.replace({
+              pathname: "/(proveedor)/job",
+              params: { providerId },
             }) }]
           );
         },
