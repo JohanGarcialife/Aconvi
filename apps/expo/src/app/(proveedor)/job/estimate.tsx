@@ -13,7 +13,7 @@ import {
   Modal,
   Dimensions,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, Stack, useLocalSearchParams } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import NetInfo from "~/utils/safe-netinfo";
@@ -201,6 +201,7 @@ const DURATION_CHIPS = ["30 min", "1 hora", "2 horas", "Más de 2 horas"];
 // ─── Main screen ──────────────────────────────────────────────────────────────
 export default function EstimateScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ incidentId?: string; providerId?: string; tenantId?: string }>();
   const [departure, setDeparture] = useState(40);
   const [labor, setLabor] = useState(80);
@@ -554,7 +555,7 @@ export default function EstimateScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 16 }}>
               {/* 1. Date */}
               <Text style={bsStyles.sectionLabel}>1. Selecciona la fecha</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={bsStyles.chipScroll}>
@@ -634,7 +635,7 @@ export default function EstimateScreen() {
             </ScrollView>
 
             {/* Footer buttons */}
-            <View style={bsStyles.footer}>
+            <View style={[bsStyles.footer, { paddingBottom: Math.max(28, insets.bottom + 12) }]}>
               <TouchableOpacity style={bsStyles.cancelBtn} onPress={closeSheet}>
                 <Text style={bsStyles.cancelBtnText}>Cancelar</Text>
               </TouchableOpacity>
@@ -732,7 +733,7 @@ const bsStyles = StyleSheet.create({
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.4)" },
   sheet: {
     backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    maxHeight: SCREEN_HEIGHT * 0.85, paddingHorizontal: 20, paddingTop: 20,
+    maxHeight: SCREEN_HEIGHT * 0.90, paddingHorizontal: 20, paddingTop: 16,
     shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 20, shadowOffset: { width: 0, height: -4 }, elevation: 10,
   },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
@@ -789,8 +790,8 @@ const bsStyles = StyleSheet.create({
   summaryDuration: { fontSize: 14, color: MUTED },
   // Footer
   footer: {
-    flexDirection: "row", gap: 12, paddingVertical: 16,
-    borderTopWidth: 1, borderTopColor: BORDER,
+    flexDirection: "row", gap: 12, paddingTop: 14, paddingBottom: 16,
+    borderTopWidth: 1, borderTopColor: BORDER, backgroundColor: "#fff",
   },
   cancelBtn: {
     flex: 1, paddingVertical: 14, borderRadius: 12, borderWidth: 1.5,
