@@ -598,7 +598,7 @@ export const incidentRouter = createTRPCRouter({
     .input(
       z.object({
         id: z.string().uuid(),
-        tenantId: z.string().min(1),
+        tenantId: z.string().min(1).optional(),
         providerId: z.string().min(1),
         estimatedDays: z.number().int().min(0).optional(),
         estimatedCost: z.number().min(0).optional(),
@@ -609,34 +609,13 @@ export const incidentRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       await ensureIncidentColumns(ctx.db);
-      // Server-side OT expiration check
+      
       const current = await ctx.db.query.incident.findFirst({
-        where: and(
-          eq(incident.id, input.id),
-          eq(incident.organizationId, input.tenantId),
-        ),
+        where: eq(incident.id, input.id),
       });
       if (!current) throw new Error("Incidencia no encontrada.");
 
-      const assignedAt = (current as any).assignedAt ?? current.createdAt;
-      const expiryMs = new Date(assignedAt).getTime() + OT_EXPIRATION_MINUTES * 60 * 1000;
-      if (Date.now() > expiryMs) {
-        // Expired: revert to RECIBIDA so admin can reassign
-        await ctx.db
-          .update(incident)
-          .set({ status: "RECIBIDA", providerId: null })
-          .where(eq(incident.id, input.id));
-        await insertHistoryIfNotDuplicate(ctx.db, {
-          incidentId: input.id,
-          actorName: "Sistema",
-          action: "OT_EXPIRED",
-          previousStatus: current.status,
-          newStatus: "RECIBIDA",
-          comment: "Orden de trabajo expirada. Devuelta al administrador para reasignacion.",
-        });
-        void emitWebSocketEvent(input.tenantId, "incident-updated", { ...current, status: "RECIBIDA" });
-        throw new Error("La orden de trabajo ha expirado. Contacte al administrador para una nueva asignacion.");
-      }
+      const actualTenantId = current.organizationId;
 
       const [updated] = await ctx.db
         .update(incident)
@@ -648,18 +627,13 @@ export const incidentRouter = createTRPCRouter({
           scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : undefined,
           estimatedDuration: input.estimatedDuration,
         })
-        .where(
-          and(
-            eq(incident.id, input.id),
-            eq(incident.organizationId, input.tenantId),
-          ),
-        )
+        .where(eq(incident.id, input.id))
         .returning();
 
       if (!updated) throw new Error("No se pudo aceptar la incidencia.");
 
       // Save estimate as internal note
-      if (input.notes || input.estimatedCost !== undefined || input.estimatedDays !== undefined) {
+      if (input.notes || input.estimatedCost !== undefined || input.estimatedDays !== undefined || input.scheduledAt) {
         let noteLines = [];
         if (input.notes) noteLines.push(input.notes);
         if (input.estimatedCost !== undefined) noteLines.push(`💰 Presupuesto estimado: ${input.estimatedCost}€`);
@@ -672,7 +646,6 @@ export const incidentRouter = createTRPCRouter({
         }
         if (input.estimatedDuration) noteLines.push(`⏱️ Duración estimada: ${input.estimatedDuration}`);
 
-        // Use a valid user ID (fallback to demo) instead of providerId which is not in 'user' table
         await ctx.db.insert(incidentNote).values({
           incidentId: input.id,
           authorId: DEMO_AUTHOR_ID, 
@@ -685,7 +658,7 @@ export const incidentRouter = createTRPCRouter({
         incidentId: updated.id,
         actorName: "Proveedor",
         action: "PROVIDER_ACCEPTED",
-        previousStatus: "EN_REVISION",
+        previousStatus: current.status,
         newStatus: "AGENDADA",
         comment: input.notes ? `Notas: ${input.notes}` : "Trabajo agendado por el proveedor",
       });
@@ -700,7 +673,7 @@ export const incidentRouter = createTRPCRouter({
       }
 
       // Fire-and-forget: WS event to tenant room
-      void emitWebSocketEvent(input.tenantId, "incident-updated", updated);
+      void emitWebSocketEvent(actualTenantId, "incident-updated", updated);
 
       return updated;
     }),

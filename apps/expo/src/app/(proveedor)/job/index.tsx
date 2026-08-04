@@ -224,6 +224,7 @@ export default function ProveedorJobScreen() {
       params: {
         incidentId: activeIncident.id,
         providerId,
+        tenantId: activeIncident.organizationId,
       },
     });
   };

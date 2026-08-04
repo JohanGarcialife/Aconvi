@@ -201,7 +201,7 @@ const DURATION_CHIPS = ["30 min", "1 hora", "2 horas", "Más de 2 horas"];
 // ─── Main screen ──────────────────────────────────────────────────────────────
 export default function EstimateScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ incidentId?: string; providerId?: string }>();
+  const params = useLocalSearchParams<{ incidentId?: string; providerId?: string; tenantId?: string }>();
   const [departure, setDeparture] = useState(40);
   const [labor, setLabor] = useState(80);
   const [materials, setMaterials] = useState(35);
@@ -298,8 +298,10 @@ export default function EstimateScreen() {
   // ─── Handle "Salir ahora" send ────────────────────────────────────────────
   const handleSendNow = async () => {
     const incidentId = params.incidentId;
-    const providerId = params.providerId;
-    if (!incidentId || !providerId) {
+    const providerId = params.providerId ?? "11111111-2222-3333-4444-555555555555";
+    const tenantId = params.tenantId ?? DEMO_TENANT_ID;
+
+    if (!incidentId) {
       Alert.alert("Estimación enviada ✓", `Presupuesto de ${total}€ enviado.`,
         [{ text: "OK", onPress: () => router.push("/(proveedor)/job/inprogress") }]
       );
@@ -311,7 +313,7 @@ export default function EstimateScreen() {
         id: `offline_est_${Date.now()}`,
         incidentId,
         providerId,
-        tenantId: DEMO_TENANT_ID,
+        tenantId,
         estimatedCost: total,
         estimatedDays: 0,
         notes: "Salida inmediata",
@@ -331,7 +333,7 @@ export default function EstimateScreen() {
       acceptMutation.mutate(
         {
           id: incidentId,
-          tenantId: DEMO_TENANT_ID,
+          tenantId,
           providerId,
           estimatedCost: total,
           estimatedDays: 0,
@@ -354,8 +356,13 @@ export default function EstimateScreen() {
   // ─── Handle schedule confirm ──────────────────────────────────────────────
   const handleConfirmSchedule = () => {
     const incidentId = params.incidentId;
-    const providerId = params.providerId;
-    if (!incidentId || !providerId) return;
+    const providerId = params.providerId ?? "11111111-2222-3333-4444-555555555555";
+    const tenantId = params.tenantId ?? DEMO_TENANT_ID;
+
+    if (!incidentId) {
+      Alert.alert("Error", "No se encontró el ID de la incidencia.");
+      return;
+    }
 
     const selectedDate = dateChips[selectedDateIdx]!.date;
     const [hours, minutes] = selectedHour.split(":").map(Number);
@@ -369,7 +376,7 @@ export default function EstimateScreen() {
         id: `offline_est_${Date.now()}`,
         incidentId,
         providerId,
-        tenantId: DEMO_TENANT_ID,
+        tenantId,
         estimatedCost: total,
         estimatedDays: days,
         notes: "Salida programada",
@@ -392,7 +399,7 @@ export default function EstimateScreen() {
     acceptMutation.mutate(
       {
         id: incidentId,
-        tenantId: DEMO_TENANT_ID,
+        tenantId,
         providerId,
         estimatedCost: total,
         estimatedDays: days,
