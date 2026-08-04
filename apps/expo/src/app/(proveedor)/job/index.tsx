@@ -140,7 +140,7 @@ export default function ProveedorJobScreen() {
     )
   );
 
-  const providerId = params.providerId ?? currentProv?.id;
+  const providerId = params.providerId ?? currentProv?.id ?? DEMO_PROVIDER_ID;
   const tenantId = currentProv?.organizationId ?? DEMO_TENANT_ID;
 
   // Step 3: Fetch assigned incidents for this provider
