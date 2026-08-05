@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import DateTimePicker from '@react-native-community/datetimepicker';
 import {
   View,
   Text,
@@ -179,10 +178,10 @@ const DAY_NAMES_FULL = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "V
 const MONTH_NAMES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 const MONTH_NAMES_FULL = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 
-function generateDateChips(): { label: string; sublabel: string; date: Date }[] {
+function generateDateChips(count = 14): { label: string; sublabel: string; date: Date }[] {
   const chips: { label: string; sublabel: string; date: Date }[] = [];
   const today = new Date();
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < count; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
     d.setHours(0, 0, 0, 0);
@@ -218,12 +217,11 @@ export default function EstimateScreen() {
   const [selectedDateIdx, setSelectedDateIdx] = useState(1); // default: Mañana
   const [selectedHour, setSelectedHour] = useState("10:00");
   const [selectedDuration, setSelectedDuration] = useState("1 hora");
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [customDate, setCustomDate] = useState<Date | null>(null);
+  const [showAllDates, setShowAllDates] = useState(false);
   const [showAllHours, setShowAllHours] = useState(false);
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
 
-  const dateChips = generateDateChips();
+  const dateChips = generateDateChips(14);
 
   const DEMO_TENANT_ID = "org_aconvi_demo";
   const total = departure + labor + materials;
@@ -369,7 +367,7 @@ export default function EstimateScreen() {
       return;
     }
 
-    const selectedDate = selectedDateIdx === -1 && customDate ? new Date(customDate) : dateChips[selectedDateIdx]!.date;
+    const selectedDate = new Date(dateChips[selectedDateIdx]!.date);
     const [hours, minutes] = selectedHour.split(":").map(Number);
     selectedDate.setHours(hours!, minutes!, 0, 0);
     const scheduledAtISO = selectedDate.toISOString();
@@ -431,7 +429,7 @@ export default function EstimateScreen() {
   };
 
   // ─── Summary text for bottom sheet ────────────────────────────────────────
-  const selectedDate = selectedDateIdx === -1 && customDate ? customDate : (dateChips[selectedDateIdx]?.date ?? new Date());
+  const selectedDate = dateChips[selectedDateIdx]?.date ?? new Date();
   const summaryDayName = DAY_NAMES_FULL[selectedDate.getDay()];
   const summaryMonth = MONTH_NAMES_FULL[selectedDate.getMonth()];
   const summaryText = `${summaryDayName}, ${selectedDate.getDate()} de ${summaryMonth} a las ${selectedHour}`;
@@ -563,7 +561,7 @@ export default function EstimateScreen() {
               {/* 1. Date */}
               <Text style={bsStyles.sectionLabel}>1. Selecciona la fecha</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={bsStyles.chipScroll}>
-                {dateChips.map((chip, idx) => (
+                {(showAllDates ? dateChips : dateChips.slice(0, 5)).map((chip, idx) => (
                   <TouchableOpacity
                     key={idx}
                     style={[bsStyles.dateChip, selectedDateIdx === idx && bsStyles.dateChipActive]}
@@ -580,26 +578,11 @@ export default function EstimateScreen() {
                     </Text>
                   </TouchableOpacity>
                 ))}
-                <TouchableOpacity style={bsStyles.dateChipCalendar} onPress={() => setShowDatePicker(true)}>
-                  <Text style={{ fontSize: 20 }}>📅</Text>
-                  <Text style={bsStyles.dateChipCalendarText}>Elegir{"\n"}fecha</Text>
+                <TouchableOpacity style={bsStyles.dateChipCalendar} onPress={() => setShowAllDates(!showAllDates)}>
+                  <Text style={{ fontSize: 20 }}>{showAllDates ? '⬅️' : '📅'}</Text>
+                  <Text style={bsStyles.dateChipCalendarText}>{showAllDates ? 'Menos\nfechas' : 'Más\nfechas'}</Text>
                 </TouchableOpacity>
               </ScrollView>
-              {showDatePicker && (
-                <DateTimePicker
-                  value={customDate ?? new Date()}
-                  mode="date"
-                  minimumDate={new Date()}
-                  onChange={(event, date) => {
-                    setShowDatePicker(false);
-                    if (event.type === 'set' && date) {
-                      setCustomDate(date);
-                      // Set selectedDateIdx to -1 to indicate custom date
-                      setSelectedDateIdx(-1);
-                    }
-                  }}
-                />
-              )}
 
               {/* 2. Hour */}
               <Text style={bsStyles.sectionLabel}>2. Selecciona la hora</Text>
