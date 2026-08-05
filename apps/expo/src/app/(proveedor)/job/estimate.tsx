@@ -220,6 +220,21 @@ export default function EstimateScreen() {
   const [showAllDates, setShowAllDates] = useState(false);
   const [showAllHours, setShowAllHours] = useState(false);
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  const dateScrollRef = useRef<ScrollView>(null);
+  const hourScrollRef = useRef<ScrollView>(null);
+
+  const handleToggleDates = () => {
+    dateScrollRef.current?.scrollTo({ x: 0, animated: false });
+    if (showAllDates && selectedDateIdx >= 5) {
+      setSelectedDateIdx(0);
+    }
+    setShowAllDates((prev) => !prev);
+  };
+
+  const handleToggleHours = () => {
+    hourScrollRef.current?.scrollTo({ x: 0, animated: false });
+    setShowAllHours((prev) => !prev);
+  };
 
   const dateChips = generateDateChips(14);
 
@@ -560,7 +575,7 @@ export default function EstimateScreen() {
             <ScrollView showsVerticalScrollIndicator={false} style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 16 }}>
               {/* 1. Date */}
               <Text style={bsStyles.sectionLabel}>1. Selecciona la fecha</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={bsStyles.chipScroll}>
+              <ScrollView ref={dateScrollRef} horizontal showsHorizontalScrollIndicator={false} style={bsStyles.chipScroll}>
                 {(showAllDates ? dateChips : dateChips.slice(0, 5)).map((chip, idx) => (
                   <TouchableOpacity
                     key={idx}
@@ -578,7 +593,7 @@ export default function EstimateScreen() {
                     </Text>
                   </TouchableOpacity>
                 ))}
-                <TouchableOpacity style={bsStyles.dateChipCalendar} onPress={() => setShowAllDates(!showAllDates)}>
+                <TouchableOpacity style={bsStyles.dateChipCalendar} onPress={handleToggleDates}>
                   <Text style={{ fontSize: 20 }}>{showAllDates ? '⬅️' : '📅'}</Text>
                   <Text style={bsStyles.dateChipCalendarText}>{showAllDates ? 'Menos\nfechas' : 'Más\nfechas'}</Text>
                 </TouchableOpacity>
@@ -586,7 +601,7 @@ export default function EstimateScreen() {
 
               {/* 2. Hour */}
               <Text style={bsStyles.sectionLabel}>2. Selecciona la hora</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={bsStyles.chipScroll}>
+              <ScrollView ref={hourScrollRef} horizontal showsHorizontalScrollIndicator={false} style={bsStyles.chipScroll}>
                 {(showAllHours ? ALL_HOUR_CHIPS : ALL_HOUR_CHIPS.slice(0, 5)).map((h) => (
                   <TouchableOpacity
                     key={h}
@@ -598,7 +613,7 @@ export default function EstimateScreen() {
                     </Text>
                   </TouchableOpacity>
                 ))}
-                <TouchableOpacity style={bsStyles.hourChipMore} onPress={() => setShowAllHours(!showAllHours)}>
+                <TouchableOpacity style={bsStyles.hourChipMore} onPress={handleToggleHours}>
                   <Text style={{ fontSize: 16 }}>{showAllHours ? '⬅️' : '🕐'}</Text>
                   <Text style={bsStyles.hourChipMoreText}>{showAllHours ? 'Menos\nhoras' : 'Más\nhoras'}</Text>
                 </TouchableOpacity>

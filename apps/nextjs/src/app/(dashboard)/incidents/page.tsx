@@ -86,7 +86,7 @@ export default function IncidentsPage() {
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok });
-    setTimeout(() => setToast(null), 3000);
+    setTimeout(() => setToast(null), ok ? 3500 : 7000);
   };
 
   const { data: incidentsRaw, refetch } = useQuery({
@@ -211,8 +211,11 @@ export default function IncidentsPage() {
       // @ts-ignore – tRPC mutateAsync types lag
       await assignProvider.mutateAsync({ tenantId: TENANT_ID, id: selected.id, providerId: selectedProvider.id });
       // onSuccess already updated the cache — show confirmation
-      showToast("\u2705 Proveedor asignado y vecino notificado");
-    } catch { showToast("\u274c Error al asignar", false); }
+      showToast("✅ Proveedor asignado y vecino notificado");
+    } catch (err: any) { 
+      const msg = err?.message || "Error al asignar el proveedor";
+      showToast(msg, false); 
+    }
   };
 
   const handleBulkAssign = async () => {
@@ -223,7 +226,10 @@ export default function IncidentsPage() {
       await Promise.all([...checked].map((id: string) => assignProvider.mutateAsync({ tenantId: TENANT_ID, id, providerId: selectedProvider.id })));
       setChecked(new Set());
       showToast(`✅ ${count} incidencias asignadas`);
-    } catch { showToast("❌ Error en asignación múltiple", false); }
+    } catch (err: any) { 
+      const msg = err?.message || "Error en asignación múltiple";
+      showToast(msg, false); 
+    }
   };
 
   const handleReject = async () => {
@@ -270,11 +276,19 @@ export default function IncidentsPage() {
 
   return (
     <div className="flex h-screen flex-col bg-slate-50 -m-4 md:-m-8 overflow-hidden">
-      {/* Toast */}
+      {/* Toast (Top-Right) */}
       {toast && (
-        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-xl px-5 py-3 text-sm font-semibold text-white shadow-lg transition-all
-          ${toast.ok ? "bg-slate-900" : "bg-red-600"}`}>
-          {toast.msg}
+        <div className={`fixed top-6 right-6 z-[100] flex max-w-md items-start gap-3 rounded-2xl p-4 shadow-2xl transition-all duration-300 border backdrop-blur-md ${
+          toast.ok 
+            ? "bg-slate-900/95 text-white border-slate-700 shadow-slate-900/20" 
+            : "bg-red-600/95 text-white border-red-500 shadow-red-500/30"
+        }`}>
+          <span className="text-xl mt-0.5">{toast.ok ? "✅" : "⚠️"}</span>
+          <div className="flex-1 pr-2">
+            <h4 className="font-bold text-sm leading-tight">{toast.ok ? "Éxito" : "Atención"}</h4>
+            <p className="text-xs mt-1 text-slate-100 font-medium leading-relaxed">{toast.msg.replace(/^(✅|⚠️|❌)\s*/, '')}</p>
+          </div>
+          <button onClick={() => setToast(null)} className="text-white/70 hover:text-white font-bold p-1 transition-colors">✕</button>
         </div>
       )}
 
