@@ -63,7 +63,9 @@ type TimelineEntry = {
 };
 
 function buildTimeline(history: any[], currentStatus: string): TimelineEntry[] {
-  const entries: TimelineEntry[] = (history ?? []).map((h) => {
+  const entries: TimelineEntry[] = (history ?? [])
+    .filter((h: any) => !["PROVIDER_REJECTED", "OT_EXPIRED"].includes(h.action))
+    .map((h) => {
     const dateStr = format(new Date(h.createdAt), "d 'de' MMMM '•' HH:mm", { locale: es });
     if (h.action === "CREATED") {
       return { key: h.id, label: "Incidencia recibida", detail: "Hemos recibido tu incidencia.", icon: "✉️", date: dateStr };

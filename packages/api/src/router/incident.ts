@@ -367,6 +367,23 @@ export const incidentRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       await ensureIncidentColumns(ctx.db);
+
+      // Check if incident already has an active OT (provider assigned and not rejected/expired)
+      const current = await ctx.db.query.incident.findFirst({
+        where: and(
+          eq(incident.id, input.id),
+          eq(incident.organizationId, input.tenantId),
+        ),
+      });
+      if (!current) throw new Error("Incidencia no encontrada.");
+      
+      // Block reassignment if OT is active (EN_REVISION or AGENDADA or EN_CURSO)
+      if (current.providerId && ["EN_REVISION", "AGENDADA", "EN_CURSO"].includes(current.status)) {
+        throw new Error(
+          "Esta incidencia ya tiene una orden de trabajo activa. Solo podrá reasignarse cuando la OT haya sido rechazada o caducada."
+        );
+      }
+
       const [updated] = await ctx.db
         .update(incident)
         .set({ 
@@ -766,6 +783,22 @@ export const incidentRouter = createTRPCRouter({
       });
 
       if (!inc) throw new Error("Incidencia no encontrada");
+
+      // Block arrival before scheduled time
+      if ((inc as any).scheduledAt) {
+        const scheduledTime = new Date((inc as any).scheduledAt).getTime();
+        const now = Date.now();
+        // Allow arrival up to 15 minutes before scheduled time
+        const EARLY_BUFFER_MS = 15 * 60 * 1000;
+        if (now < scheduledTime - EARLY_BUFFER_MS) {
+          const scheduledDate = new Date((inc as any).scheduledAt);
+          const formattedDate = scheduledDate.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+          const formattedTime = scheduledDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+          throw new Error(
+            `La intervención está programada para el ${formattedDate} a las ${formattedTime}. No puedes registrar la llegada antes de esa fecha y hora.`
+          );
+        }
+      }
 
       // Update status to EN_CURSO — provider is now on site
       let arrivedInc;
