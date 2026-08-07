@@ -217,20 +217,6 @@ export default function ProveedorJobScreen() {
 
   const { formatted: countdown, isExpired } = useDynamicCountdown(activeIncident?.assignedAt ?? activeIncident?.createdAt);
 
-  const expireMutation = useMutation(
-    api.incident.providerExpire.mutationOptions({
-      onSuccess: () => {
-        void queryClient.invalidateQueries(api.incident.assignedToProvider.queryFilter());
-      },
-    })
-  );
-
-  useEffect(() => {
-    if (isExpired && activeIncident?.id && activeIncident?.status === "EN_REVISION") {
-      expireMutation.mutate({ id: activeIncident.id, tenantId: activeIncident.organizationId });
-    }
-  }, [isExpired, activeIncident?.id, activeIncident?.status]);
-
   const handleAccept = () => {
     if (!activeIncident || !providerId) return;
     router.push({
