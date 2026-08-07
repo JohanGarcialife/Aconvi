@@ -66,40 +66,54 @@ function buildTimeline(history: any[], currentStatus: string): TimelineEntry[] {
   const entries: TimelineEntry[] = (history ?? [])
     .filter((h: any) => !["PROVIDER_REJECTED", "OT_EXPIRED"].includes(h.action))
     .map((h) => {
-    const dateStr = format(new Date(h.createdAt), "d 'de' MMMM '•' HH:mm", { locale: es });
-    if (h.action === "CREATED") {
-      return { key: h.id, label: "Incidencia recibida", detail: "Hemos recibido tu incidencia.", icon: "✉️", date: dateStr };
-    }
-    if (h.action === "ASSIGNED" || (h.newStatus === "EN_REVISION" && h.action !== "PROVIDER_ACCEPTED")) {
-      return { key: h.id, label: "Profesional asignado", detail: "Hemos asignado un profesional para atender la incidencia.", icon: "👤", date: dateStr };
-    }
-    if (h.action === "PROVIDER_ACCEPTED" || h.newStatus === "AGENDADA") {
-      return { key: h.id, label: "Intervención confirmada", detail: "El profesional ha confirmado la intervención.", icon: "📅", date: dateStr };
-    }
-    if (h.action === "ARRIVED") {
-      return { key: h.id, label: "En intervención", detail: "El profesional ya está atendiendo la incidencia.", icon: "📍", date: dateStr };
-    }
-    if (h.newStatus === "EN_CURSO") {
-      return { key: h.id, label: "En intervención", detail: "El profesional ya está atendiendo la incidencia.", icon: "🔧", date: dateStr };
-    }
-    if (h.action === "COMPLETED" || h.newStatus === "RESUELTA") {
-      return { key: h.id, label: "Intervención finalizada", detail: "La intervención ha finalizado.", icon: "✅", date: dateStr };
-    }
-    if (h.action === "RATED") {
-      return { key: h.id, label: "Valoración enviada", detail: h.comment ?? "Gracias por compartir tu valoración.", icon: "⭐", date: dateStr };
-    }
-    if (h.newStatus === "CERRADA") {
-      return { key: h.id, label: "Incidencia cerrada", detail: "El administrador ha validado la actuación y ha cerrado la incidencia.", icon: "🔒", date: dateStr };
-    }
-    return { key: h.id, label: h.action, detail: h.comment ?? "", icon: "•", date: dateStr };
-  });
+      const dateStr = format(new Date(h.createdAt), "d 'de' MMMM '•' HH:mm", { locale: es });
+      if (h.action === "CREATED") {
+        return { key: h.id, label: "Incidencia recibida", detail: "Hemos recibido tu incidencia.", icon: "✉️", date: dateStr };
+      }
+      if (h.action === "ASSIGNED" || (h.newStatus === "EN_REVISION" && h.action !== "PROVIDER_ACCEPTED")) {
+        return { key: h.id, label: "Profesional asignado", detail: "Hemos asignado un profesional para atender la incidencia.", icon: "👤", date: dateStr };
+      }
+      if (h.action === "PROVIDER_ACCEPTED" || h.newStatus === "AGENDADA") {
+        return { key: h.id, label: "Intervención confirmada", detail: "El profesional ha confirmado la intervención.", icon: "📅", date: dateStr };
+      }
+      if (h.action === "ARRIVED") {
+        return { key: h.id, label: "En intervención", detail: "El profesional ya está atendiendo la incidencia.", icon: "📍", date: dateStr };
+      }
+      if (h.newStatus === "EN_CURSO") {
+        return { key: h.id, label: "En intervención", detail: "El profesional ya está atendiendo la incidencia.", icon: "🔧", date: dateStr };
+      }
+      if (h.action === "COMPLETED" || h.newStatus === "RESUELTA") {
+        return { key: h.id, label: "Intervención finalizada", detail: "La intervención ha finalizado.", icon: "✅", date: dateStr };
+      }
+      if (h.action === "RATED") {
+        return { key: h.id, label: "Valoración enviada", detail: h.comment ?? "Gracias por compartir tu valoración.", icon: "⭐", date: dateStr };
+      }
+      if (h.newStatus === "CERRADA") {
+        return { key: h.id, label: "Incidencia cerrada", detail: "El administrador ha validado la actuación y ha cerrado la incidencia.", icon: "🔒", date: dateStr };
+      }
+      return { key: h.id, label: h.action, detail: h.comment ?? "", icon: "•", date: dateStr };
+    });
 
-  // Mark the last entry as current
-  if (entries.length > 0) {
-    entries[entries.length - 1] = { ...entries[entries.length - 1]!, isCurrent: true };
+  // Deduplicate "Profesional asignado" so it only appears ONCE for the vecino
+  const seenLabels = new Set<string>();
+  const deduplicatedEntries: TimelineEntry[] = [];
+  for (const entry of entries) {
+    if (entry.label === "Profesional asignado") {
+      if (seenLabels.has("Profesional asignado")) continue;
+      seenLabels.add("Profesional asignado");
+    }
+    deduplicatedEntries.push(entry);
   }
 
-  return entries;
+  // Mark the last entry as current
+  if (deduplicatedEntries.length > 0) {
+    deduplicatedEntries[deduplicatedEntries.length - 1] = { 
+      ...deduplicatedEntries[deduplicatedEntries.length - 1]!, 
+      isCurrent: true 
+    };
+  }
+
+  return deduplicatedEntries;
 }
 
 // ─── "Próximo paso" config ────────────────────────────────────────────────────

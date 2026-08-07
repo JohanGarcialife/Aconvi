@@ -549,6 +549,52 @@ export const incidentRouter = createTRPCRouter({
       return updated;
     }),
 
+  providerExpire: publicProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        tenantId: z.string().min(1).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await ensureIncidentColumns(ctx.db);
+      const inc = await ctx.db.query.incident.findFirst({
+        where: eq(incident.id, input.id),
+      });
+      if (!inc) throw new Error("Incidencia no encontrada");
+
+      // Revert to RECIBIDA and clear provider assignment
+      const [updated] = await ctx.db
+        .update(incident)
+        .set({
+          status: "RECIBIDA",
+          providerId: null,
+          estimatedCost: null,
+          estimatedDays: null,
+          scheduledAt: null,
+          estimatedDuration: null,
+        })
+        .where(eq(incident.id, input.id))
+        .returning();
+
+      if (!updated) throw new Error("No se pudo registrar la caducidad de la OT.");
+
+      // Log history
+      await insertHistoryIfNotDuplicate(ctx.db, {
+        incidentId: updated.id,
+        actorName: "Sistema",
+        action: "OT_EXPIRED",
+        previousStatus: "EN_REVISION",
+        newStatus: "RECIBIDA",
+        comment: "La orden de trabajo caducó por falta de respuesta del proveedor.",
+      });
+
+      // Fire-and-forget WS event to tenant room so Admin Panel updates in real-time
+      void emitWebSocketEvent(updated.organizationId, "incident-updated", updated);
+
+      return updated;
+    }),
+
   // ─── Add internal note ───────────────────────────────────────────────────
   addNote: publicProcedure
     .input(

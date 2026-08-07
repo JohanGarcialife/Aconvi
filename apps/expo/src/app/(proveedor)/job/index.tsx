@@ -217,6 +217,20 @@ export default function ProveedorJobScreen() {
 
   const { formatted: countdown, isExpired } = useDynamicCountdown(activeIncident?.assignedAt ?? activeIncident?.createdAt);
 
+  const expireMutation = useMutation(
+    api.incident.providerExpire.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries(api.incident.assignedToProvider.queryFilter());
+      },
+    })
+  );
+
+  useEffect(() => {
+    if (isExpired && activeIncident?.id && activeIncident?.status === "EN_REVISION") {
+      expireMutation.mutate({ id: activeIncident.id, tenantId: activeIncident.organizationId });
+    }
+  }, [isExpired, activeIncident?.id, activeIncident?.status]);
+
   const handleAccept = () => {
     if (!activeIncident || !providerId) return;
     router.push({
@@ -529,7 +543,9 @@ export default function ProveedorJobScreen() {
         </Text>
         {isExpired && (
           <View style={{ backgroundColor: '#FEF2F2', padding: 12, borderRadius: 12, marginTop: 8, marginBottom: 8 }}>
-            <Text style={{ color: '#991B1B', fontSize: 13, fontWeight: '600', textAlign: 'center' }}>Tiempo expirado. Contacte al administrador para una nueva asignación.</Text>
+            <Text style={{ color: '#991B1B', fontSize: 13, fontWeight: '600', textAlign: 'center' }}>
+              {"El tiempo para aceptar esta orden ha finalizado.\nContacta con el Administrador."}
+            </Text>
           </View>
         )}
 
@@ -581,7 +597,11 @@ export default function ProveedorJobScreen() {
         </TouchableOpacity>
 
         {/* Decline */}
-        <TouchableOpacity style={styles.declineButton} onPress={handleDecline}>
+        <TouchableOpacity 
+          style={[styles.declineButton, isExpired && { opacity: 0.4 }]} 
+          onPress={handleDecline}
+          disabled={isExpired}
+        >
           <Text style={styles.declineButtonText}>No puedo atenderla</Text>
         </TouchableOpacity>
       </ScrollView>

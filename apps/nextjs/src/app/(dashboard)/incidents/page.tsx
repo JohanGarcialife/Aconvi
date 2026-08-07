@@ -688,7 +688,7 @@ export default function IncidentsPage() {
                   {(selected.history ?? []).length > 1 && (
                     <div className="absolute left-2 top-2 bottom-4 w-0.5 bg-slate-200" />
                   )}
-                  {(selected.history ?? []).map((h: any) => {
+                  {[...(selected.history ?? [])].reverse().map((h: any) => {
                     const statusName = STATUS_LABEL[h.newStatus]?.label ?? h.newStatus;
                     let actionText = `→ ${statusName}`;
                     let dotColor = "bg-teal-500";

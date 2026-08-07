@@ -445,6 +445,14 @@ export default function EstimateScreen() {
 
   // ─── Summary text for bottom sheet ────────────────────────────────────────
   const selectedDate = dateChips[selectedDateIdx]?.date ?? new Date();
+  const isToday = selectedDate.toDateString() === new Date().toDateString();
+  const currentHour = new Date().getHours();
+
+  const rawAvailableHours = isToday
+    ? ALL_HOUR_CHIPS.filter((h) => parseInt(h.split(":")[0]!, 10) > currentHour)
+    : ALL_HOUR_CHIPS;
+  const availableHours = rawAvailableHours.length > 0 ? rawAvailableHours : ALL_HOUR_CHIPS;
+
   const summaryDayName = DAY_NAMES_FULL[selectedDate.getDay()];
   const summaryMonth = MONTH_NAMES_FULL[selectedDate.getMonth()];
   const summaryText = `${summaryDayName}, ${selectedDate.getDate()} de ${summaryMonth} a las ${selectedHour}`;
@@ -602,7 +610,7 @@ export default function EstimateScreen() {
               {/* 2. Hour */}
               <Text style={bsStyles.sectionLabel}>2. Selecciona la hora</Text>
               <ScrollView ref={hourScrollRef} horizontal showsHorizontalScrollIndicator={false} style={bsStyles.chipScroll}>
-                {(showAllHours ? ALL_HOUR_CHIPS : ALL_HOUR_CHIPS.slice(0, 5)).map((h) => (
+                {(showAllHours ? availableHours : availableHours.slice(0, 5)).map((h) => (
                   <TouchableOpacity
                     key={h}
                     style={[bsStyles.hourChip, selectedHour === h && bsStyles.hourChipActive]}

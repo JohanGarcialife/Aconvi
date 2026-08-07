@@ -191,12 +191,14 @@ export default function JobInProgressScreen() {
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.navigateButton}
-          onPress={() => Alert.alert("Navegación", "Abriendo maps...")}
-        >
-          <Text style={styles.navigateButtonText}>🗺️ Navegar hacia allá</Text>
-        </TouchableOpacity>
+        {!isArrived && (
+          <TouchableOpacity
+            style={styles.navigateButton}
+            onPress={() => Alert.alert("Navegación", "Abriendo maps...")}
+          >
+            <Text style={styles.navigateButtonText}>🗺️ Navegar hacia allá</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </SafeAreaView>
   );
