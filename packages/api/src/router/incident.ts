@@ -989,12 +989,13 @@ export const incidentRouter = createTRPCRouter({
         .set({
           rating: input.rating,
           ratingComment: input.comment ? sanitizeText(input.comment) : null,
+          status: "CERRADA",
         })
         .where(
           and(
             eq(incident.id, input.id),
             eq(incident.organizationId, input.tenantId),
-            eq(incident.status, "CERRADA"),
+            inArray(incident.status, ["RESUELTA", "CERRADA"]),
             isNull(incident.rating),
           ),
         )
@@ -1002,17 +1003,12 @@ export const incidentRouter = createTRPCRouter({
 
       if (!updated) throw new Error("No se pudo registrar la valoración.");
 
-      // Server-side guard: only allow rating on CERRADA incidents
-      if (updated.status !== "CERRADA") {
-        throw new Error("Solo puedes valorar incidencias cerradas.");
-      }
-
       // Log history event (not state change)
       await ctx.db.insert(incidentHistory).values({
         incidentId: updated.id,
         actorName: "Vecino",
         action: "RATED",
-        previousStatus: "CERRADA",
+        previousStatus: updated.status,
         newStatus: "CERRADA",
         comment: `Valoró con ${input.rating} estrellas: "${input.comment ?? "Sin comentario"}"`,
       });

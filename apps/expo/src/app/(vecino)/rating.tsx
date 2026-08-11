@@ -78,7 +78,11 @@ export default function RatingScreen() {
 
   // ─── Submit mutation ─────────────────────────────────────────────────────
   const submitRating = useMutation({
-    ...api.incident.submitRating.mutationOptions(),
+    ...((api.incident as any).submitRating?.mutationOptions?.() ?? {}),
+    mutationFn: async (data: { tenantId: string; id: string; rating: number; comment?: string }) => {
+      const opts = (api.incident as any).submitRating.mutationOptions();
+      return opts.mutationFn(data);
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries(api.incident.all.queryFilter());
       setSubmitted(true);
@@ -94,7 +98,13 @@ export default function RatingScreen() {
       return;
     }
     if (!incidentId) return;
-    submitRating.mutate({ tenantId: TENANT_ID, id: incidentId, rating, comment });
+    const orgId = (incident as any)?.organizationId ?? TENANT_ID;
+    submitRating.mutate({
+      tenantId: orgId,
+      id: incidentId,
+      rating,
+      comment: comment.trim() || undefined,
+    });
   };
 
   const displayId = incidentId ? `#INC-${incidentId.slice(0, 8).toUpperCase()}` : "";
@@ -134,8 +144,8 @@ export default function RatingScreen() {
     );
   }
 
-  // Only allow rating when incident is CERRADA
-  if (incident && (incident as any).status !== "CERRADA") {
+  // Allow rating when incident is RESUELTA or CERRADA
+  if (incident && !["RESUELTA", "CERRADA"].includes((incident as any).status)) {
     return (
       <SafeAreaView style={s.safe} edges={["top", "bottom"]}>
         <Stack.Screen options={{ headerShown: false }} />
