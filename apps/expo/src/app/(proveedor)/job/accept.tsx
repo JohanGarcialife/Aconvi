@@ -66,6 +66,7 @@ export default function AcceptScreen() {
       return opts.mutationFn(data);
     },
     onSuccess: () => {
+      setShowRejectModal(false);
       queryClient.invalidateQueries({ queryKey: [["incident"]] });
       Alert.alert(
         "Asignación rechazada",
@@ -126,8 +127,7 @@ export default function AcceptScreen() {
   };
 
   const handleConfirmReject = () => {
-    if (!incidentId) return;
-    setShowRejectModal(false);
+    if (!incidentId || rejectMutation.isPending) return;
     rejectMutation.mutate({
       id: incidentId,
       tenantId,

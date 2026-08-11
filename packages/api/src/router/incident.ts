@@ -379,22 +379,12 @@ export const incidentRouter = createTRPCRouter({
       });
       if (!current) throw new Error("Incidencia no encontrada.");
       
-      // Block reassignment if OT is active and not expired
+      // Block reassignment ONLY if OT is accepted / scheduled / in progress
       if (current.providerId) {
-        if (current.status === "AGENDADA" || current.status === "EN_CURSO") {
+        if (current.status === "AGENDADA" || current.status === "EN_CURSO" || current.status === "RESUELTA" || current.status === "CERRADA") {
           throw new Error(
-            "Esta incidencia ya tiene una orden de trabajo activa. Solo podrá reasignarse cuando la OT haya sido rechazada o caducada."
+            "Esta incidencia ya ha sido aceptada o agendada por el proveedor. No se puede cambiar de proveedor."
           );
-        }
-        if (current.status === "EN_REVISION") {
-          const assignedTime = current.assignedAt ? new Date(current.assignedAt).getTime() : new Date(current.createdAt).getTime();
-          const EXPIRATION_MS = 120 * 60 * 1000; // 2 hours matching provider countdown
-          const isExpired = Date.now() - assignedTime > EXPIRATION_MS;
-          if (!isExpired) {
-            throw new Error(
-              "Esta incidencia ya tiene una orden de trabajo activa. Solo podrá reasignarse cuando la OT haya sido rechazada o caducada."
-            );
-          }
         }
       }
 

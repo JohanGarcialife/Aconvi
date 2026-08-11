@@ -831,19 +831,38 @@ export default function IncidentsPage() {
               <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-slate-400">Proveedor</h3>
 
               {/* Dropdown trigger */}
-              <button onClick={() => setProviderOpen(v => !v)}
-                className="flex w-full items-center justify-between rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-semibold text-teal-800 transition hover:bg-teal-100">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-teal-500 text-white">
-                    <Check size={12} strokeWidth={3} />
-                  </div>
-                  {selectedProvider?.name ?? "Seleccionar proveedor"}
-                </div>
-                {providerOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-              </button>
+              {(() => {
+                const isLocked = ["AGENDADA", "EN_CURSO", "RESUELTA", "CERRADA"].includes(selected.status);
+                return (
+                  <>
+                    <button
+                      onClick={() => !isLocked && setProviderOpen(v => !v)}
+                      disabled={isLocked}
+                      className={`flex w-full items-center justify-between rounded-xl border px-4 py-3 text-sm font-semibold transition ${
+                        isLocked
+                          ? "border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed"
+                          : "border-teal-200 bg-teal-50 text-teal-800 hover:bg-teal-100"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className={`flex h-6 w-6 items-center justify-center rounded-full ${isLocked ? "bg-slate-400" : "bg-teal-500"} text-white`}>
+                          <Check size={12} strokeWidth={3} />
+                        </div>
+                        {selectedProvider?.name ?? "Seleccionar proveedor"}
+                      </div>
+                      {!isLocked && (providerOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />)}
+                    </button>
+                    {isLocked && (
+                      <p className="mt-2 text-xs text-slate-500 font-medium">
+                        🔒 La incidencia ha sido aceptada/agendada por el proveedor y no permite cambio de asignación.
+                      </p>
+                    )}
+                  </>
+                );
+              })()}
 
               {/* Dropdown options */}
-              {providerOpen && (
+              {providerOpen && !["AGENDADA", "EN_CURSO", "RESUELTA", "CERRADA"].includes(selected.status) && (
                 <div className="mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                   {providers.map((p: any, i: number) => (
                     <button key={p.id} onClick={() => { setSelectedProviderId(p.id); setProviderOpen(false); }}
@@ -908,19 +927,24 @@ export default function IncidentsPage() {
               {(() => {
                 const isAlreadyAssigned = selected.providerId === selectedProvider?.id;
                 const hasAnyProvider = !!selected.providerId;
-                
-                let btnText = "Asignar y Notificar Vecino";
+                const isLocked = ["AGENDADA", "EN_CURSO", "RESUELTA", "CERRADA"].includes(selected.status);
+
+                let btnText = "Asignar Proveedor";
                 let btnCls = "bg-teal-500 hover:bg-teal-600 text-white";
                 let isBtnDisabled = !selectedProvider || assignProvider.isPending;
 
                 if (assignProvider.isPending) {
                   btnText = "Asignando...";
+                } else if (isLocked) {
+                  btnText = "✓ Trabajo Aceptado / Agendado";
+                  btnCls = "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed";
+                  isBtnDisabled = true;
                 } else if (isAlreadyAssigned) {
                   btnText = "✓ Proveedor Asignado";
                   btnCls = "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed";
                   isBtnDisabled = true;
                 } else if (hasAnyProvider) {
-                  btnText = "Reasignar y Notificar Vecino";
+                  btnText = "Reasignar a este Proveedor";
                   btnCls = "bg-teal-500 hover:bg-teal-600 text-white";
                 }
 
@@ -930,7 +954,7 @@ export default function IncidentsPage() {
                     disabled={isBtnDisabled}
                     className={`mt-4 flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold transition-colors shadow-sm ${btnCls}`}
                   >
-                    {!isAlreadyAssigned && <CheckCircle2 size={15} />}
+                    {!isAlreadyAssigned && !isLocked && <CheckCircle2 size={15} />}
                     {btnText}
                   </button>
                 );
