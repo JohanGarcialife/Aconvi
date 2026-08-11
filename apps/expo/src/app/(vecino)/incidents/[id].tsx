@@ -47,7 +47,7 @@ const STATUS_MAP: Record<string, { label: string; icon: string; color: string; b
   EN_REVISION: { label: "Profesional asignado",     icon: "👤",  color: "#1e40af", bg: "#dbeafe" },
   AGENDADA:    { label: "Intervención confirmada",  icon: "📅",  color: "#5b21b6", bg: "#ede9fe" },
   EN_CURSO:    { label: "En intervención",           icon: "🔧",  color: "#065f46", bg: "#d1fae5" },
-  RESUELTA:    { label: "Intervención finalizada",  icon: "🕒",  color: "#b45309", bg: "#fef3c7" },
+  RESUELTA:    { label: "Resuelta",                 icon: "🕒",  color: "#b45309", bg: "#fef3c7" },
   RECHAZADA:   { label: "No procede",               icon: "✕",   color: "#991b1b", bg: "#fee2e2" },
   CERRADA:     { label: "Incidencia cerrada",        icon: "✅",  color: "#065f46", bg: "#d1fae5" },
 };
@@ -83,7 +83,7 @@ function buildTimeline(history: any[], currentStatus: string): TimelineEntry[] {
         return { key: h.id, label: "En intervención", detail: "El profesional ya está atendiendo la incidencia.", icon: "🔧", date: dateStr };
       }
       if (h.action === "COMPLETED" || h.newStatus === "RESUELTA") {
-        return { key: h.id, label: "Intervención finalizada", detail: "La intervención ha finalizado.", icon: "✅", date: dateStr };
+        return { key: h.id, label: "Resuelta", detail: "La intervención ha finalizado.", icon: "✅", date: dateStr };
       }
       if (h.action === "RATED") {
         return { key: h.id, label: "Valoración enviada", detail: h.comment ?? "Gracias por compartir tu valoración.", icon: "⭐", date: dateStr };

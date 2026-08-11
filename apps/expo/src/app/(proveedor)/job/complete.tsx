@@ -33,7 +33,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import { api, queryClient } from "~/utils/api";
 import { useQuery, useMutation } from "@tanstack/react-query";
 
-const PRIMARY = "#4aa19b";
+const PRIMARY = "#009689";
 const DARK = "#0f172a";
 const MUTED = "#64748b";
 const BORDER = "#e2e8f0";

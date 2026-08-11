@@ -204,7 +204,7 @@ export default function RatingScreen() {
           {incident && ((incident as any).photoUrl || (incident as any).finalPhotoUrl) && (
             <View style={s.photosRow}>
               <View style={s.photoWrap}>
-                <Text style={s.photoCaption}>Así estaba el problema</Text>
+                <Text style={s.photoCaption}>Antes</Text>
                 {resolvePhotoUri((incident as any).photoUrl) ? (
                 <Image
                   source={{ uri: resolvePhotoUri((incident as any).photoUrl)! }}
@@ -221,7 +221,7 @@ export default function RatingScreen() {
                 <Text style={s.photoArrow}>→</Text>
               </View>
               <View style={s.photoWrap}>
-                <Text style={s.photoCaption}>Así lo ha dejado el técnico</Text>
+                <Text style={s.photoCaption}>Después</Text>
                 {resolvePhotoUri((incident as any).finalPhotoUrl) ? (
                   <>
                     <Image
@@ -230,7 +230,7 @@ export default function RatingScreen() {
                       resizeMode="cover"
                     />
                     <View style={s.resolvedBadgeOverlay}>
-                      <Text style={s.resolvedBadgeText}>INTERVENCIÓN FINALIZADA</Text>
+                      <Text style={s.resolvedBadgeText}>RESULTADO</Text>
                     </View>
                   </>
                 ) : (

@@ -46,7 +46,7 @@ const STATUS_MAP: Record<string, { label: string; icon: string; color: string; b
   EN_REVISION:      { label: "Profesional asignado",       icon: "🔍",  color: "#1e40af", bg: "#dbeafe" },
   AGENDADA:         { label: "Intervención confirmada",    icon: "📅",  color: "#5b21b6", bg: "#ede9fe" },
   EN_CURSO:         { label: "En intervención",            icon: "🔧",  color: "#065f46", bg: "#d1fae5" },
-  RESUELTA:         { label: "Intervención finalizada",    icon: "✅",  color: "#065f46", bg: "#d1fae5" },
+  RESUELTA:         { label: "Resuelta",                   icon: "✅",  color: "#065f46", bg: "#d1fae5" },
   RECHAZADA:        { label: "No procede",                 icon: "✕",   color: "#991b1b", bg: "#fee2e2" },
   CERRADA:          { label: "Incidencia cerrada",         icon: "🔒",  color: "#374151", bg: "#f3f4f6" },
 };

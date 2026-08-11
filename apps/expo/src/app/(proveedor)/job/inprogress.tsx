@@ -13,7 +13,7 @@ import { useRouter, Stack, useLocalSearchParams } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { api } from "~/utils/api";
 
-const PRIMARY = "#4aa19b";
+const PRIMARY = "#009689";
 const DARK = "#0f172a";
 const MUTED = "#64748b";
 const BORDER = "#e2e8f0";
@@ -69,6 +69,18 @@ export default function JobInProgressScreen() {
   );
 
   const isArrived = incident?.status === "EN_CURSO" || !!(incident as any)?.startedAt || arrivedMutation.isSuccess;
+
+  const scheduledAtTime = (incident as any)?.scheduledAt ? new Date((incident as any).scheduledAt).getTime() : null;
+  const [nowTime, setNowTime] = useState(Date.now());
+
+  useEffect(() => {
+    if (isArrived || !scheduledAtTime) return;
+    const interval = setInterval(() => setNowTime(Date.now()), 10000);
+    return () => clearInterval(interval);
+  }, [isArrived, scheduledAtTime]);
+
+  const EARLY_BUFFER_MS = 15 * 60 * 1000;
+  const canArrive = isArrived || !scheduledAtTime || (nowTime >= scheduledAtTime - EARLY_BUFFER_MS);
 
   const handleArrived = async () => {
     if (isArrived) {
@@ -177,9 +189,13 @@ export default function JobInProgressScreen() {
 
         {/* CTA */}
         <TouchableOpacity
-          style={[styles.arrivedButton, arrivedLoading && { opacity: 0.7 }, isArrived && { backgroundColor: PRIMARY }]}
+          style={[
+            styles.arrivedButton,
+            (arrivedLoading || !canArrive) && { opacity: 0.5 },
+            isArrived && { backgroundColor: PRIMARY },
+          ]}
           onPress={handleArrived}
-          disabled={arrivedLoading}
+          disabled={arrivedLoading || !canArrive}
           activeOpacity={0.85}
         >
           {arrivedLoading ? (
@@ -190,6 +206,12 @@ export default function JobInProgressScreen() {
             </Text>
           )}
         </TouchableOpacity>
+
+        {!isArrived && !canArrive && (
+          <Text style={{ fontSize: 12, color: "#64748b", marginTop: 6, textAlign: "center" }}>
+            El botón se habilitará 15 min antes de la cita programada
+          </Text>
+        )}
 
         {!isArrived && (
           <TouchableOpacity

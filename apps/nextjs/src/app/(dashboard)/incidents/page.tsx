@@ -32,6 +32,14 @@ const PRIORITY_COLOR: Record<string, string> = {
 
 const STEPS = ["RECIBIDA", "EN_REVISION", "AGENDADA", "EN_CURSO", "RESUELTA", "CERRADA"];
 
+const resolvePhotoUrl = (url: string | null | undefined): string | null => {
+  if (!url) return null;
+  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) {
+    return url;
+  }
+  return url.startsWith("/") ? url : `/${url}`;
+};
+
 function StatusBadge({ status }: { status: string }) {
   const s = STATUS_LABEL[status] ?? { label: status, cls: "bg-slate-100 text-slate-600" };
   return <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${s.cls}`}>{s.label}</span>;
@@ -220,15 +228,45 @@ export default function IncidentsPage() {
 
   const handleBulkAssign = async () => {
     if (!selectedProvider || checked.size === 0) return;
-    const count = checked.size;
-    try {
-      // @ts-ignore – tRPC mutateAsync types lag
-      await Promise.all([...checked].map((id: string) => assignProvider.mutateAsync({ tenantId: TENANT_ID, id, providerId: selectedProvider.id })));
-      setChecked(new Set());
-      showToast(`✅ ${count} incidencias asignadas`);
-    } catch (err: any) { 
-      const msg = err?.message || "Error en asignación múltiple";
-      showToast(msg, false); 
+    
+    const selectedIncs = incidents.filter((i: any) => checked.has(i.id));
+    
+    const withActiveOT = selectedIncs.filter((i: any) =>
+      i.providerId && ["EN_REVISION", "AGENDADA", "EN_CURSO"].includes(i.status)
+    );
+    const assignable = selectedIncs.filter((i: any) =>
+      !i.providerId || !["EN_REVISION", "AGENDADA", "EN_CURSO"].includes(i.status)
+    );
+
+    let proceedWithActiveOT = false;
+    if (withActiveOT.length > 0) {
+      const titles = withActiveOT.map((i: any) => `• ${i.title}`).join("\n");
+      proceedWithActiveOT = window.confirm(
+        `${withActiveOT.length} de las incidencias seleccionadas tienen una OT activa:\n\n${titles}\n\n¿Deseas reasignar también estas incidencias?`
+      );
+    }
+
+    const toProcess = [...assignable, ...(proceedWithActiveOT ? withActiveOT : [])];
+    if (toProcess.length === 0) return;
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const inc of toProcess) {
+      try {
+        // @ts-ignore – tRPC mutateAsync types lag
+        await assignProvider.mutateAsync({ tenantId: TENANT_ID, id: inc.id, providerId: selectedProvider.id });
+        successCount++;
+      } catch (err) {
+        failCount++;
+      }
+    }
+
+    setChecked(new Set());
+    if (failCount > 0) {
+      showToast(`✅ ${successCount} asignadas, ❌ ${failCount} no se pudieron asignar`, false);
+    } else {
+      showToast(`✅ ${successCount} incidencia(s) asignada(s)`);
     }
   };
 
@@ -319,7 +357,7 @@ export default function IncidentsPage() {
                     <p className="mb-1 text-xs font-semibold text-slate-500">Antes</p>
                     {selected.photoUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={selected.photoUrl} alt="Foto inicial" className="h-40 w-full rounded-xl object-cover border border-slate-200" />
+                      <img src={resolvePhotoUrl(selected.photoUrl)!} alt="Foto inicial" className="h-40 w-full rounded-xl object-cover border border-slate-200" />
                     ) : (
                       <div className="flex h-40 items-center justify-center rounded-xl bg-slate-100 text-xs text-slate-400">Sin foto</div>
                     )}
@@ -328,7 +366,7 @@ export default function IncidentsPage() {
                     <p className="mb-1 text-xs font-semibold text-emerald-600">Después (proveedor)</p>
                     {(selected as any).finalPhotoUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={(selected as any).finalPhotoUrl} alt="Foto final" className="h-40 w-full rounded-xl object-cover border-2 border-emerald-300" />
+                      <img src={resolvePhotoUrl((selected as any).finalPhotoUrl)!} alt="Foto final" className="h-40 w-full rounded-xl object-cover border-2 border-emerald-300" />
                     ) : (
                       <div className="flex h-40 items-center justify-center rounded-xl bg-slate-100 text-xs text-slate-400">Sin foto de cierre</div>
                     )}
@@ -586,19 +624,19 @@ export default function IncidentsPage() {
               <div className="mb-6 aspect-video max-w-lg overflow-hidden rounded-2xl bg-slate-100">
                 {selected.photoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={selected.photoUrl} alt="Incidencia" className="h-full w-full object-cover" />
+                  <img src={resolvePhotoUrl(selected.photoUrl)!} alt="Incidencia" className="h-full w-full object-cover" />
                 ) : (
                   <div className="flex h-full items-center justify-center text-sm text-slate-400">Sin fotografía</div>
                 )}
               </div>
 
-              {/* Final photo (resolved) */}
-              {selected.status === "RESUELTA" && (selected as any).finalPhotoUrl && (
+              {/* Final photo (resolved/closed) */}
+              {(selected as any).finalPhotoUrl && (
                 <div className="mb-6 max-w-lg">
                   <h3 className="mb-2 text-sm font-bold text-slate-800">✅ Foto de cierre (proveedor)</h3>
                   <div className="overflow-hidden rounded-2xl border-2 border-emerald-200 bg-emerald-50 aspect-video">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={(selected as any).finalPhotoUrl} alt="Foto final" className="h-full w-full object-cover" />
+                    <img src={resolvePhotoUrl((selected as any).finalPhotoUrl)!} alt="Foto final" className="h-full w-full object-cover" />
                   </div>
                 </div>
               )}

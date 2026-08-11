@@ -21,4 +21,5 @@ type RouterOutputs = inferRouterOutputs<AppRouter>;
 export { type AppRouter, appRouter } from "./root";
 export { createTRPCContext } from "./trpc";
 export { sendPushToUser, sendPushToAllMembers } from "./router/notification";
+export { emitWebSocketEvent } from "./utils/ws";
 export type { RouterInputs, RouterOutputs };

@@ -2,7 +2,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, Stack, useLocalSearchParams } from "expo-router";
 
-const PRIMARY = "#4aa19b";
+const PRIMARY = "#009689";
 const DARK = "#0f172a";
 const MUTED = "#64748b";
 

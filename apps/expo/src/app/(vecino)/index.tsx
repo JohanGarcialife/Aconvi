@@ -418,7 +418,7 @@ export default function VecinoHome() {
                     latestIncident.status === "RECIBIDA" ? "Incidencia recibida" :
                     latestIncident.status === "AGENDADA" ? "Intervención confirmada" :
                     latestIncident.status === "EN_CURSO" ? "En intervención" :
-                    latestIncident.status === "RESUELTA" ? "Intervención finalizada" :
+                    latestIncident.status === "RESUELTA" ? "Resuelta" :
                     latestIncident.status === "CERRADA" ? "Incidencia cerrada" :
                     latestIncident.status === "RECHAZADA" ? "No procede" : latestIncident.status
                   } · {format(new Date(latestIncident.createdAt), "dd MMM", { locale: es })}

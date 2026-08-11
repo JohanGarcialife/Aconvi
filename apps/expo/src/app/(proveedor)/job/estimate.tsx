@@ -13,12 +13,13 @@ import {
   Modal,
   Dimensions,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, Stack, useLocalSearchParams } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import NetInfo from "~/utils/safe-netinfo";
 import { api, queryClient } from "~/utils/api";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Ionicons } from "@expo/vector-icons";
 
 const OFFLINE_ESTIMATE_QUEUE_KEY = "aconvi_offline_estimate_queue";
 
@@ -52,7 +53,7 @@ async function removeEstimateFromQueue(id: string) {
   );
 }
 
-const PRIMARY = "#4aa19b";
+const PRIMARY = "#009689";
 const DARK = "#0f172a";
 const MUTED = "#64748b";
 const BORDER = "#e2e8f0";
@@ -65,9 +66,10 @@ interface NativeSliderProps {
   max: number;
   step?: number;
   onChange: (v: number) => void;
+  disabled?: boolean;
 }
 
-function NativeSlider({ value, min, max, step = 5, onChange }: NativeSliderProps) {
+function NativeSlider({ value, min, max, step = 5, onChange, disabled = false }: NativeSliderProps) {
   const TRACK_WIDTH = useWindowDimensions().width - 80;
   const THUMB = 24;
   const pct = (value - min) / (max - min);
@@ -77,12 +79,14 @@ function NativeSlider({ value, min, max, step = 5, onChange }: NativeSliderProps
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: () => !disabled,
       onPanResponderGrant: (_, g) => {
+        if (disabled) return;
         startX.current = g.x0;
         startVal.current = value;
       },
       onPanResponderMove: (_, g) => {
+        if (disabled) return;
         const ratio = g.dx / (TRACK_WIDTH - THUMB);
         const raw = startVal.current + ratio * (max - min);
         const clamped = Math.max(min, Math.min(max, raw));
@@ -96,15 +100,26 @@ function NativeSlider({ value, min, max, step = 5, onChange }: NativeSliderProps
 
   return (
     <View style={{ height: 44, justifyContent: "center" }}>
-      <View style={[slStyles.track, { width: TRACK_WIDTH }]}>
+      <View style={[slStyles.track, { width: TRACK_WIDTH }, disabled && { backgroundColor: "#f1f5f9" }]}>
         <Animated.View
           style={[
             slStyles.fill,
-            { width: Animated.add(thumbX, THUMB / 2) },
+            disabled && { backgroundColor: "#cbd5e1" },
+            {
+              width: thumbX.interpolate({
+                inputRange: [0, TRACK_WIDTH - THUMB],
+                outputRange: [0, TRACK_WIDTH],
+                extrapolate: "clamp",
+              }),
+            },
           ]}
         />
         <Animated.View
-          style={[slStyles.thumb, { transform: [{ translateX: thumbX }] }]}
+          style={[
+            slStyles.thumb,
+            disabled && { backgroundColor: "#94a3b8", borderColor: "#e2e8f0" },
+            { transform: [{ translateX: thumbX }] },
+          ]}
           {...panResponder.panHandlers}
         />
       </View>
@@ -113,110 +128,78 @@ function NativeSlider({ value, min, max, step = 5, onChange }: NativeSliderProps
 }
 
 const slStyles = StyleSheet.create({
-  track: {
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: BORDER,
-  },
-  fill: {
-    position: "absolute",
-    height: 6,
-    backgroundColor: PRIMARY,
-    borderRadius: 3,
-  },
+  track: { height: 8, borderRadius: 4, backgroundColor: "#e2e8f0", overflow: "visible" },
+  fill: { height: 8, borderRadius: 4, backgroundColor: PRIMARY },
   thumb: {
-    position: "absolute",
-    top: -9,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: PRIMARY,
-    shadowColor: PRIMARY,
-    shadowOpacity: 0.35,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
+    position: "absolute", top: -8, width: 24, height: 24, borderRadius: 12,
+    backgroundColor: PRIMARY, borderWidth: 3, borderColor: "#fff",
+    shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 4, elevation: 4,
   },
 });
 
-// ─── Cost row ─────────────────────────────────────────────────────────────────
-interface CostRowProps {
-  label: string;
-  emoji: string;
-  value: number;
-  min: number;
-  max: number;
-  step?: number;
-  scaleMarks: string[];
-  onChange: (v: number) => void;
-}
-
-function CostRow({ label, emoji, value, min, max, step, scaleMarks, onChange }: CostRowProps) {
-  return (
-    <View style={styles.sliderBox}>
-      <View style={styles.sliderHeader}>
-        <Text style={styles.sliderEmoji}>{emoji}</Text>
-        <Text style={styles.sliderLabel}>{label}</Text>
-        <View style={styles.sliderBadge}>
-          <Text style={styles.sliderBadgeText}>{value} €</Text>
-          <Text style={{ color: MUTED, fontSize: 12 }}> ›</Text>
-        </View>
-      </View>
-      <NativeSlider value={value} min={min} max={max} step={step} onChange={onChange} />
-      <View style={styles.scaleRow}>
-        {scaleMarks.map((m) => (
-          <Text key={m} style={styles.scaleMark}>{m}</Text>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-// ─── Date helpers ─────────────────────────────────────────────────────────────
+// ─── Scheduling Helpers ───────────────────────────────────────────────────────
 const DAY_NAMES = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-const DAY_NAMES_FULL = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+const DAY_NAMES_FULL = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 const MONTH_NAMES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 const MONTH_NAMES_FULL = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+const ALL_HOUR_CHIPS = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "16:00", "17:00", "18:00", "19:00"];
+const DURATION_OPTIONS = ["30 min", "1 hora", "1.5 horas", "2 horas", "3 horas", "4+ horas"];
 
-function generateDateChips(count = 14): { label: string; sublabel: string; date: Date }[] {
-  const chips: { label: string; sublabel: string; date: Date }[] = [];
+interface DateChip {
+  date: Date;
+  dayName: string;
+  dayNum: number;
+  monthName: string;
+  isToday: boolean;
+}
+
+function generateDateChips(count = 14): DateChip[] {
+  const chips: DateChip[] = [];
   const today = new Date();
   for (let i = 0; i < count; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
-    d.setHours(0, 0, 0, 0);
-    const dayLabel = i === 0 ? "Hoy" : i === 1 ? "Mañana" : DAY_NAMES[d.getDay()]!;
     chips.push({
-      label: dayLabel,
-      sublabel: `${d.getDate()}\n${MONTH_NAMES[d.getMonth()]}`,
       date: d,
+      dayName: DAY_NAMES[d.getDay()]!,
+      dayNum: d.getDate(),
+      monthName: MONTH_NAMES[d.getMonth()]!,
+      isToday: i === 0,
     });
   }
   return chips;
 }
 
-const ALL_HOUR_CHIPS = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00"];
-const DURATION_CHIPS = ["30 min", "1 hora", "2 horas", "Más de 2 horas"];
-
-// ─── Main screen ──────────────────────────────────────────────────────────────
-export default function EstimateScreen() {
+export default function JobEstimateScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ incidentId?: string; providerId?: string; tenantId?: string }>();
+
+  const incidentId = params.incidentId;
+  const DEMO_TENANT_ID = "org_aconvi_demo";
+  const tenantId = params.tenantId ?? DEMO_TENANT_ID;
+
+  // 100% Real Incident DB Query
+  const { data: incident } = useQuery(
+    api.incident.byId.queryOptions(
+      { id: incidentId ?? "", tenantId },
+      { enabled: !!incidentId }
+    )
+  );
+
   const [departure, setDeparture] = useState(40);
   const [labor, setLabor] = useState(80);
   const [materials, setMaterials] = useState(35);
   const [days, setDays] = useState(1);
   const [goNow, setGoNow] = useState(true);
+
+  // Bottom Sheet
+  const [showSchedule, setShowSchedule] = useState(false);
+  const [selectedDateIdx, setSelectedDateIdx] = useState(0);
+  const [selectedHour, setSelectedHour] = useState("10:00");
+  const [selectedDuration, setSelectedDuration] = useState("1 hora");
   const [isOffline, setIsOffline] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
-
-  // Bottom sheet state
-  const [showSchedule, setShowSchedule] = useState(false);
-  const [selectedDateIdx, setSelectedDateIdx] = useState(1); // default: Mañana
-  const [selectedHour, setSelectedHour] = useState("10:00");
-  const [selectedDuration, setSelectedDuration] = useState("1 hora");
   const [showAllDates, setShowAllDates] = useState(false);
   const [showAllHours, setShowAllHours] = useState(false);
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
@@ -237,8 +220,6 @@ export default function EstimateScreen() {
   };
 
   const dateChips = generateDateChips(14);
-
-  const DEMO_TENANT_ID = "org_aconvi_demo";
   const total = departure + labor + materials;
 
   const acceptMutation = useMutation(
@@ -254,7 +235,7 @@ export default function EstimateScreen() {
     })
   );
 
-  // ─── Offline queue sync ───────────────────────────────────────────────────
+  // Offline queue sync
   const syncEstimateQueue = useCallback(async () => {
     const queue = await loadEstimateQueue();
     if (queue.length === 0) return;
@@ -294,8 +275,19 @@ export default function EstimateScreen() {
     return () => unsub();
   }, [syncEstimateQueue]);
 
-  // ─── Bottom sheet animation ───────────────────────────────────────────────
+  // Check if assigned > 2 hours ago or already expired
+  const assignedTime = incident?.assignedAt
+    ? new Date(incident.assignedAt).getTime()
+    : incident?.createdAt
+    ? new Date(incident.createdAt).getTime()
+    : Date.now();
+  const isIncidentExpired =
+    incident?.status === "RECIBIDA" ||
+    (incident?.status !== "AGENDADA" && incident?.status !== "EN_CURSO" && Date.now() - assignedTime > 2 * 60 * 60 * 1000);
+
+  // Bottom sheet animation
   const openSheet = () => {
+    if (isIncidentExpired) return;
     setShowSchedule(true);
     Animated.spring(slideAnim, {
       toValue: 0,
@@ -313,11 +305,17 @@ export default function EstimateScreen() {
     }).start(() => setShowSchedule(false));
   };
 
-  // ─── Handle "Salir ahora" send ────────────────────────────────────────────
+  // Handle "Salir ahora" send
   const handleSendNow = async () => {
-    const incidentId = params.incidentId;
+    if (isIncidentExpired) {
+      Alert.alert(
+        "OT Caducada",
+        "El tiempo límite de 2 horas para responder esta orden ha finalizado. La incidencia ha sido devuelta al estado RECIBIDA y no se puede aceptar."
+      );
+      return;
+    }
+
     const providerId = params.providerId ?? "11111111-2222-3333-4444-555555555555";
-    const tenantId = params.tenantId ?? DEMO_TENANT_ID;
 
     if (!incidentId) {
       Alert.alert("Estimación enviada ✓", `Presupuesto de ${total}€ enviado.`,
@@ -359,7 +357,7 @@ export default function EstimateScreen() {
         } as any,
         {
           onSuccess: () => {
-            Alert.alert("Estimación enviada ✓", `Presupuesto de ${total}€ guardado.`,
+            Alert.alert("Intervención Aceptada ✓", `Presupuesto de ${total}€ registrado. Te diriges a la intervención.`,
               [{ text: "OK", onPress: () => router.push({
                 pathname: "/(proveedor)/job/inprogress",
                 params: { incidentId, providerId },
@@ -371,11 +369,17 @@ export default function EstimateScreen() {
     }
   };
 
-  // ─── Handle schedule confirm ──────────────────────────────────────────────
+  // Handle schedule confirm
   const handleConfirmSchedule = () => {
-    const incidentId = params.incidentId;
+    if (isIncidentExpired) {
+      Alert.alert(
+        "OT Caducada",
+        "El tiempo límite de 2 horas para responder esta orden ha finalizado. No es posible programar una cita."
+      );
+      return;
+    }
+
     const providerId = params.providerId ?? "11111111-2222-3333-4444-555555555555";
-    const tenantId = params.tenantId ?? DEMO_TENANT_ID;
 
     if (!incidentId) {
       Alert.alert("Error", "No se encontró el ID de la incidencia.");
@@ -443,12 +447,11 @@ export default function EstimateScreen() {
     );
   };
 
-  // ─── Summary text for bottom sheet ────────────────────────────────────────
   const selectedDate = dateChips[selectedDateIdx]?.date ?? new Date();
-  const isToday = selectedDate.toDateString() === new Date().toDateString();
+  const isTodayDate = selectedDate.toDateString() === new Date().toDateString();
   const currentHour = new Date().getHours();
 
-  const rawAvailableHours = isToday
+  const rawAvailableHours = isTodayDate
     ? ALL_HOUR_CHIPS.filter((h) => parseInt(h.split(":")[0]!, 10) > currentHour)
     : ALL_HOUR_CHIPS;
   const availableHours = rawAvailableHours.length > 0 ? rawAvailableHours : ALL_HOUR_CHIPS;
@@ -459,9 +462,12 @@ export default function EstimateScreen() {
 
   const isLoading = acceptMutation.isPending || isSyncing;
 
+  const communityName = incident?.organization?.name || (incident as any)?.communityName || "Aconvi Demo Community";
+  const incidentTitle = incident?.title || "Intervención solicitada";
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
-      <Stack.Screen options={{ title: "Intervención", headerBackTitle: "Regresar" }} />
+      <Stack.Screen options={{ title: "Detalle de OT", headerBackTitle: "Regresar" }} />
 
       <ScrollView
         contentContainerStyle={styles.scroll}
@@ -477,202 +483,322 @@ export default function EstimateScreen() {
         {!isOffline && pendingCount > 0 && (
           <TouchableOpacity style={styles.syncBanner} onPress={syncEstimateQueue} disabled={isSyncing}>
             <Text style={styles.syncBannerText}>
-              {isSyncing ? "⏳ Sincronizando..." : `☁️ ${pendingCount} estimación${pendingCount > 1 ? "es" : ""} pendiente${pendingCount > 1 ? "s" : ""} de subir. Pulsa para sincronizar.`}
+              {isSyncing ? "⏳ Sincronizando..." : `☁️ ${pendingCount} estimación${pendingCount > 1 ? "es" : ""} pendiente${pendingCount > 1 ? "s" : ""} de subir.`}
             </Text>
           </TouchableOpacity>
         )}
 
-        {/* OT header */}
+        {/* ── Dynamic OT Header ────────────────────────────────────────────── */}
         <View style={styles.otHeader}>
-          <View style={styles.otIconCircle}>
-            <Text style={{ fontSize: 28 }}>✅</Text>
+          <View style={[
+            styles.otIconCircle,
+            {
+              backgroundColor: isIncidentExpired
+                ? "#fef2f2"
+                : incident?.status === "AGENDADA"
+                ? "#ecfdf5"
+                : "#fff7ed"
+            }
+          ]}>
+            <Ionicons
+              name={
+                isIncidentExpired
+                  ? "close-circle-outline"
+                  : incident?.status === "AGENDADA"
+                  ? "checkmark-circle-outline"
+                  : "document-text-outline"
+              }
+              size={32}
+              color={
+                isIncidentExpired
+                  ? "#ef4444"
+                  : incident?.status === "AGENDADA"
+                  ? "#10b981"
+                  : "#ea580c"
+              }
+            />
           </View>
-          <Text style={styles.otTitle}>OT aceptada</Text>
-          <Text style={styles.communityName}>Residencial El Lago</Text>
-          <Text style={styles.address}>Calle Los Sauces, 345</Text>
+
+          <Text style={styles.otTitle}>
+            {isIncidentExpired
+              ? "OT Caducada"
+              : incident?.status === "AGENDADA"
+              ? "OT Aceptada"
+              : incident?.status === "EN_CURSO"
+              ? "OT en Curso"
+              : "Respuesta de OT"}
+          </Text>
+
+          <Text style={styles.incidentTitleText}>{incidentTitle}</Text>
+
+          <View style={styles.communityRow}>
+            <Ionicons name="business-outline" size={14} color={MUTED} style={{ marginRight: 4 }} />
+            <Text style={styles.communityName}>{communityName}</Text>
+          </View>
+
+          {/* Strict Expiration Banner - No acceptance allowed */}
+          {isIncidentExpired && (
+            <View style={styles.expiredNoticeCard}>
+              <Ionicons name="alert-circle" size={18} color="#ef4444" style={{ marginRight: 8 }} />
+              <Text style={styles.expiredNoticeText}>
+                Esta orden de trabajo ha superado el límite de 2 horas y ha caducado. Ha vuelto a la administración para su reasignación y no se puede aceptar.
+              </Text>
+            </View>
+          )}
         </View>
 
-        {/* Go now / Schedule toggle */}
-        <Text style={styles.questionLabel}>¿Salir ahora?</Text>
+        {/* Go now / Schedule toggle (Disabled if expired) */}
+        <Text style={[styles.questionLabel, isIncidentExpired && { color: MUTED }]}>
+          ¿Cuándo realizarás la intervención?
+        </Text>
         <View style={styles.toggleRow}>
           <TouchableOpacity
-            style={[styles.toggleBtn, goNow && styles.toggleBtnActive]}
-            onPress={() => setGoNow(true)}
+            style={[
+              styles.toggleBtn,
+              goNow && styles.toggleBtnActive,
+              isIncidentExpired && { opacity: 0.5, borderColor: "#e2e8f0" }
+            ]}
+            onPress={() => !isIncidentExpired && setGoNow(true)}
+            disabled={isIncidentExpired}
           >
-            <Text style={[styles.toggleIcon, goNow && styles.toggleIconActive]}>🚗</Text>
-            <Text style={[styles.toggleText, goNow && styles.toggleTextActive]}>Salir ahora</Text>
+            <Ionicons name="car-outline" size={18} color={goNow && !isIncidentExpired ? "#fff" : MUTED} />
+            <Text style={[styles.toggleText, goNow && !isIncidentExpired && styles.toggleTextActive]}>Salir ahora</Text>
           </TouchableOpacity>
+
           <TouchableOpacity
-            style={[styles.toggleBtn, !goNow && styles.toggleBtnActive]}
-            onPress={() => { setGoNow(false); openSheet(); }}
+            style={[
+              styles.toggleBtn,
+              !goNow && styles.toggleBtnActive,
+              isIncidentExpired && { opacity: 0.5, borderColor: "#e2e8f0" }
+            ]}
+            onPress={() => {
+              if (!isIncidentExpired) {
+                setGoNow(false);
+                openSheet();
+              }
+            }}
+            disabled={isIncidentExpired}
           >
-            <Text style={[styles.toggleIcon, !goNow && styles.toggleIconActive]}>📅</Text>
-            <Text style={[styles.toggleText, !goNow && styles.toggleTextActive]}>Programar</Text>
+            <Ionicons name="calendar-outline" size={18} color={!goNow && !isIncidentExpired ? "#fff" : MUTED} />
+            <Text style={[styles.toggleText, !goNow && !isIncidentExpired && styles.toggleTextActive]}>Programar</Text>
           </TouchableOpacity>
         </View>
 
         {/* Show schedule summary if programmed */}
-        {!goNow && (
+        {!goNow && !isIncidentExpired && (
           <TouchableOpacity style={styles.scheduleSummaryCard} onPress={openSheet} activeOpacity={0.7}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Text style={{ fontSize: 18 }}>📅</Text>
+              <Ionicons name="calendar" size={20} color={PRIMARY} />
               <View>
-                <Text style={styles.scheduleSummaryLabel}>Programado:</Text>
+                <Text style={styles.scheduleSummaryLabel}>Cita programada:</Text>
                 <Text style={styles.scheduleSummaryText}>{summaryText}</Text>
                 <Text style={styles.scheduleSummaryDuration}>Duración estimada: {selectedDuration}</Text>
               </View>
             </View>
-            <Text style={{ color: PRIMARY, fontWeight: "600", fontSize: 13 }}>Cambiar ›</Text>
+            <Ionicons name="create-outline" size={18} color={PRIMARY} />
           </TouchableOpacity>
         )}
 
-        {/* Sliders */}
-        <CostRow label="Desplazamiento" emoji="🚗" value={departure} min={0} max={150} step={5}
-          scaleMarks={["0", "30 €", "50 €", "100 €", "150 €"]} onChange={setDeparture} />
-        <CostRow label="Mano de obra" emoji="🔧" value={labor} min={0} max={200} step={5}
-          scaleMarks={["0 €", "40 €", "80 €", "160 €", "200 €"]} onChange={setLabor} />
-        <CostRow label="Materiales" emoji="🧰" value={materials} min={0} max={100} step={5}
-          scaleMarks={["0 €", "20 €", "40 €", "80 €", "100 €"]} onChange={setMaterials} />
-        {!goNow && (
-          <CostRow label="Plazo estimado" emoji="⏳" value={days} min={1} max={15} step={1}
-            scaleMarks={["1d", "3d", "5d", "10d", "15d"]} onChange={setDays} />
-        )}
+        {/* Sliders for cost estimation */}
+        <View style={[styles.sliderBox, isIncidentExpired && { opacity: 0.5 }]}>
+          <View style={styles.sliderHeader}>
+            <Ionicons name="car-outline" size={18} color={DARK} style={{ marginRight: 8 }} />
+            <Text style={styles.sliderLabel}>Desplazamiento</Text>
+            <View style={styles.sliderBadge}>
+              <Text style={styles.sliderBadgeText}>{departure} €</Text>
+            </View>
+          </View>
+          <NativeSlider value={departure} min={0} max={150} step={5} onChange={setDeparture} disabled={isIncidentExpired} />
+          <View style={styles.scaleRow}>
+            <Text style={styles.scaleMark}>0 €</Text>
+            <Text style={styles.scaleMark}>50 €</Text>
+            <Text style={styles.scaleMark}>100 €</Text>
+            <Text style={styles.scaleMark}>150 €</Text>
+          </View>
+        </View>
 
-        {/* Total */}
+        <View style={[styles.sliderBox, isIncidentExpired && { opacity: 0.5 }]}>
+          <View style={styles.sliderHeader}>
+            <Ionicons name="build-outline" size={18} color={DARK} style={{ marginRight: 8 }} />
+            <Text style={styles.sliderLabel}>Mano de obra</Text>
+            <View style={styles.sliderBadge}>
+              <Text style={styles.sliderBadgeText}>{labor} €</Text>
+            </View>
+          </View>
+          <NativeSlider value={labor} min={0} max={200} step={10} onChange={setLabor} disabled={isIncidentExpired} />
+          <View style={styles.scaleRow}>
+            <Text style={styles.scaleMark}>0 €</Text>
+            <Text style={styles.scaleMark}>80 €</Text>
+            <Text style={styles.scaleMark}>160 €</Text>
+            <Text style={styles.scaleMark}>200 €</Text>
+          </View>
+        </View>
+
+        <View style={[styles.sliderBox, isIncidentExpired && { opacity: 0.5 }]}>
+          <View style={styles.sliderHeader}>
+            <Ionicons name="briefcase-outline" size={18} color={DARK} style={{ marginRight: 8 }} />
+            <Text style={styles.sliderLabel}>Materiales</Text>
+            <View style={styles.sliderBadge}>
+              <Text style={styles.sliderBadgeText}>{materials} €</Text>
+            </View>
+          </View>
+          <NativeSlider value={materials} min={0} max={100} step={5} onChange={setMaterials} disabled={isIncidentExpired} />
+          <View style={styles.scaleRow}>
+            <Text style={styles.scaleMark}>0 €</Text>
+            <Text style={styles.scaleMark}>40 €</Text>
+            <Text style={styles.scaleMark}>80 €</Text>
+            <Text style={styles.scaleMark}>100 €</Text>
+          </View>
+        </View>
+
+        {/* Total sum row */}
         <View style={styles.totalRow}>
-          <Text style={styles.totalLabel}>Total estimado:</Text>
-          <View style={styles.totalBadge}>
+          <Text style={styles.totalLabel}>Presupuesto total estimativo:</Text>
+          <View style={[styles.totalBadge, isIncidentExpired && { backgroundColor: "#94a3b8" }]}>
             <Text style={styles.totalAmount}>{total} €</Text>
           </View>
         </View>
 
-        {/* CTA */}
+        {/* Submit button / Disabled button if expired */}
         <TouchableOpacity
-          style={[styles.sendButton, isLoading && { opacity: 0.7 }]}
-          onPress={goNow ? handleSendNow : openSheet}
-          disabled={isLoading}
-          activeOpacity={0.85}
+          style={[
+            styles.sendButton,
+            isIncidentExpired && { backgroundColor: "#94a3b8", shadowColor: "transparent" }
+          ]}
+          onPress={goNow ? handleSendNow : handleConfirmSchedule}
+          disabled={isLoading || isIncidentExpired}
+          activeOpacity={isIncidentExpired ? 1 : 0.7}
         >
           {isLoading ? (
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={styles.sendButtonText}>
-              {isOffline ? "💾 Guardar sin conexión" : goNow ? "Enviar estimación" : "📅 Confirmar programación"}
+              {isIncidentExpired
+                ? "OT Caducada — No se puede aceptar"
+                : goNow
+                ? "Aceptar e Intervenir Ahora"
+                : "Confirmar Cita y Aceptar"}
             </Text>
           )}
         </TouchableOpacity>
-
-        <TouchableOpacity style={styles.navLink}>
-          <Text style={styles.navLinkText}>📍 Navegar</Text>
-        </TouchableOpacity>
       </ScrollView>
 
-      {/* ─── Schedule Bottom Sheet ─────────────────────────────────────────── */}
+      {/* ─── Bottom sheet for scheduling ─────────────────────────────────── */}
       <Modal visible={showSchedule} transparent animationType="none" onRequestClose={closeSheet}>
         <View style={bsStyles.overlay}>
           <TouchableOpacity style={bsStyles.backdrop} activeOpacity={1} onPress={closeSheet} />
+
           <Animated.View style={[bsStyles.sheet, { transform: [{ translateY: slideAnim }] }]}>
-            {/* Header */}
             <View style={bsStyles.header}>
               <Text style={bsStyles.headerTitle}>Programar intervención</Text>
-              <TouchableOpacity onPress={closeSheet} hitSlop={12}>
-                <Text style={bsStyles.closeX}>✕</Text>
+              <TouchableOpacity onPress={closeSheet}>
+                <Ionicons name="close" size={24} color={MUTED} />
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} style={{ flexShrink: 1 }} contentContainerStyle={{ paddingBottom: 16 }}>
-              {/* 1. Date */}
-              <Text style={bsStyles.sectionLabel}>1. Selecciona la fecha</Text>
-              <ScrollView ref={dateScrollRef} horizontal showsHorizontalScrollIndicator={false} style={bsStyles.chipScroll}>
-                {(showAllDates ? dateChips : dateChips.slice(0, 5)).map((chip, idx) => (
-                  <TouchableOpacity
-                    key={idx}
-                    style={[bsStyles.dateChip, selectedDateIdx === idx && bsStyles.dateChipActive]}
-                    onPress={() => setSelectedDateIdx(idx)}
-                  >
-                    <Text style={[bsStyles.dateChipLabel, selectedDateIdx === idx && bsStyles.dateChipLabelActive]}>
-                      {chip.label}
-                    </Text>
-                    <Text style={[bsStyles.dateChipDay, selectedDateIdx === idx && bsStyles.dateChipDayActive]}>
-                      {chip.date.getDate()}
-                    </Text>
-                    <Text style={[bsStyles.dateChipMonth, selectedDateIdx === idx && bsStyles.dateChipMonthActive]}>
-                      {MONTH_NAMES[chip.date.getMonth()]}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+            <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled>
+              <Text style={bsStyles.sectionLabel}>Día de la visita</Text>
+              <ScrollView
+                ref={dateScrollRef}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={bsStyles.chipScroll}
+              >
+                {(showAllDates ? dateChips : dateChips.slice(0, 5)).map((chip, idx) => {
+                  const isActive = selectedDateIdx === idx;
+                  return (
+                    <TouchableOpacity
+                      key={chip.date.toISOString()}
+                      style={[bsStyles.dateChip, isActive && bsStyles.dateChipActive]}
+                      onPress={() => setSelectedDateIdx(idx)}
+                    >
+                      <Text style={[bsStyles.dateChipLabel, isActive && bsStyles.dateChipLabelActive]}>
+                        {chip.isToday ? "Hoy" : chip.dayName}
+                      </Text>
+                      <Text style={[bsStyles.dateChipDay, isActive && bsStyles.dateChipDayActive]}>
+                        {chip.dayNum}
+                      </Text>
+                      <Text style={[bsStyles.dateChipMonth, isActive && bsStyles.dateChipMonthActive]}>
+                        {chip.monthName}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+
                 <TouchableOpacity style={bsStyles.dateChipCalendar} onPress={handleToggleDates}>
-                  <Text style={{ fontSize: 20 }}>{showAllDates ? '⬅️' : '📅'}</Text>
-                  <Text style={bsStyles.dateChipCalendarText}>{showAllDates ? 'Menos\nfechas' : 'Más\nfechas'}</Text>
+                  <Ionicons name="calendar-outline" size={20} color={PRIMARY} />
+                  <Text style={bsStyles.dateChipCalendarText}>
+                    {showAllDates ? "Menos" : "Ver más"}
+                  </Text>
                 </TouchableOpacity>
               </ScrollView>
 
-              {/* 2. Hour */}
-              <Text style={bsStyles.sectionLabel}>2. Selecciona la hora</Text>
-              <ScrollView ref={hourScrollRef} horizontal showsHorizontalScrollIndicator={false} style={bsStyles.chipScroll}>
-                {(showAllHours ? availableHours : availableHours.slice(0, 5)).map((h) => (
-                  <TouchableOpacity
-                    key={h}
-                    style={[bsStyles.hourChip, selectedHour === h && bsStyles.hourChipActive]}
-                    onPress={() => setSelectedHour(h)}
-                  >
-                    <Text style={[bsStyles.hourChipText, selectedHour === h && bsStyles.hourChipTextActive]}>
-                      {h}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+              <Text style={bsStyles.sectionLabel}>Hora de llegada estimada</Text>
+              <ScrollView
+                ref={hourScrollRef}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={bsStyles.chipScroll}
+              >
+                {(showAllHours ? availableHours : availableHours.slice(0, 5)).map((h) => {
+                  const isActive = selectedHour === h;
+                  return (
+                    <TouchableOpacity
+                      key={h}
+                      style={[bsStyles.hourChip, isActive && bsStyles.hourChipActive]}
+                      onPress={() => setSelectedHour(h)}
+                    >
+                      <Text style={[bsStyles.hourChipText, isActive && bsStyles.hourChipTextActive]}>
+                        {h}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+
                 <TouchableOpacity style={bsStyles.hourChipMore} onPress={handleToggleHours}>
-                  <Text style={{ fontSize: 16 }}>{showAllHours ? '⬅️' : '🕐'}</Text>
-                  <Text style={bsStyles.hourChipMoreText}>{showAllHours ? 'Menos\nhoras' : 'Más\nhoras'}</Text>
+                  <Ionicons name="time-outline" size={18} color={PRIMARY} />
+                  <Text style={bsStyles.hourChipMoreText}>{showAllHours ? "Menos" : "Ver más"}</Text>
                 </TouchableOpacity>
               </ScrollView>
 
-              {/* 3. Duration */}
-              <Text style={bsStyles.sectionLabel}>3. Duración estimada</Text>
+              <Text style={bsStyles.sectionLabel}>Duración estimada</Text>
               <View style={bsStyles.durationRow}>
-                {DURATION_CHIPS.map((d) => (
-                  <TouchableOpacity
-                    key={d}
-                    style={[bsStyles.durationChip, selectedDuration === d && bsStyles.durationChipActive]}
-                    onPress={() => setSelectedDuration(d)}
-                  >
-                    <Text style={[bsStyles.durationChipText, selectedDuration === d && bsStyles.durationChipTextActive]}>
-                      {d}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                {DURATION_OPTIONS.map((dur) => {
+                  const isActive = selectedDuration === dur;
+                  return (
+                    <TouchableOpacity
+                      key={dur}
+                      style={[bsStyles.durationChip, isActive && bsStyles.durationChipActive]}
+                      onPress={() => setSelectedDuration(dur)}
+                    >
+                      <Text style={[bsStyles.durationChipText, isActive && bsStyles.durationChipTextActive]}>
+                        {dur}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
 
-              {/* Summary */}
               <View style={bsStyles.summaryCard}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 4 }}>
-                  <Text style={{ fontSize: 18 }}>📅</Text>
-                  <View>
-                    <Text style={bsStyles.summaryLabel}>Resumen:</Text>
-                    <Text style={bsStyles.summaryDate}>{summaryText}</Text>
-                  </View>
-                </View>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                  <Text style={{ fontSize: 18 }}>🕐</Text>
-                  <Text style={bsStyles.summaryDuration}>Duración estimada: {selectedDuration}</Text>
-                </View>
+                <Text style={bsStyles.summaryLabel}>Resumen de la cita:</Text>
+                <Text style={bsStyles.summaryDate}>{summaryText}</Text>
+                <Text style={bsStyles.summaryDuration}>Duración: {selectedDuration}</Text>
               </View>
             </ScrollView>
 
-            {/* Footer buttons */}
-            <View style={[bsStyles.footer, { paddingBottom: Math.max(28, insets.bottom + 12) }]}>
+            <View style={bsStyles.footer}>
               <TouchableOpacity style={bsStyles.cancelBtn} onPress={closeSheet}>
                 <Text style={bsStyles.cancelBtnText}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[bsStyles.confirmBtn, isLoading && { opacity: 0.7 }]}
+                style={bsStyles.confirmBtn}
                 onPress={handleConfirmSchedule}
                 disabled={isLoading}
               >
                 {isLoading ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={bsStyles.confirmBtnText}>Confirmar programación</Text>
+                  <Text style={bsStyles.confirmBtnText}>Confirmar Cita</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -683,7 +809,6 @@ export default function EstimateScreen() {
   );
 }
 
-// ─── Main styles ──────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#fff" },
   scroll: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 40 },
@@ -697,25 +822,46 @@ const styles = StyleSheet.create({
     marginBottom: 12, borderWidth: 1, borderColor: "#bbf7d0",
   },
   syncBannerText: { fontSize: 13, color: "#065f46", fontWeight: "600", textAlign: "center" },
+
   otHeader: { alignItems: "center", marginBottom: 24 },
   otIconCircle: {
-    width: 64, height: 64, borderRadius: 32, backgroundColor: "#ecfdf5",
+    width: 64, height: 64, borderRadius: 32,
     justifyContent: "center", alignItems: "center", marginBottom: 12,
   },
-  otTitle: { fontSize: 28, fontWeight: "800", color: DARK, letterSpacing: -0.5, marginBottom: 4 },
-  communityName: { fontSize: 16, color: MUTED },
-  address: { fontSize: 14, color: MUTED, marginBottom: 4 },
-  questionLabel: { fontSize: 17, fontWeight: "700", color: DARK, marginBottom: 10 },
+  otTitle: { fontSize: 24, fontWeight: "800", color: DARK, letterSpacing: -0.5, marginBottom: 4 },
+  incidentTitleText: { fontSize: 16, fontWeight: "700", color: DARK, textAlign: "center", marginBottom: 4 },
+  communityRow: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
+  communityName: { fontSize: 14, color: MUTED, fontWeight: "600" },
+
+  expiredNoticeCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fef2f2",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#fecaca",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginTop: 10,
+  },
+  expiredNoticeText: {
+    fontSize: 13,
+    color: "#991b1b",
+    fontWeight: "700",
+    lineHeight: 18,
+    flex: 1,
+  },
+
+  questionLabel: { fontSize: 16, fontWeight: "700", color: DARK, marginBottom: 10 },
   toggleRow: { flexDirection: "row", gap: 10, marginBottom: 16 },
   toggleBtn: {
     flex: 1, paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, borderColor: BORDER,
     alignItems: "center", backgroundColor: "#fff", flexDirection: "row", justifyContent: "center", gap: 6,
   },
   toggleBtnActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
-  toggleIcon: { fontSize: 16 },
-  toggleIconActive: {},
   toggleText: { fontSize: 15, fontWeight: "600", color: MUTED },
   toggleTextActive: { color: "#fff" },
+
   scheduleSummaryCard: {
     backgroundColor: "#f0fdfa", borderRadius: 12, padding: 14, marginBottom: 16,
     borderWidth: 1, borderColor: "#ccfbf1", flexDirection: "row",
@@ -724,12 +870,12 @@ const styles = StyleSheet.create({
   scheduleSummaryLabel: { fontSize: 12, color: MUTED, fontWeight: "600" },
   scheduleSummaryText: { fontSize: 15, color: PRIMARY, fontWeight: "700" },
   scheduleSummaryDuration: { fontSize: 12, color: MUTED, marginTop: 2 },
+
   sliderBox: {
     backgroundColor: "#f8fafc", borderRadius: 16, borderWidth: 1, borderColor: BORDER,
     padding: 14, marginBottom: 12,
   },
   sliderHeader: { flexDirection: "row", alignItems: "center", marginBottom: 4 },
-  sliderEmoji: { fontSize: 18, marginRight: 8 },
   sliderLabel: { fontSize: 15, fontWeight: "600", color: DARK, flex: 1 },
   sliderBadge: {
     flexDirection: "row", alignItems: "center", backgroundColor: "#fff",
@@ -738,21 +884,21 @@ const styles = StyleSheet.create({
   sliderBadgeText: { fontSize: 14, fontWeight: "700", color: DARK },
   scaleRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 2 },
   scaleMark: { fontSize: 10, color: MUTED },
+
   totalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginVertical: 16 },
-  totalLabel: { fontSize: 17, fontWeight: "700", color: DARK },
+  totalLabel: { fontSize: 16, fontWeight: "700", color: DARK },
   totalBadge: { backgroundColor: PRIMARY, borderRadius: 12, paddingHorizontal: 18, paddingVertical: 8 },
   totalAmount: { color: "#fff", fontSize: 20, fontWeight: "800" },
+
   sendButton: {
     backgroundColor: PRIMARY, borderRadius: 14, paddingVertical: 16, alignItems: "center",
     marginBottom: 12, shadowColor: PRIMARY, shadowOpacity: 0.25, shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 }, elevation: 4,
   },
-  sendButtonText: { color: "#fff", fontSize: 17, fontWeight: "700" },
-  navLink: { alignItems: "center", paddingVertical: 8 },
-  navLinkText: { fontSize: 14, color: PRIMARY, fontWeight: "600" },
+  sendButtonText: { color: "#fff", fontSize: 16, fontWeight: "700" },
 });
 
-// ─── Bottom sheet styles ──────────────────────────────────────────────────────
+// Bottom sheet styles
 const bsStyles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: "flex-end" },
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.4)" },
@@ -762,11 +908,9 @@ const bsStyles = StyleSheet.create({
     shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 20, shadowOffset: { width: 0, height: -4 }, elevation: 10,
   },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
-  headerTitle: { fontSize: 20, fontWeight: "700", color: DARK },
-  closeX: { fontSize: 22, color: MUTED, fontWeight: "600" },
+  headerTitle: { fontSize: 18, fontWeight: "700", color: DARK },
   sectionLabel: { fontSize: 15, fontWeight: "600", color: DARK, marginBottom: 10, marginTop: 8 },
   chipScroll: { marginBottom: 8 },
-  // Date chips
   dateChip: {
     width: 72, height: 88, borderRadius: 14, borderWidth: 1.5, borderColor: BORDER,
     alignItems: "center", justifyContent: "center", marginRight: 8, backgroundColor: "#fff",
@@ -783,7 +927,6 @@ const bsStyles = StyleSheet.create({
     alignItems: "center", justifyContent: "center", backgroundColor: "#f8fafc",
   },
   dateChipCalendarText: { fontSize: 11, color: MUTED, textAlign: "center", fontWeight: "600", marginTop: 4 },
-  // Hour chips
   hourChip: {
     paddingHorizontal: 18, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5,
     borderColor: BORDER, marginRight: 8, backgroundColor: "#fff",
@@ -796,7 +939,6 @@ const bsStyles = StyleSheet.create({
     borderColor: BORDER, alignItems: "center", justifyContent: "center", backgroundColor: "#f8fafc",
   },
   hourChipMoreText: { fontSize: 11, color: MUTED, textAlign: "center", fontWeight: "600", marginTop: 2 },
-  // Duration chips
   durationRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 },
   durationChip: {
     paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, borderWidth: 1.5,
@@ -805,7 +947,6 @@ const bsStyles = StyleSheet.create({
   durationChipActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
   durationChipText: { fontSize: 14, fontWeight: "600", color: DARK },
   durationChipTextActive: { color: "#fff" },
-  // Summary
   summaryCard: {
     backgroundColor: "#f0fdfa", borderRadius: 14, padding: 16, marginBottom: 16,
     borderWidth: 1, borderColor: "#ccfbf1",
@@ -813,7 +954,6 @@ const bsStyles = StyleSheet.create({
   summaryLabel: { fontSize: 12, color: MUTED, fontWeight: "600" },
   summaryDate: { fontSize: 16, fontWeight: "700", color: PRIMARY },
   summaryDuration: { fontSize: 14, color: MUTED },
-  // Footer
   footer: {
     flexDirection: "row", gap: 12, paddingTop: 14, paddingBottom: 16,
     borderTopWidth: 1, borderTopColor: BORDER, backgroundColor: "#fff",

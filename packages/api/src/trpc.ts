@@ -55,20 +55,14 @@ export const createTRPCContext = async (opts: {
 
         if (foundUser) {
           sessionResult = {
-            session: {
-              id: foundSession.id,
-              userId: foundSession.userId,
-              token: foundSession.token,
-              expiresAt: foundSession.expiresAt,
-            },
+            session: foundSession,
             user: {
-              id: foundUser.id,
-              email: foundUser.email,
-              name: foundUser.name,
-              image: foundUser.image,
+              ...foundUser,
+              email: foundUser.email ?? "",
+              name: foundUser.name ?? "",
               role: foundUser.role ?? "Vecino",
             },
-          };
+          } as any;
         }
       }
     } catch (err) {

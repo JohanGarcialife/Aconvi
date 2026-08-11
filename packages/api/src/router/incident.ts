@@ -1,4 +1,4 @@
-import { eq, desc, and, isNull, sql } from "drizzle-orm";
+import { eq, desc, and, isNull, isNotNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { join } from "path";
 import { writeFileSync, existsSync, mkdirSync } from "fs";
@@ -96,6 +96,8 @@ function sanitizeText(str: string): string {
   };
   return str.split('').map(c => map[c] || c).join('');
 }
+
+let columnsEnsured = false;
 
 async function ensureIncidentColumns(db: any) {
   try {
@@ -467,8 +469,17 @@ export const incidentRouter = createTRPCRouter({
       // Fire-and-forget: WS event to tenant room
       void emitWebSocketEvent(input.tenantId, "incident-updated", updated);
 
-      // Fire-and-forget push to vecino
-      if (updated.reporterId) {
+      // Check if this incident was ever assigned before (to prevent push to vecino on reassignment)
+      const previousAssignment = await ctx.db.query.incidentHistory.findFirst({
+        where: and(
+          eq(incidentHistory.incidentId, input.id),
+          eq(incidentHistory.action, "ASSIGNED")
+        ),
+      });
+      const isReassignment = Boolean(current.providerId) || Boolean(current.assignedAt) || Boolean(previousAssignment);
+
+      // Fire-and-forget push to vecino - ONLY on first assignment (never on reassignment)
+      if (updated.reporterId && !isReassignment) {
         void sendPushToUser(ctx.db, updated.reporterId, {
           title: "Profesional asignado",
           body: `Hemos asignado un profesional para atender tu incidencia: "${updated.title}".`,
@@ -649,7 +660,7 @@ export const incidentRouter = createTRPCRouter({
     )
     .query(async ({ ctx, input }) => {
       await ensureIncidentColumns(ctx.db);
-      return ctx.db.query.incident.findMany({
+      const items = await ctx.db.query.incident.findMany({
         where: and(
           eq(incident.providerId, input.providerId),
           input.tenantId ? eq(incident.organizationId, input.tenantId) : undefined,
@@ -658,6 +669,7 @@ export const incidentRouter = createTRPCRouter({
         with: {
           reporter: { columns: { id: true, name: true, phoneNumber: true } },
           provider: true,
+          organization: true,
           notes: {
             orderBy: (n, { asc }) => asc(n.createdAt),
           },
@@ -666,6 +678,13 @@ export const incidentRouter = createTRPCRouter({
           },
         },
       });
+
+      // Strip large base64 data URLs in list query to prevent client OutOfMemoryError
+      return items.map((item) => ({
+        ...item,
+        photoUrl: item.photoUrl?.startsWith("data:") ? undefined : item.photoUrl,
+        finalPhotoUrl: item.finalPhotoUrl?.startsWith("data:") ? undefined : item.finalPhotoUrl,
+      }));
     }),
 
   // ─── Provider: accept job (→ AGENDADA) ────────────────────────────────────
@@ -717,7 +736,7 @@ export const incidentRouter = createTRPCRouter({
         }
         if (input.scheduledAt) {
           const d = new Date(input.scheduledAt);
-          noteLines.push(`📅 Programado: ${d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })} a las ${d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`);
+          noteLines.push(`📅 Programado: ${d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Madrid' })} a las ${d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Madrid' })}`);
         }
         if (input.estimatedDuration) noteLines.push(`⏱️ Duración estimada: ${input.estimatedDuration}`);
 
@@ -850,8 +869,8 @@ export const incidentRouter = createTRPCRouter({
         const EARLY_BUFFER_MS = 15 * 60 * 1000;
         if (now < scheduledTime - EARLY_BUFFER_MS) {
           const scheduledDate = new Date((inc as any).scheduledAt);
-          const formattedDate = scheduledDate.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
-          const formattedTime = scheduledDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+          const formattedDate = scheduledDate.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Madrid' });
+          const formattedTime = scheduledDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Madrid' });
           throw new Error(
             `La intervención está programada para el ${formattedDate} a las ${formattedTime}. No puedes registrar la llegada antes de esa fecha y hora.`
           );
@@ -1010,21 +1029,21 @@ export const incidentRouter = createTRPCRouter({
 
       // Update provider statistics if any
       if (updated.providerId) {
-        // Find all resolved incidents for this provider that have a rating
+        // Find all incidents for this provider that have a valid rating
         const ratedIncidents = await ctx.db.query.incident.findMany({
           where: and(
             eq(incident.providerId, updated.providerId),
-            sql`${incident.status} IN ('RESUELTA', 'CERRADA')`,
+            isNotNull(incident.rating),
           ),
         });
 
         const ratings = ratedIncidents
           .map((i) => i.rating)
-          .filter((r): r is number => r !== null && r !== undefined);
+          .filter((r): r is number => typeof r === "number" && !isNaN(r));
 
         const totalRatings = ratings.length;
         const avgRating = totalRatings > 0 
-          ? ratings.reduce((sum, r) => sum + r, 0) / totalRatings 
+          ? Number((ratings.reduce((sum, r) => sum + r, 0) / totalRatings).toFixed(2))
           : 5.0;
 
         await ctx.db
