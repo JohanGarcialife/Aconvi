@@ -18,12 +18,26 @@ import { SocketProvider } from "~/components/SocketProvider";
 
 const asyncStoragePersister = createAsyncStoragePersister({
   storage: AsyncStorage,
-  // Limit key size to avoid writing huge payloads
+  // Limit key size to avoid writing huge payloads that exceed Android SQLite CursorWindow (2MB)
   serialize: (data) => {
     try {
-      return JSON.stringify(data);
+      const str = JSON.stringify(data);
+      if (str.length > 1_000_000) {
+        return JSON.stringify({ clientState: { queries: [], mutations: [] }, timestamp: Date.now(), buster: "" });
+      }
+      return str;
     } catch {
-      return JSON.stringify({ clientState: { queries: [], mutations: [] }, timestamp: 0, buster: '' });
+      return JSON.stringify({ clientState: { queries: [], mutations: [] }, timestamp: Date.now(), buster: "" });
+    }
+  },
+  deserialize: (str) => {
+    try {
+      if (!str || str.length > 1_500_000) {
+        return { clientState: { queries: [], mutations: [] }, timestamp: Date.now(), buster: "" };
+      }
+      return JSON.parse(str);
+    } catch {
+      return { clientState: { queries: [], mutations: [] }, timestamp: Date.now(), buster: "" };
     }
   },
 });
@@ -31,6 +45,19 @@ const asyncStoragePersister = createAsyncStoragePersister({
 // ─── Inner component wraps hooks that need QueryClient ────────────────────────
 function AppInitializer({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+
+  // Self-healing: clear oversized REACT_QUERY_OFFLINE_CACHE on boot to fix CursorWindow errors
+  useEffect(() => {
+    AsyncStorage.getItem("REACT_QUERY_OFFLINE_CACHE")
+      .then((val) => {
+        if (val && val.length > 1_000_000) {
+          void AsyncStorage.removeItem("REACT_QUERY_OFFLINE_CACHE");
+        }
+      })
+      .catch(() => {
+        void AsyncStorage.removeItem("REACT_QUERY_OFFLINE_CACHE");
+      });
+  }, []);
 
   // Initialize push notifications (requests permission, registers token)
   usePushNotifications();
@@ -116,9 +143,15 @@ export default function RootLayout() {
           dehydrateOptions: {
             shouldDehydrateMutation: () => false,
             shouldDehydrateQuery: (query) => {
-              // Don't persist queries that could contain large photo payloads
-              const key = query.queryKey?.[0];
-              return query.state.status === 'success' && key !== 'incident';
+              if (query.state.status !== "success") return false;
+              // Safely extract primary domain key string from tRPC query key array structure
+              const rawKey = query.queryKey;
+              const firstPart = Array.isArray(rawKey?.[0]) ? rawKey[0][0] : rawKey?.[0];
+              // Never dehydrate heavy query domains that contain photos, lists, or large payloads
+              if (typeof firstPart === "string" && ["incident", "document", "notice", "booking", "provider"].includes(firstPart)) {
+                return false;
+              }
+              return true;
             },
           },
         }}
