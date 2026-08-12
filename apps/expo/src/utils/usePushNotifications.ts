@@ -28,18 +28,21 @@ export function usePushNotifications() {
 
   // tRPC mutation to register token in backend
   const registerToken = useMutation({
-    ...trpc.notification.registerToken.mutationOptions(),
+    ...((trpc.notification as any).registerToken?.mutationOptions?.() ?? {}),
+    mutationFn: async (data: { token: string; platform: "web" | "expo" }) => {
+      const opts = (trpc.notification as any).registerToken.mutationOptions();
+      return opts.mutationFn(data);
+    },
     onSuccess: () => {
       console.log("[Push] Token saved in DB successfully");
     },
-    onError: (err) => {
+    onError: (err: any) => {
       console.error("[Push] Error saving token to DB:", err);
       const isUnauth = err?.message?.toUpperCase().includes("UNAUTHORIZED");
       if (isUnauth) {
         // Expected at startup when user is not logged in yet.
         return;
       }
-      Alert.alert("Error de Registro", "No se pudo guardar el token en la base de datos: " + (err?.message ?? "Error desconocido"));
     }
   });
 
@@ -92,11 +95,6 @@ export function usePushNotifications() {
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 async function registerForPushNotificationsAsync(): Promise<string | null> {
-  if (!Device.isDevice) {
-    console.warn("[Push] Must use a physical device for push notifications.");
-    return null;
-  }
-
   if (Platform.OS === "android") {
     await Notifications.setNotificationChannelAsync("default", {
       name: "Aconvi",
@@ -119,17 +117,21 @@ async function registerForPushNotificationsAsync(): Promise<string | null> {
     return null;
   }
 
-  // Get Expo push token — requires projectId for EAS builds
-  // During development with Expo Go, this works without EAS
-  const projectId =
-    process.env.EXPO_PUBLIC_PROJECT_ID ??
-    Constants.expoConfig?.extra?.eas?.projectId ??
-    Constants.easConfig?.projectId;
+  try {
+    const projectId =
+      process.env.EXPO_PUBLIC_PROJECT_ID ??
+      Constants.expoConfig?.extra?.eas?.projectId ??
+      Constants.easConfig?.projectId ??
+      "1713543a-27cf-4db0-9da2-64ddf821d5d7";
 
-  const tokenData = await Notifications.getExpoPushTokenAsync({
-    projectId,
-  });
+    const tokenData = await Notifications.getExpoPushTokenAsync({
+      projectId,
+    });
 
-  console.log("[Push] Expo Push Token:", tokenData.data);
-  return tokenData.data;
+    console.log("[Push] Expo Push Token successfully acquired:", tokenData.data);
+    return tokenData.data;
+  } catch (error) {
+    console.warn("[Push] Failed to get Expo push token:", error);
+    return null;
+  }
 }
