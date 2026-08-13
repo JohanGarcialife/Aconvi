@@ -660,7 +660,14 @@ export default function ProveedorJobScreen() {
 
           <View style={styles.profileDropdownContainer}>
             {/* Header info */}
-            <View style={styles.profileDropdownHeader}>
+            <TouchableOpacity
+              style={styles.profileDropdownHeader}
+              onPress={() => {
+                setShowProfileDropdown(false);
+                setActiveTab("perfil");
+              }}
+              activeOpacity={0.7}
+            >
               <View style={styles.profileBigAvatar}>
                 <Text style={styles.profileBigAvatarText}>{initials}</Text>
               </View>
@@ -677,11 +684,23 @@ export default function ProveedorJobScreen() {
                   </Text>
                 </View>
               </View>
-            </View>
+            </TouchableOpacity>
 
             <View style={styles.dropdownDivider} />
 
             {/* Actions */}
+            <TouchableOpacity
+              style={styles.profileActionRow}
+              onPress={() => {
+                setShowProfileDropdown(false);
+                setActiveTab("perfil");
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="person-outline" size={18} color={DARK} style={{ marginRight: 10 }} />
+              <Text style={styles.profileActionText}>Mi Perfil</Text>
+            </TouchableOpacity>
+
             <TouchableOpacity
               style={styles.profileActionRow}
               onPress={() => {

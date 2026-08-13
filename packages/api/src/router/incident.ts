@@ -646,7 +646,7 @@ export const incidentRouter = createTRPCRouter({
     .input(
       z.object({
         providerId: z.string().min(1),
-        tenantId: z.string().min(1).optional(),
+        tenantId: z.string().nullish(),
       }),
     )
     .query(async ({ ctx, input }) => {
@@ -661,12 +661,6 @@ export const incidentRouter = createTRPCRouter({
           reporter: { columns: { id: true, name: true, phoneNumber: true } },
           provider: true,
           organization: true,
-          notes: {
-            orderBy: (n, { asc }) => asc(n.createdAt),
-          },
-          history: {
-            orderBy: (h, { asc }) => asc(h.createdAt),
-          },
         },
       });
 
