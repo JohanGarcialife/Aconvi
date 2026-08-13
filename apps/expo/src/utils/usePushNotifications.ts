@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
+import * as SecureStore from "expo-secure-store";
 import { Platform, Alert } from "react-native";
 import Constants from "expo-constants";
 import { trpc, queryClient } from "../utils/api";
 import { useMutation } from "@tanstack/react-query";
 import { authClient } from "./auth";
+import { getBaseUrl } from "./base-url";
 
 // Configure how notifications appear when app is in foreground
 Notifications.setNotificationHandler({
@@ -82,12 +84,39 @@ export function usePushNotifications() {
 
   // Reactively register token when user logs in or swaps accounts
   useEffect(() => {
-    if (!expoPushToken || !userId) {
-      console.log("[Push] Skipping register: token or userId missing", { token: !!expoPushToken, userId: !!userId });
-      return;
+    if (!expoPushToken) return;
+
+    // 1. Better Auth session (Web / Vecino)
+    if (userId) {
+      console.log("[Push] Registering token for Better Auth user", userId);
+      registerToken.mutate({ token: expoPushToken, platform: "expo" } as any);
     }
-    console.log("[Push] Registering token for user", userId);
-    registerToken.mutate({ token: expoPushToken, platform: "expo" } as any);
+
+    // 2. SecureStore session token (Proveedor mobile app)
+    void (async () => {
+      try {
+        const sessionToken = await SecureStore.getItemAsync("expo_session_token");
+        if (sessionToken) {
+          console.log("[Push] Registering token via SecureStore session token...");
+          const res = await fetch(`${getBaseUrl()}/api/register-push-token`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${sessionToken}`,
+            },
+            body: JSON.stringify({ token: expoPushToken, platform: "expo" }),
+          });
+          const data = (await res.json()) as { ok: boolean; error?: string };
+          if (data.ok) {
+            console.log("[Push] Successfully registered push token via SecureStore session!");
+          } else {
+            console.warn("[Push] REST registration returned error:", data.error);
+          }
+        }
+      } catch (err) {
+        console.warn("[Push] Error auto-registering token via SecureStore:", err);
+      }
+    })();
   }, [expoPushToken, userId]);
 
   return { expoPushToken, permissionStatus };
