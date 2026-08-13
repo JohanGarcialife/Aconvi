@@ -268,82 +268,6 @@ export default function ProveedorJobScreen() {
     router.replace("/login");
   }, [router]);
 
-  // Handle Manual Push Token Registration & Diagnostics
-  const [testingPush, setTestingPush] = useState(false);
-
-  const handleTestPushRegistration = useCallback(async () => {
-    setTestingPush(true);
-    try {
-      if (Platform.OS === "android") {
-        await Notifications.setNotificationChannelAsync("default", {
-          name: "Aconvi",
-          importance: Notifications.AndroidImportance.MAX,
-          vibrationPattern: [0, 250, 250, 250],
-          lightColor: "#4aa19b",
-        });
-      }
-      const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      let finalStatus = existingStatus;
-      if (existingStatus !== "granted") {
-        const { status } = await Notifications.requestPermissionsAsync();
-        finalStatus = status;
-      }
-      if (finalStatus !== "granted") {
-        Alert.alert(
-          "Permiso denegado",
-          "Las notificaciones push están desactivadas. Por favor permítelas en Ajustes de tu móvil > Aplicaciones > Aconvi > Notificaciones."
-        );
-        setTestingPush(false);
-        return;
-      }
-
-      const projectId =
-        process.env.EXPO_PUBLIC_PROJECT_ID ??
-        Constants.expoConfig?.extra?.eas?.projectId ??
-        Constants.easConfig?.projectId ??
-        "1713543a-27cf-4db0-9da2-64ddf821d5d7";
-
-      const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
-      const token = tokenData?.data;
-
-      if (!token) {
-        Alert.alert("Error", "No se pudo obtener el token push de Expo.");
-        setTestingPush(false);
-        return;
-      }
-
-      const sessionToken = await SecureStore.getItemAsync("expo_session_token");
-      if (!sessionToken) {
-        Alert.alert("Error", "No hay sesión activa.");
-        setTestingPush(false);
-        return;
-      }
-
-      const res = await fetch(`${getBaseUrl()}/api/register-push-token`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${sessionToken}`,
-        },
-        body: JSON.stringify({ token, platform: "expo" }),
-      });
-      const resData = (await res.json()) as { ok: boolean; error?: string };
-
-      if (resData.ok) {
-        Alert.alert(
-          "¡Push Conectado Con Éxito!",
-          `Token registrado:\n${token}\n\n¡Tu dispositivo ya está listo para recibir notificaciones!`
-        );
-      } else {
-        Alert.alert("Error de registro", resData.error || "No se pudo registrar el token.");
-      }
-    } catch (err: any) {
-      Alert.alert("Error", err?.message || "Error al obtener o vincular token push.");
-    } finally {
-      setTestingPush(false);
-    }
-  }, []);
-
   // Dynamic DB Data Arrays
   const rawIncidents = (incidents as any[] | undefined) ?? [];
 
@@ -1214,22 +1138,6 @@ export default function ProveedorJobScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 15, fontWeight: "600", color: DARK }}>OT Expiradas (Histórico)</Text>
                 <Text style={{ fontSize: 13, color: MUTED }}>Historial de órdenes caducadas ({expiradasCount})</Text>
-              </View>
-              <Ionicons name="chevron-forward-outline" size={18} color="#94a3b8" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.profileActionRow, { padding: 16, borderBottomWidth: 1, borderBottomColor: "#f1f5f9" }]}
-              onPress={handleTestPushRegistration}
-              disabled={testingPush}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="notifications-circle-outline" size={20} color={TEAL} style={{ marginRight: 12 }} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 15, fontWeight: "600", color: DARK }}>
-                  {testingPush ? "Vincular Notificaciones..." : "Vincular Notificaciones Push"}
-                </Text>
-                <Text style={{ fontSize: 13, color: MUTED }}>Activa permisos y registra el token de tu dispositivo</Text>
               </View>
               <Ionicons name="chevron-forward-outline" size={18} color="#94a3b8" />
             </TouchableOpacity>
