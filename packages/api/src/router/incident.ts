@@ -131,6 +131,12 @@ async function ensureIncidentColumns(db: any) {
 }
 
 export const incidentRouter = createTRPCRouter({
+  clearAll: publicProcedure.mutation(async ({ ctx }) => {
+    const { sql } = await import("drizzle-orm");
+    await ctx.db.execute(sql.raw("TRUNCATE TABLE incident_note, incident_history, incident CASCADE;"));
+    return { success: true };
+  }),
+
   // ─── List (public) ────────────────────────────────────────────────────────
   all: publicProcedure
     .input(
