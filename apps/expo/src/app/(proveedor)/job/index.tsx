@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, Stack, useLocalSearchParams, useFocusEffect } from "expo-router";
 import * as SecureStore from "expo-secure-store";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { api } from "~/utils/api";
 import { useQuery } from "@tanstack/react-query";
@@ -229,7 +230,16 @@ export default function ProveedorJobScreen() {
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [notificationsSeen, setNotificationsSeen] = useState(false);
+  const [lastNotificationSeenTimestamp, setLastNotificationSeenTimestamp] = useState<number>(0);
   const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem("lastNotificationSeenTimestamp").then((val) => {
+      if (val) {
+        setLastNotificationSeenTimestamp(parseInt(val, 10));
+      }
+    }).catch(() => {});
+  }, []);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -318,8 +328,14 @@ export default function ProveedorJobScreen() {
   const programadasCount = programadasDB.length;
   const finalizadasCount = finalizadasDB.length;
 
-  // Unread count is 0 if user has already opened/seen notifications
-  const unreadCount = notificationsSeen ? 0 : porResponderCount;
+  // Unread count based on last seen timestamp
+  const unreadCount = useMemo(() => {
+    if (notificationsSeen) return 0;
+    return porResponderDB.filter((i: any) => {
+      const ts = i.assignedAt ? new Date(i.assignedAt).getTime() : (i.createdAt ? new Date(i.createdAt).getTime() : 0);
+      return ts > lastNotificationSeenTimestamp;
+    }).length;
+  }, [notificationsSeen, porResponderDB, lastNotificationSeenTimestamp]);
 
   // Open notifications panel and mark notifications as seen/read
   const handleToggleNotifications = useCallback(() => {
@@ -328,6 +344,9 @@ export default function ProveedorJobScreen() {
       const next = !prev;
       if (next) {
         setNotificationsSeen(true);
+        const now = Date.now();
+        setLastNotificationSeenTimestamp(now);
+        AsyncStorage.setItem("lastNotificationSeenTimestamp", now.toString()).catch(() => {});
       }
       return next;
     });
@@ -411,9 +430,10 @@ export default function ProveedorJobScreen() {
 
     return source.map((i: any, idx: number) => {
       const schedDate = i.scheduledAt ? new Date(i.scheduledAt) : null;
+      const fallbackDate = new Date(i.assignedAt || i.createdAt);
       const timeStr = schedDate
         ? schedDate.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })
-        : ["09:00", "10:30", "13:00", "16:00", "17:30"][idx % 5];
+        : fallbackDate.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
       return {
         id: i.id,
         time: timeStr,
@@ -1273,6 +1293,26 @@ export default function ProveedorJobScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity
+          style={activeTab === "intervenciones" ? styles.tabItemActive : styles.tabItem}
+          onPress={() => {
+            setShowNotificationsDropdown(false);
+            setShowProfileDropdown(false);
+            setActiveTab("intervenciones");
+          }}
+          activeOpacity={0.8}
+        >
+          {activeTab === "intervenciones" && <View style={styles.activeTabTopBar} />}
+          <Ionicons
+            name="briefcase-outline"
+            size={22}
+            color={activeTab === "intervenciones" ? TEAL : MUTED}
+          />
+          <Text style={activeTab === "intervenciones" ? styles.tabTextActive : styles.tabText}>
+            Intervenciones
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
           style={activeTab === "expiradas" ? styles.tabItemActive : styles.tabItem}
           onPress={() => {
             setShowNotificationsDropdown(false);
@@ -1296,26 +1336,6 @@ export default function ProveedorJobScreen() {
           </View>
           <Text style={activeTab === "expiradas" ? styles.tabTextActive : styles.tabText}>
             Expiradas hoy
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={activeTab === "perfil" || activeTab === "intervenciones" ? styles.tabItemActive : styles.tabItem}
-          onPress={() => {
-            setShowNotificationsDropdown(false);
-            setShowProfileDropdown(false);
-            setActiveTab("perfil");
-          }}
-          activeOpacity={0.8}
-        >
-          {(activeTab === "perfil" || activeTab === "intervenciones") && <View style={styles.activeTabTopBar} />}
-          <Ionicons
-            name="person-outline"
-            size={22}
-            color={activeTab === "perfil" || activeTab === "intervenciones" ? TEAL : MUTED}
-          />
-          <Text style={activeTab === "perfil" || activeTab === "intervenciones" ? styles.tabTextActive : styles.tabText}>
-            Mi perfil
           </Text>
         </TouchableOpacity>
       </View>

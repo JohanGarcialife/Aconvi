@@ -1,4 +1,4 @@
-import { eq, desc, and, isNull, isNotNull, sql } from "drizzle-orm";
+import { eq, desc, and, isNull, isNotNull, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { join } from "path";
 import { writeFileSync, existsSync, mkdirSync } from "fs";
@@ -84,6 +84,7 @@ const INCIDENT_STATUSES = [
   "EN_CURSO",
   "RESUELTA",
   "RECHAZADA",
+  "CADUCADA",
   "CERRADA",
 ] as const;
 
@@ -516,11 +517,11 @@ export const incidentRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       await ensureIncidentColumns(ctx.db);
-      // Revert to RECIBIDA and clear provider assignment
+      // Revert to EN_REVISION and clear provider assignment
       const [updated] = await ctx.db
         .update(incident)
         .set({
-          status: "RECIBIDA",
+          status: "EN_REVISION",
           providerId: null,
           estimatedCost: null,
           estimatedDays: null,
@@ -543,7 +544,7 @@ export const incidentRouter = createTRPCRouter({
         actorName: "Proveedor",
         action: "PROVIDER_REJECTED",
         previousStatus: "EN_REVISION",
-        newStatus: "RECIBIDA",
+        newStatus: "EN_REVISION",
         comment: input.reason ? `Motivo: ${input.reason}` : "El proveedor ha rechazado la orden de trabajo.",
       });
 
@@ -576,11 +577,11 @@ export const incidentRouter = createTRPCRouter({
       });
       if (!inc) throw new Error("Incidencia no encontrada");
 
-      // Revert to RECIBIDA and clear provider assignment
+      // Revert to CADUCADA and clear provider assignment
       const [updated] = await ctx.db
         .update(incident)
         .set({
-          status: "RECIBIDA",
+          status: "CADUCADA",
           providerId: null,
           estimatedCost: null,
           estimatedDays: null,
@@ -598,7 +599,7 @@ export const incidentRouter = createTRPCRouter({
         actorName: "Sistema",
         action: "OT_EXPIRED",
         previousStatus: "EN_REVISION",
-        newStatus: "RECIBIDA",
+        newStatus: "CADUCADA",
         comment: "La orden de trabajo caducó por falta de respuesta del proveedor.",
       });
 
@@ -734,6 +735,7 @@ export const incidentRouter = createTRPCRouter({
           incidentId: input.id,
           authorId: DEMO_AUTHOR_ID, 
           content: noteLines.join('\n'),
+          createdAt: input.scheduledAt ? new Date(input.scheduledAt) : new Date(),
         });
       }
 
