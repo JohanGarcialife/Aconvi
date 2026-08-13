@@ -49,13 +49,15 @@ export function usePushNotifications() {
   });
 
   useEffect(() => {
-    // Register for push notifications
+    let isMounted = true;
+
     registerForPushNotificationsAsync()
       .then(async (token) => {
-        if (!token) {
+        if (!token || !isMounted) {
           console.warn("[Push] No token returned from registration helper.");
           return;
         }
+        console.log("[Push] Acquired push token:", token.slice(0, 25) + "...");
         setExpoPushToken(token);
       })
       .catch((err) => {
@@ -65,7 +67,7 @@ export function usePushNotifications() {
     // Listener: receives notification while app is open
     notificationListener.current =
       Notifications.addNotificationReceivedListener((notification) => {
-        console.log("[Push] Notification received:", notification);
+        console.log("[Push] Notification received in foreground:", notification);
       });
 
     // Listener: user tapped on a notification
@@ -73,10 +75,10 @@ export function usePushNotifications() {
       Notifications.addNotificationResponseReceivedListener((response) => {
         const data = response.notification.request.content.data;
         console.log("[Push] Notification tapped, data:", data);
-        // Navigation is handled in the root layout via deep link
       });
 
     return () => {
+      isMounted = false;
       notificationListener.current?.remove();
       responseListener.current?.remove();
     };
@@ -92,12 +94,12 @@ export function usePushNotifications() {
       registerToken.mutate({ token: expoPushToken, platform: "expo" } as any);
     }
 
-    // 2. SecureStore session token (Proveedor mobile app)
+    // 2. SecureStore session token (Mobile Vecino & Proveedor)
     void (async () => {
       try {
         const sessionToken = await SecureStore.getItemAsync("expo_session_token");
         if (sessionToken) {
-          console.log("[Push] Registering token via SecureStore session token...");
+          console.log("[Push] Auto-registering push token via SecureStore session token...");
           const res = await fetch(`${getBaseUrl()}/api/register-push-token`, {
             method: "POST",
             headers: {
@@ -108,7 +110,7 @@ export function usePushNotifications() {
           });
           const data = (await res.json()) as { ok: boolean; error?: string };
           if (data.ok) {
-            console.log("[Push] Successfully registered push token via SecureStore session!");
+            console.log("[Push] Successfully registered push token in backend!");
           } else {
             console.warn("[Push] REST registration returned error:", data.error);
           }
@@ -142,7 +144,7 @@ async function registerForPushNotificationsAsync(): Promise<string | null> {
   }
 
   if (finalStatus !== "granted") {
-    console.warn("[Push] Permission not granted.");
+    console.warn("[Push] Notification permission not granted. Status:", finalStatus);
     return null;
   }
 
@@ -160,7 +162,14 @@ async function registerForPushNotificationsAsync(): Promise<string | null> {
     console.log("[Push] Expo Push Token successfully acquired:", tokenData.data);
     return tokenData.data;
   } catch (error) {
-    console.warn("[Push] Failed to get Expo push token:", error);
-    return null;
+    console.warn("[Push] Failed to get Expo push token via projectId, trying device token fallback:", error);
+    try {
+      const deviceToken = await Notifications.getDevicePushTokenAsync();
+      console.log("[Push] Device Push Token acquired:", deviceToken.data);
+      return typeof deviceToken.data === "string" ? deviceToken.data : null;
+    } catch (fallbackErr) {
+      console.error("[Push] Both getExpoPushTokenAsync and getDevicePushTokenAsync failed:", fallbackErr);
+      return null;
+    }
   }
 }
