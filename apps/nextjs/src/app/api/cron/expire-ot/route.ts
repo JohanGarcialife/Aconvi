@@ -31,7 +31,7 @@ export async function GET(request: Request) {
       await db
         .update(incident)
         .set({
-          status: "RECIBIDA",
+          status: "CADUCADA",
           providerId: null,
           estimatedCost: null,
           estimatedDays: null,
@@ -45,11 +45,11 @@ export async function GET(request: Request) {
         actorName: "Sistema",
         action: "OT_EXPIRED",
         previousStatus: "EN_REVISION",
-        newStatus: "RECIBIDA",
+        newStatus: "CADUCADA",
         comment: "OT Caducada por límite de tiempo de respuesta.",
       });
 
-      void emitWebSocketEvent(inc.organizationId, "incident-updated", { ...inc, status: "RECIBIDA", providerId: null });
+      void emitWebSocketEvent(inc.organizationId, "incident-updated", { ...inc, status: "CADUCADA", providerId: null });
       expiredCount++;
     }
 

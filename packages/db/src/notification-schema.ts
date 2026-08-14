@@ -2,7 +2,7 @@ import { relations } from "drizzle-orm";
 import { pgTable, text, timestamp, pgEnum } from "drizzle-orm/pg-core";
 import { user } from "./auth-schema";
 
-export const platformEnum = pgEnum("push_platform", ["web", "expo"]);
+export const platformEnum = pgEnum("push_platform", ["web", "expo", "fcm"]);
 
 export const pushToken = pgTable("push_token", {
   id: text("id").primaryKey(),

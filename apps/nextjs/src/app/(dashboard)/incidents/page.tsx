@@ -11,7 +11,7 @@ import { useSocketClient } from "~/hooks/useSocketClient";
 
 const TENANT_ID = "org_aconvi_demo";
 
-type Status = "RECIBIDA" | "EN_REVISION" | "AGENDADA" | "EN_CURSO" | "RESUELTA" | "RECHAZADA" | "CERRADA";
+type Status = "RECIBIDA" | "EN_REVISION" | "AGENDADA" | "EN_CURSO" | "RESUELTA" | "RECHAZADA" | "CERRADA" | "CADUCADA";
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   RECIBIDA:    { label: "Sin asignar",  cls: "bg-amber-50 text-amber-700 border border-amber-200" },
@@ -21,6 +21,7 @@ const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   RESUELTA:    { label: "Resuelta",     cls: "bg-emerald-50 text-emerald-700 border border-emerald-200" },
   RECHAZADA:   { label: "No procede",   cls: "bg-red-50 text-red-700 border border-red-200" },
   CERRADA:     { label: "Cerrada",      cls: "bg-slate-100 text-slate-600 border border-slate-300" },
+  CADUCADA:    { label: "Caducada",     cls: "bg-rose-50 text-rose-700 border border-rose-200" },
 };
 
 const PRIORITY_COLOR: Record<string, string> = {
@@ -309,6 +310,7 @@ export default function IncidentsPage() {
     { key: "AGENDADA",   label: "Agendadas" },
     { key: "EN_CURSO",   label: "En curso" },
     { key: "RESUELTA",   label: "Resueltas" },
+    { key: "CADUCADA",   label: "Caducadas" },
     { key: "CERRADA",    label: "Cerradas" },
   ];
 
@@ -701,7 +703,7 @@ export default function IncidentsPage() {
                           />
                         )}
                         <p className="mt-1 text-xs text-slate-400">
-                          {n.author?.name ?? "AF"} · {new Date(n.createdAt).toLocaleDateString("es-ES")}
+                          {n.author?.name ?? "AF"} · {new Date(n.createdAt).toLocaleDateString("es-ES")} {new Date(n.createdAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
                         </p>
                       </div>
                     );
@@ -749,6 +751,9 @@ export default function IncidentsPage() {
                     } else if (h.action === "RATED") {
                       actionText = "valoró el servicio";
                       dotColor = "bg-amber-500";
+                    } else if (h.action === "OT_EXPIRED") {
+                      actionText = "caducó por límite de tiempo";
+                      dotColor = "bg-rose-500";
                     }
 
                     return (
@@ -809,11 +814,15 @@ export default function IncidentsPage() {
 
               </div>
 
-              {selected.status === "RECIBIDA" && (
+              {(selected.status === "RECIBIDA" || selected.status === "CADUCADA") && (
                 <button onClick={handleAssign} disabled={!selectedProvider || assignProvider.isPending}
                   className="flex items-center gap-2 rounded-xl bg-teal-500 px-6 py-2.5 text-sm font-bold text-white hover:bg-teal-600 disabled:opacity-40 transition-colors shadow-sm">
                   <CheckCircle2 size={15} />
-                  {assignProvider.isPending ? "Asignando..." : "Asignar y Notificar Vecino"}
+                  {assignProvider.isPending
+                    ? "Asignando..."
+                    : selected.status === "CADUCADA"
+                    ? "Reasignar proveedor"
+                    : "Asignar y Notificar Vecino"}
                 </button>
               )}
             </div>

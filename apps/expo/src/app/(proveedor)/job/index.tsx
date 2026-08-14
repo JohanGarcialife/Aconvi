@@ -415,29 +415,24 @@ export default function ProveedorJobScreen() {
     }));
   }, [porResponderDB]);
 
-  // Format Hoy items directly from DB (sorted chronologically)
+  // Format Hoy items directly from DB (sorted chronologically for today ONLY)
   const hoyItems = useMemo(() => {
     const todayMatches = rawIncidents.filter((i: any) => {
       if (i.status !== "AGENDADA" && i.status !== "EN_CURSO") return false;
-      if (!i.scheduledAt) return true;
+      if (!i.scheduledAt) return false;
       return isToday(i.scheduledAt);
     });
 
-    const source = [...(todayMatches.length > 0 ? todayMatches : programadasDB)];
-
     // Sort chronologically (earliest to latest)
-    source.sort((a: any, b: any) => {
+    todayMatches.sort((a: any, b: any) => {
       const timeA = a.scheduledAt ? new Date(a.scheduledAt).getTime() : 0;
       const timeB = b.scheduledAt ? new Date(b.scheduledAt).getTime() : 0;
       return timeA - timeB;
     });
 
-    return source.map((i: any, idx: number) => {
-      const schedDate = i.scheduledAt ? new Date(i.scheduledAt) : null;
-      const fallbackDate = new Date(i.assignedAt || i.createdAt);
-      const timeStr = schedDate
-        ? schedDate.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })
-        : fallbackDate.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+    return todayMatches.map((i: any, idx: number) => {
+      const schedDate = new Date(i.scheduledAt);
+      const timeStr = schedDate.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
       return {
         id: i.id,
         time: timeStr,
@@ -449,12 +444,13 @@ export default function ProveedorJobScreen() {
         raw: i,
       };
     });
-  }, [rawIncidents, programadasDB]);
+  }, [rawIncidents]);
 
-  // Format Mañana items directly from DB (sorted chronologically)
+  // Format Mañana items directly from DB (sorted chronologically for tomorrow ONLY)
   const mananaItems = useMemo(() => {
     const tomorrowMatches = rawIncidents.filter((i: any) => {
-      if (i.status !== "AGENDADA") return false;
+      if (i.status !== "AGENDADA" && i.status !== "EN_CURSO") return false;
+      if (!i.scheduledAt) return false;
       return isTomorrow(i.scheduledAt);
     });
 
@@ -709,12 +705,26 @@ export default function ProveedorJobScreen() {
               style={styles.profileActionRow}
               onPress={() => {
                 setShowProfileDropdown(false);
+                setIntervencionesFilter("todas");
                 setActiveTab("intervenciones");
               }}
               activeOpacity={0.7}
             >
               <Ionicons name="clipboard-outline" size={18} color={DARK} style={{ marginRight: 10 }} />
               <Text style={styles.profileActionText}>Mis Intervenciones ({rawIncidents.length})</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.profileActionRow}
+              onPress={() => {
+                setShowProfileDropdown(false);
+                setIntervencionesFilter("expiradas");
+                setActiveTab("intervenciones");
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="alert-circle-outline" size={18} color="#ef4444" style={{ marginRight: 10 }} />
+              <Text style={styles.profileActionText}>OT Expiradas ({expiradasCount})</Text>
             </TouchableOpacity>
 
             <View style={styles.dropdownDivider} />

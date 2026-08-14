@@ -199,8 +199,9 @@ async function sendExpoPush(
   const expo = new Expo();
 
   if (!Expo.isExpoPushToken(expoPushToken)) {
-    console.warn("[Push] Token is not an Expo token, routing to direct FCM:", expoPushToken.slice(0, 25));
-    await sendDirectFcmPush(expoPushToken, notification);
+    const rawToken = String(expoPushToken);
+    console.warn("[Push] Token is not an Expo token, routing to direct FCM:", rawToken.slice(0, 25));
+    await sendDirectFcmPush(rawToken, notification);
     return;
   }
 

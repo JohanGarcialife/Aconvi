@@ -727,15 +727,17 @@ export const incidentRouter = createTRPCRouter({
         }
         if (input.scheduledAt) {
           const d = new Date(input.scheduledAt);
-          noteLines.push(`📅 Programado: ${d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Madrid' })} a las ${d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Madrid' })}`);
+          const dateStr = d.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
+          const timeStr = d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+          noteLines.push(`📅 Programado: ${dateStr} a las ${timeStr}`);
         }
         if (input.estimatedDuration) noteLines.push(`⏱️ Duración estimada: ${input.estimatedDuration}`);
 
         await ctx.db.insert(incidentNote).values({
           incidentId: input.id,
           authorId: DEMO_AUTHOR_ID, 
-          content: noteLines.join('\n'),
-          createdAt: input.scheduledAt ? new Date(input.scheduledAt) : new Date(),
+          content: noteLines.join("\n"),
+          createdAt: new Date(),
         });
       }
 
