@@ -120,28 +120,32 @@ async function acquirePushToken(): Promise<{ token: string; platform: string } |
   }
 
   // ─── Android Standalone: use native FCM token directly ─────────────────
-  // ExponentPushToken relay doesn't work reliably on standalone APKs with
-  // custom keystores. Use @react-native-firebase/messaging for native FCM.
+  // ExponentPushToken relay fails on standalone APKs. Use native FCM token directly.
   if (Platform.OS === "android") {
+    // 1. Try Expo's native device push token (calls Google Play Services FCM directly)
+    try {
+      const deviceToken = await Notifications.getDevicePushTokenAsync();
+      console.log("[Push] Notifications.getDevicePushTokenAsync acquired:", deviceToken);
+      if (deviceToken && typeof deviceToken.data === "string" && deviceToken.data.length > 20) {
+        console.log("[Push] Native FCM Device Token acquired via expo-notifications:", deviceToken.data.slice(0, 30));
+        return { token: deviceToken.data, platform: "fcm" };
+      }
+    } catch (err) {
+      console.warn("[Push] Notifications.getDevicePushTokenAsync failed:", err);
+    }
+
+    // 2. Try @react-native-firebase/messaging fallback
     try {
       const messagingModule = await import("@react-native-firebase/messaging");
       const messaging = messagingModule.default;
-
-      // Request Firebase messaging permission (Android 13+)
-      const authStatus = await messaging().requestPermission();
-      const enabled =
-        authStatus === 1 || // AUTHORIZED
-        authStatus === 2;   // PROVISIONAL
-      console.log("[Push] Firebase messaging permission status:", authStatus, "enabled:", enabled);
-
+      await messaging().requestPermission().catch(() => {});
       const fcmToken = await messaging().getToken();
-      console.log("[Push] Native FCM token acquired:", fcmToken?.slice(0, 30) + "...");
-
+      console.log("[Push] Native FCM token acquired via @react-native-firebase/messaging:", fcmToken?.slice(0, 30));
       if (fcmToken && typeof fcmToken === "string") {
         return { token: fcmToken, platform: "fcm" };
       }
     } catch (err) {
-      console.warn("[Push] @react-native-firebase/messaging failed, falling back to Expo:", err);
+      console.warn("[Push] @react-native-firebase/messaging failed:", err);
     }
   }
 
