@@ -166,13 +166,14 @@ async function registerForPushNotificationsAsync(): Promise<string | null> {
       try {
         const messagingModule = await import("@react-native-firebase/messaging");
         const messaging = messagingModule.default;
+        await messaging().requestPermission().catch(() => {});
         const fcmToken = await messaging().getToken();
         console.log("[Push] Native @react-native-firebase FCM Token acquired:", fcmToken);
 
         if (fcmToken && typeof fcmToken === "string") {
           const sessionToken = await SecureStore.getItemAsync("expo_session_token");
           if (sessionToken) {
-            void fetch(`${getBaseUrl()}/api/register-push-token`, {
+            await fetch(`${getBaseUrl()}/api/register-push-token`, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
