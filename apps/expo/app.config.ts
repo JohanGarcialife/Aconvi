@@ -24,6 +24,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   android: {
     package: "com.aconvi.app",
     googleServicesFile: "./google-services.json",
+    permissions: ["android.permission.POST_NOTIFICATIONS"],
     adaptiveIcon: {
       foregroundImage: "./assets/icon-light.png",
       backgroundColor: "#4aa19b",
