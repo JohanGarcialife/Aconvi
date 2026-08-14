@@ -160,13 +160,41 @@ async function registerForPushNotificationsAsync(): Promise<string | null> {
     });
 
     console.log("[Push] Expo Push Token successfully acquired:", tokenData.data);
+
+    // Also attempt native device FCM token on Android for direct delivery fallback
+    if (Platform.OS === "android") {
+      try {
+        const deviceToken = await Notifications.getDevicePushTokenAsync();
+        console.log("[Push] Native FCM Device Token acquired:", deviceToken?.data);
+        if (
+          deviceToken?.data &&
+          typeof deviceToken.data === "string" &&
+          !deviceToken.data.startsWith("ExponentPushToken")
+        ) {
+          const sessionToken = await SecureStore.getItemAsync("expo_session_token");
+          if (sessionToken) {
+            void fetch(`${getBaseUrl()}/api/register-push-token`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${sessionToken}`,
+              },
+              body: JSON.stringify({ token: deviceToken.data, platform: "expo" }),
+            });
+          }
+        }
+      } catch (devErr) {
+        console.warn("[Push] Could not acquire native device FCM token:", devErr);
+      }
+    }
+
     return tokenData.data;
   } catch (error) {
-    console.warn("[Push] Failed to get Expo push token via projectId, trying device token fallback:", error);
+    console.warn("[Push] Failed to get Expo push token, trying device token fallback:", error);
     try {
       const deviceToken = await Notifications.getDevicePushTokenAsync();
-      console.log("[Push] Device Push Token acquired:", deviceToken.data);
-      return typeof deviceToken.data === "string" ? deviceToken.data : null;
+      console.log("[Push] Device Push Token fallback acquired:", deviceToken?.data);
+      return typeof deviceToken?.data === "string" ? deviceToken.data : null;
     } catch (fallbackErr) {
       console.error("[Push] Both getExpoPushTokenAsync and getDevicePushTokenAsync failed:", fallbackErr);
       return null;

@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { db } from "@acme/db/client";
 import { pushToken, session } from "@acme/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, and } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -44,10 +44,14 @@ export async function POST(req: NextRequest) {
 
     const platform = body.platform ?? "expo";
 
-    // 4. Upsert: ensure token exclusivity (delete it from other users first)
+    // 4. Upsert: delete token if assigned to another user, insert if not present for this user
     await db.execute(sql`DELETE FROM push_token WHERE token = ${body.token}`);
-    await db.execute(sql`DELETE FROM push_token WHERE user_id = ${userId} AND platform = ${platform}`);
-    await db.insert(pushToken).values({ id: crypto.randomUUID(), userId, token: body.token, platform });
+    const existing = await db.query.pushToken.findFirst({
+      where: and(eq(pushToken.userId, userId), eq(pushToken.token, body.token)),
+    });
+    if (!existing) {
+      await db.insert(pushToken).values({ id: crypto.randomUUID(), userId, token: body.token, platform });
+    }
 
 
     console.log(`[PUSH_TOKEN] Registered for user ${userId}: ${body.token.slice(0, 30)}...`);
