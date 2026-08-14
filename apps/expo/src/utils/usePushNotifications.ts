@@ -164,19 +164,12 @@ async function registerForPushNotificationsAsync(): Promise<string | null> {
     // Also attempt native device FCM token on Android for direct delivery fallback
     if (Platform.OS === "android") {
       try {
-        const deviceToken = await Notifications.getDevicePushTokenAsync();
-        const rawToken =
-          typeof deviceToken?.data === "string"
-            ? deviceToken.data
-            : (deviceToken as any)?.data?.data ?? (deviceToken as any)?.data;
+        const messagingModule = await import("@react-native-firebase/messaging");
+        const messaging = messagingModule.default;
+        const fcmToken = await messaging().getToken();
+        console.log("[Push] Native @react-native-firebase FCM Token acquired:", fcmToken);
 
-        console.log("[Push] Native FCM Device Token acquired:", rawToken);
-
-        if (
-          rawToken &&
-          typeof rawToken === "string" &&
-          !rawToken.startsWith("ExponentPushToken")
-        ) {
+        if (fcmToken && typeof fcmToken === "string") {
           const sessionToken = await SecureStore.getItemAsync("expo_session_token");
           if (sessionToken) {
             void fetch(`${getBaseUrl()}/api/register-push-token`, {
@@ -185,12 +178,12 @@ async function registerForPushNotificationsAsync(): Promise<string | null> {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${sessionToken}`,
               },
-              body: JSON.stringify({ token: rawToken, platform: "expo" }),
+              body: JSON.stringify({ token: fcmToken, platform: "expo" }),
             });
           }
         }
       } catch (devErr) {
-        console.warn("[Push] Could not acquire native device FCM token:", devErr);
+        console.warn("[Push] Could not acquire native device FCM token via messaging():", devErr);
       }
     }
 
