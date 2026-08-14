@@ -42,14 +42,19 @@ export async function sendPushToUser(
   console.log("[sendPushToUser] Found tokens count:", tokens.length);
 
   for (const tok of tokens) {
-    console.log("[sendPushToUser] Dispatching token platform:", tok.platform, "token:", tok.token);
-    if (tok.platform === "expo") {
+    console.log("[sendPushToUser] Dispatching token platform:", tok.platform, "token:", tok.token?.slice(0, 30));
+    if (tok.platform === "fcm") {
+      // Native Android FCM token → FCM V1 API direct
+      await sendDirectFcmPush(tok.token, notification).catch((err) => {
+        console.error("[sendPushToUser] sendDirectFcmPush failed for token:", tok.token?.slice(0, 30), err);
+      });
+    } else if (tok.platform === "expo") {
       await sendExpoPush(tok.token, notification).catch((err) => {
-        console.error("[sendPushToUser] sendExpoPush failed for token:", tok.token, err);
+        console.error("[sendPushToUser] sendExpoPush failed for token:", tok.token?.slice(0, 30), err);
       });
     } else if (tok.platform === "web") {
       await sendWebPush(tok.token, notification).catch((err) => {
-        console.error("[sendPushToUser] sendWebPush failed for token:", tok.token, err);
+        console.error("[sendPushToUser] sendWebPush failed for token:", tok.token?.slice(0, 30), err);
       });
     }
   }
@@ -252,7 +257,7 @@ export const notificationRouter = createTRPCRouter({
     .input(
       z.object({
         token: z.string().min(1),
-        platform: z.enum(["web", "expo"]),
+        platform: z.enum(["web", "expo", "fcm"]),
       }),
     )
     .mutation(async ({ ctx, input }) => {
