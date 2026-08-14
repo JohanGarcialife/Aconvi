@@ -127,22 +127,24 @@ async function getFcmAccessToken(serviceAccount: { client_email: string; private
   return data.access_token;
 }
 
+const DEFAULT_FCM_SERVICE_ACCOUNT = {
+  project_id: "creative-feel-agency",
+  client_email: "firebase-adminsdk-6xe0d@creative-feel-agency.iam.gserviceaccount.com",
+  private_key: "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDYwk5jQVu6OOCy\n6nK7iZsXTajWOCGtaf0HeJkvZ/YRNuWZdxaQZsjdbcC5h8BZ3vuw/6YR6Vu5mzmE\nOz4Z506DEsT04NojOyzO2XmcAvu05wTpRBF6Yv44h64mLLvV+Wa0S9imyTq17bNP\nXFDsDk5S9pTJlSipSejeDLZw6JQfltWJkb89PjjByfhu/fZJUkBaivCSKJVuSl/a\nDNI2eYWOdetCu4csA86qbYzAe5/VWg+LF4vKAUucQHz3ZWSzcZTHlOWO1H9o+PTL\nrLyUalntSsE73cuVI00twOTjcafADOx2uodFi245q9GMSfq0tCMT+Sl1lJRItg5Y\nytf5NYSnAgMBAAECggEAE6XVPij7/A7Qy1b2DGrGPKAE+FoBL3tmfKlhVUs6okfU\nGwuQ54jxlySuLgMQm/Ta4qnhr0j0UAgyd/p4wBdX5girArlo/H2OK7fJzqr0jurL\n5qsNXIchnRUrY3l1k0k2lowzeLbP1BLWSJDJIwSO8/U2+mjDVUkGSy5i0Sw71PsH\n6bgW73+UcgfEvJenqQGBRKuI/E510/O1Kki7epxn+09h7Oq7dzv86joIRJEZDvZz\njSldfV8FsNTzsrQLZBMBmZKs2+Q0QEv0v5VFRAb8xOAvUcxVzDurl70OWuKLqpJ3\njBzH3rIgVMJvvmAi4htYsDIlrivOHdWoHlMERdhI4QKBgQDyr0tWnzrdxtbJFdRd\niTE1kxvk1jX6+Oo7jcNqEhnhvLRzKWALcZY9DaD+HeHHn0J7RcgUx8PGhp/Ur7KR\nAPJIJb2pKAerihBtdPfRkhcfONgqV5f02jnCtkjVN+ZjQF+2ABfS/kMH3ZxghW5S\n1peMiq+1JzYnZGMGpwxWX++woQKBgQDkpt0fkbADlLM+VFczaHJ6XQsKGnoKw+mx\nXdoa7KLtXxwmfNVFpY0K5C/ChB4jR0lEFubY/o4lZofKcmpyTLawbzyNi3Ln40uD\ngGvAObYpEFN3lamj8N4K031mnWRUdcJd5BoNySWUJuRu/OiSoiLugsltZbn3WNE2\nG3210CaIRwKBgQCdCaGOo+rLp+dEp8OL40LckBz0r0iu5nNrpghVkvD8icea3aMw\nxIebaj5LMbrwGbZDXpxiFgIxbNvwHOFHw30EAqf/1c9gyS5oJdBW5Fnh8j6u54+E\n+dF2lc37avjCMN2+P8Eq3y0w4c5XBwCkyge3AedBKeZ5BxStMVtiaSIJAQKBgQC8\n6ANubo4OF0+TYlj89wEFiVNykHdd54huakyky/a7yEVYovAM7368jdPLkB3aJa4p\nXAZzJrRHwBLWNnstXaXd1LkhdCGF5argxTvAf6249W0QMo0KDhlUtnA3VDes8/GW\nYrsHwrSSVyOJctevNddIWLOT92SSL0YBvuq4SHVdRwKBgCtdYe1rliGSV0fwUugE\niww3FQpVZjAgdED2zzBBP8nIK+Pu6HhL6Xl4jVTzPgjEaQqJXV3RPC3i3e1K9GS3\n20iW19LkaNgHYIqOV1K+Ol++It8G/lcw7dsS6BsIV/uAmwrku74DV0VN5EQ4FePk\nR68IoI2ve4sKfFr3WTXY2nil\n-----END PRIVATE KEY-----\n",
+};
+
 async function sendDirectFcmPush(
   fcmToken: string,
   notification: { title: string; body: string; data?: Record<string, string> },
 ) {
-  const serviceAccountJsonStr = process.env.FCM_SERVICE_ACCOUNT_JSON;
-  if (!serviceAccountJsonStr) {
-    console.warn("[FCM] FCM_SERVICE_ACCOUNT_JSON env var not set. Cannot send direct FCM push.");
-    return;
-  }
-
   try {
-    const serviceAccount = JSON.parse(serviceAccountJsonStr) as {
-      project_id: string;
-      client_email: string;
-      private_key: string;
-    };
+    const serviceAccount = process.env.FCM_SERVICE_ACCOUNT_JSON
+      ? (JSON.parse(process.env.FCM_SERVICE_ACCOUNT_JSON) as {
+          project_id: string;
+          client_email: string;
+          private_key: string;
+        })
+      : DEFAULT_FCM_SERVICE_ACCOUNT;
 
     const accessToken = await getFcmAccessToken(serviceAccount);
 
