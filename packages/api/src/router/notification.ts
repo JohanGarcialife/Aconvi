@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { pushToken } from "@acme/db/schema";
@@ -84,6 +85,104 @@ export async function sendPushToAllMembers(
   return { sent, failed };
 }
 
+// ─── Direct FCM V1 HTTP API helper (bypasses Expo for native Android FCM tokens)
+async function getFcmAccessToken(serviceAccount: { client_email: string; private_key: string }): Promise<string> {
+  const header = { alg: "RS256", typ: "JWT" };
+  const now = Math.floor(Date.now() / 1000);
+  const claim = {
+    iss: serviceAccount.client_email,
+    scope: "https://www.googleapis.com/auth/firebase.messaging",
+    aud: "https://oauth2.googleapis.com/token",
+    exp: now + 3600,
+    iat: now,
+  };
+
+  const base64UrlEncode = (str: string) =>
+    Buffer.from(str)
+      .toString("base64")
+      .replace(/=/g, "")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_");
+
+  const unsignedToken = `${base64UrlEncode(JSON.stringify(header))}.${base64UrlEncode(JSON.stringify(claim))}`;
+
+  const signer = crypto.createSign("RSA-SHA256");
+  signer.update(unsignedToken);
+  const signature = signer.sign(serviceAccount.private_key, "base64");
+  const jwt = `${unsignedToken}.${signature.replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_")}`;
+
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion: jwt,
+    }),
+  });
+
+  const data = (await res.json()) as { access_token?: string; error?: string };
+  if (!data.access_token) {
+    throw new Error(`Failed to get OAuth2 access token for FCM: ${data.error ?? JSON.stringify(data)}`);
+  }
+  return data.access_token;
+}
+
+async function sendDirectFcmPush(
+  fcmToken: string,
+  notification: { title: string; body: string; data?: Record<string, string> },
+) {
+  const serviceAccountJsonStr = process.env.FCM_SERVICE_ACCOUNT_JSON;
+  if (!serviceAccountJsonStr) {
+    console.warn("[FCM] FCM_SERVICE_ACCOUNT_JSON env var not set. Cannot send direct FCM push.");
+    return;
+  }
+
+  try {
+    const serviceAccount = JSON.parse(serviceAccountJsonStr) as {
+      project_id: string;
+      client_email: string;
+      private_key: string;
+    };
+
+    const accessToken = await getFcmAccessToken(serviceAccount);
+
+    const payload = {
+      message: {
+        token: fcmToken,
+        notification: {
+          title: notification.title,
+          body: notification.body,
+        },
+        data: notification.data ?? {},
+        android: {
+          priority: "high",
+          notification: {
+            sound: "default",
+            channel_id: "default",
+          },
+        },
+      },
+    };
+
+    const res = await fetch(
+      `https://fcm.googleapis.com/v1/projects/${serviceAccount.project_id}/messages:send`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      },
+    );
+
+    const result = await res.json();
+    console.log("[FCM_DIRECT_RESPONSE]", JSON.stringify(result));
+  } catch (err) {
+    console.error("[FCM_DIRECT_ERROR]", err);
+  }
+}
+
 // ─── Expo Push helper ─────────────────────────────────────────────────────────
 async function sendExpoPush(
   expoPushToken: string,
@@ -93,7 +192,8 @@ async function sendExpoPush(
   const expo = new Expo();
 
   if (!Expo.isExpoPushToken(expoPushToken)) {
-    console.warn("[Push] Invalid Expo push token:", expoPushToken);
+    console.warn("[Push] Token is not an Expo token, routing to direct FCM:", expoPushToken.slice(0, 25));
+    await sendDirectFcmPush(expoPushToken, notification);
     return;
   }
 

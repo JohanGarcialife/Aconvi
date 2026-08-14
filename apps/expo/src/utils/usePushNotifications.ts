@@ -165,11 +165,17 @@ async function registerForPushNotificationsAsync(): Promise<string | null> {
     if (Platform.OS === "android") {
       try {
         const deviceToken = await Notifications.getDevicePushTokenAsync();
-        console.log("[Push] Native FCM Device Token acquired:", deviceToken?.data);
+        const rawToken =
+          typeof deviceToken?.data === "string"
+            ? deviceToken.data
+            : (deviceToken as any)?.data?.data ?? (deviceToken as any)?.data;
+
+        console.log("[Push] Native FCM Device Token acquired:", rawToken);
+
         if (
-          deviceToken?.data &&
-          typeof deviceToken.data === "string" &&
-          !deviceToken.data.startsWith("ExponentPushToken")
+          rawToken &&
+          typeof rawToken === "string" &&
+          !rawToken.startsWith("ExponentPushToken")
         ) {
           const sessionToken = await SecureStore.getItemAsync("expo_session_token");
           if (sessionToken) {
@@ -179,7 +185,7 @@ async function registerForPushNotificationsAsync(): Promise<string | null> {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${sessionToken}`,
               },
-              body: JSON.stringify({ token: deviceToken.data, platform: "expo" }),
+              body: JSON.stringify({ token: rawToken, platform: "expo" }),
             });
           }
         }
