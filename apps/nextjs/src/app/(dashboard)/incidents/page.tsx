@@ -11,17 +11,18 @@ import { useSocketClient } from "~/hooks/useSocketClient";
 
 const TENANT_ID = "org_aconvi_demo";
 
-type Status = "RECIBIDA" | "EN_REVISION" | "AGENDADA" | "EN_CURSO" | "RESUELTA" | "RECHAZADA" | "CERRADA" | "CADUCADA";
+type Status = "RECIBIDA" | "EN_REVISION" | "AGENDADA" | "EN_CURSO" | "RESUELTA" | "RECHAZADA" | "CERRADA" | "CADUCADA" | "NO_PRESENTADA";
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
-  RECIBIDA:    { label: "Sin asignar",  cls: "bg-amber-50 text-amber-700 border border-amber-200" },
-  EN_REVISION: { label: "Asignada",     cls: "bg-blue-50 text-blue-700 border border-blue-200" },
-  AGENDADA:    { label: "Agendada",     cls: "bg-violet-50 text-violet-700 border border-violet-200" },
-  EN_CURSO:    { label: "En curso",     cls: "bg-cyan-50 text-cyan-700 border border-cyan-200" },
-  RESUELTA:    { label: "Resuelta",     cls: "bg-emerald-50 text-emerald-700 border border-emerald-200" },
-  RECHAZADA:   { label: "No procede",   cls: "bg-red-50 text-red-700 border border-red-200" },
-  CERRADA:     { label: "Cerrada",      cls: "bg-slate-100 text-slate-600 border border-slate-300" },
-  CADUCADA:    { label: "Caducada",     cls: "bg-rose-50 text-rose-700 border border-rose-200" },
+  RECIBIDA:       { label: "Sin asignar",        cls: "bg-amber-50 text-amber-700 border border-amber-200" },
+  EN_REVISION:    { label: "Asignada",            cls: "bg-blue-50 text-blue-700 border border-blue-200" },
+  AGENDADA:       { label: "Agendada",            cls: "bg-violet-50 text-violet-700 border border-violet-200" },
+  EN_CURSO:       { label: "En curso",            cls: "bg-cyan-50 text-cyan-700 border border-cyan-200" },
+  RESUELTA:       { label: "Resuelta",            cls: "bg-emerald-50 text-emerald-700 border border-emerald-200" },
+  RECHAZADA:      { label: "Rechazada proveedor", cls: "bg-red-50 text-red-700 border border-red-200" },
+  CERRADA:        { label: "Cerrada",             cls: "bg-slate-100 text-slate-600 border border-slate-300" },
+  CADUCADA:       { label: "Caducada",            cls: "bg-rose-50 text-rose-700 border border-rose-200" },
+  NO_PRESENTADA:  { label: "No presentada",       cls: "bg-orange-50 text-orange-700 border border-orange-200" },
 };
 
 const PRIORITY_COLOR: Record<string, string> = {
@@ -304,14 +305,16 @@ export default function IncidentsPage() {
   };
 
   const FILTERS = [
-    { key: "ALL",        label: "Todas" },
-    { key: "RECIBIDA",   label: "Pendientes" },
-    { key: "EN_REVISION",label: "En revisión" },
-    { key: "AGENDADA",   label: "Agendadas" },
-    { key: "EN_CURSO",   label: "En curso" },
-    { key: "RESUELTA",   label: "Resueltas" },
-    { key: "CADUCADA",   label: "Caducadas" },
-    { key: "CERRADA",    label: "Cerradas" },
+    { key: "ALL",          label: "Todas" },
+    { key: "RECIBIDA",     label: "Pendientes" },
+    { key: "EN_REVISION",  label: "En revisión" },
+    { key: "AGENDADA",     label: "Agendadas" },
+    { key: "EN_CURSO",     label: "En curso" },
+    { key: "RESUELTA",     label: "Resueltas" },
+    { key: "RECHAZADA",    label: "Rechazadas" },
+    { key: "CADUCADA",     label: "Caducadas" },
+    { key: "NO_PRESENTADA",label: "No presentadas" },
+    { key: "CERRADA",      label: "Cerradas" },
   ];
 
   return (
@@ -814,13 +817,13 @@ export default function IncidentsPage() {
 
               </div>
 
-              {(selected.status === "RECIBIDA" || selected.status === "CADUCADA") && (
+              {(selected.status === "RECIBIDA" || selected.status === "CADUCADA" || selected.status === "RECHAZADA" || selected.status === "NO_PRESENTADA") && (
                 <button onClick={handleAssign} disabled={!selectedProvider || assignProvider.isPending}
                   className="flex items-center gap-2 rounded-xl bg-teal-500 px-6 py-2.5 text-sm font-bold text-white hover:bg-teal-600 disabled:opacity-40 transition-colors shadow-sm">
                   <CheckCircle2 size={15} />
                   {assignProvider.isPending
                     ? "Asignando..."
-                    : selected.status === "CADUCADA"
+                    : (selected.status === "CADUCADA" || selected.status === "RECHAZADA" || selected.status === "NO_PRESENTADA")
                     ? "Reasignar proveedor"
                     : "Asignar y Notificar Vecino"}
                 </button>
@@ -841,7 +844,7 @@ export default function IncidentsPage() {
 
               {/* Dropdown trigger */}
               {(() => {
-                const isLocked = ["AGENDADA", "EN_CURSO", "RESUELTA", "CERRADA"].includes(selected.status);
+                const isLocked = ["AGENDADA", "EN_CURSO", "RESUELTA", "CERRADA"].includes(selected.status) || (selected.status === "EN_REVISION" && !!selected.providerId);
                 return (
                   <>
                     <button
@@ -863,7 +866,9 @@ export default function IncidentsPage() {
                     </button>
                     {isLocked && (
                       <p className="mt-2 text-xs text-slate-500 font-medium">
-                        🔒 La incidencia ha sido aceptada/agendada por el proveedor y no permite cambio de asignación.
+                        {selected.status === "EN_REVISION"
+                          ? "⏳ Pendiente de respuesta del proveedor (ventana de 2h). No permite cambio de asignación hasta que responda o caduque."
+                          : "🔒 La incidencia ha sido aceptada/agendada por el proveedor y no permite cambio de asignación."}
                       </p>
                     )}
                   </>
@@ -871,7 +876,7 @@ export default function IncidentsPage() {
               })()}
 
               {/* Dropdown options */}
-              {providerOpen && !["AGENDADA", "EN_CURSO", "RESUELTA", "CERRADA"].includes(selected.status) && (
+              {providerOpen && !(["AGENDADA", "EN_CURSO", "RESUELTA", "CERRADA"].includes(selected.status) || (selected.status === "EN_REVISION" && !!selected.providerId)) && (
                 <div className="mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                   {providers.map((p: any, i: number) => (
                     <button key={p.id} onClick={() => { setSelectedProviderId(p.id); setProviderOpen(false); }}
@@ -936,7 +941,7 @@ export default function IncidentsPage() {
               {(() => {
                 const isAlreadyAssigned = selected.providerId === selectedProvider?.id;
                 const hasAnyProvider = !!selected.providerId;
-                const isLocked = ["AGENDADA", "EN_CURSO", "RESUELTA", "CERRADA"].includes(selected.status);
+                const isLocked = ["AGENDADA", "EN_CURSO", "RESUELTA", "CERRADA"].includes(selected.status) || (selected.status === "EN_REVISION" && hasAnyProvider);
 
                 let btnText = "Asignar Proveedor";
                 let btnCls = "bg-teal-500 hover:bg-teal-600 text-white";
@@ -945,7 +950,7 @@ export default function IncidentsPage() {
                 if (assignProvider.isPending) {
                   btnText = "Asignando...";
                 } else if (isLocked) {
-                  btnText = "✓ Trabajo Aceptado / Agendado";
+                  btnText = selected.status === "EN_REVISION" ? "⏳ Pendiente de Respuesta" : "✓ Trabajo Aceptado / Agendado";
                   btnCls = "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed";
                   isBtnDisabled = true;
                 } else if (isAlreadyAssigned) {

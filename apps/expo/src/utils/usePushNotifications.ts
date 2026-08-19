@@ -65,9 +65,9 @@ export function usePushNotifications() {
 }
 
 // ─── Register token with backend via REST ─────────────────────────────────────
-async function registerTokenWithBackend(token: string, platform: string): Promise<void> {
+export async function registerTokenWithBackend(token: string, platform: string, explicitSessionToken?: string): Promise<void> {
   try {
-    const sessionToken = await SecureStore.getItemAsync("expo_session_token");
+    const sessionToken = explicitSessionToken ?? (await SecureStore.getItemAsync("expo_session_token"));
     if (!sessionToken) {
       console.warn("[Push] No session token in SecureStore, skipping registration.");
       return;
@@ -91,6 +91,15 @@ async function registerTokenWithBackend(token: string, platform: string): Promis
   } catch (err) {
     console.warn("[Push] Error registering token:", err);
   }
+}
+
+// ─── Token acquisition and registration helper ──────────────────────────────
+export async function acquireAndRegisterPushToken(explicitSessionToken?: string): Promise<{ token: string; platform: string } | null> {
+  const result = await acquirePushToken();
+  if (result) {
+    await registerTokenWithBackend(result.token, result.platform, explicitSessionToken);
+  }
+  return result;
 }
 
 // ─── Token acquisition ────────────────────────────────────────────────────────

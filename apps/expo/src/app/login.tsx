@@ -19,6 +19,7 @@ import * as Device from "expo-device";
 import Constants from "expo-constants";
 import { getBaseUrl } from "~/utils/base-url";
 import { queryClient } from "~/utils/api";
+import { acquireAndRegisterPushToken } from "~/utils/usePushNotifications";
 
 
 
@@ -94,52 +95,8 @@ export default function LoginScreen() {
       // Clear any cached queries from a previous session
       queryClient.clear();
 
-      // Re-register push token via direct REST endpoint (simpler than tRPC,
-      // eliminates transformer/serialization issues on the mobile client).
-      void (async () => {
-        try {
-          if (!Device.isDevice) return;
-          const { status } = await Notifications.getPermissionsAsync();
-          if (status !== "granted") {
-            console.warn("[Push] Permission not granted, skipping registration.");
-            return;
-          }
-          const projectId =
-            process.env.EXPO_PUBLIC_PROJECT_ID ??
-            Constants.expoConfig?.extra?.eas?.projectId ??
-            Constants.easConfig?.projectId;
-          console.log("[Push] Getting token with projectId:", projectId);
-          const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
-          if (tokenData?.data) {
-            console.log("[Push] Got token:", tokenData.data.slice(0, 30) + "...");
-            const res = await fetch(`${getBaseUrl()}/api/register-push-token`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({ token: tokenData.data, platform: "expo" }),
-            });
-            const contentType = res.headers.get("content-type") ?? "";
-            if (contentType.includes("application/json")) {
-              const result = await res.json() as { ok: boolean; error?: string };
-              if (result.ok) {
-                console.log("[Push] Token registered successfully via REST.");
-              } else {
-                console.error("[Push] REST registration failed:", result.error);
-              }
-            } else {
-              const text = await res.text();
-              console.warn("[Push] REST registration returned non-JSON:", text);
-            }
-          } else {
-            console.warn("[Push] getExpoPushTokenAsync returned no data.");
-          }
-        } catch (err: any) {
-          console.warn("[Push] Could not register push token after login:", err);
-        }
-      })();
-
+      // Acquire and register push token with backend using centralized helper
+      void acquireAndRegisterPushToken(token);
 
       // 4. Navegar DIRECTO a la pantalla correcta (sin pasar por index.tsx)
       if (isProvider) {

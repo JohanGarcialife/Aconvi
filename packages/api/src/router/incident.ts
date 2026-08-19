@@ -85,6 +85,7 @@ const INCIDENT_STATUSES = [
   "RESUELTA",
   "RECHAZADA",
   "CADUCADA",
+  "NO_PRESENTADA",
   "CERRADA",
 ] as const;
 
@@ -386,11 +387,17 @@ export const incidentRouter = createTRPCRouter({
       });
       if (!current) throw new Error("Incidencia no encontrada.");
       
-      // Block reassignment ONLY if OT is accepted / scheduled / in progress
+      // Block reassignment if OT already has a provider assigned (pending response or accepted)
       if (current.providerId) {
-        if (current.status === "AGENDADA" || current.status === "EN_CURSO" || current.status === "RESUELTA" || current.status === "CERRADA") {
+        if (
+          current.status === "EN_REVISION" ||
+          current.status === "AGENDADA" ||
+          current.status === "EN_CURSO" ||
+          current.status === "RESUELTA" ||
+          current.status === "CERRADA"
+        ) {
           throw new Error(
-            "Esta incidencia ya ha sido aceptada o agendada por el proveedor. No se puede cambiar de proveedor."
+            "Esta incidencia ya está asignada a un proveedor y no puede reasignarse. Espera a que el proveedor responda, la rechace, o caduca el tiempo de respuesta."
           );
         }
       }
@@ -425,9 +432,13 @@ export const incidentRouter = createTRPCRouter({
               where: eq(provider.id, provId),
             });
             console.log("[PushAssign] Found provider in DB:", prov?.name, "email:", prov?.email);
-            if (prov?.email) {
+            if (prov?.email || prov?.phone) {
               const usr = await ctx.db.query.user.findFirst({
-                where: eq(user.email, prov.email),
+                where: prov.email
+                  ? eq(sql`lower(${user.email})`, prov.email.toLowerCase())
+                  : prov.phone
+                  ? eq(user.phoneNumber, prov.phone)
+                  : undefined,
               });
               console.log("[PushAssign] Found user in DB:", usr?.name, "id:", usr?.id);
               if (usr?.id) {
@@ -439,16 +450,25 @@ export const incidentRouter = createTRPCRouter({
                 });
                 console.log("[PushAssign] sendPushToUser completed successfully");
               } else {
-                console.warn("[PushAssign] No user found for provider email:", prov.email);
+                console.warn("[PushAssign] No user found for provider email/phone:", prov.email ?? prov.phone);
               }
             } else {
-              console.warn("[PushAssign] Provider has no email address configured");
+              console.warn("[PushAssign] Provider has no email or phone configured");
             }
           } catch (err) {
             console.error("[PushAssign] Failed in push notification promise chain:", err);
           }
         })();
       }
+
+      // Check if this incident was ever assigned before (to prevent push to vecino on reassignment)
+      const previousAssignment = await ctx.db.query.incidentHistory.findFirst({
+        where: and(
+          eq(incidentHistory.incidentId, input.id),
+          eq(incidentHistory.action, "ASSIGNED")
+        ),
+      });
+      const isReassignment = Boolean(current.providerId) || Boolean(current.assignedAt) || Boolean(previousAssignment);
 
       // Log history safely
       try {
@@ -465,15 +485,6 @@ export const incidentRouter = createTRPCRouter({
 
       // Fire-and-forget: WS event to tenant room
       void emitWebSocketEvent(input.tenantId, "incident-updated", updated);
-
-      // Check if this incident was ever assigned before (to prevent push to vecino on reassignment)
-      const previousAssignment = await ctx.db.query.incidentHistory.findFirst({
-        where: and(
-          eq(incidentHistory.incidentId, input.id),
-          eq(incidentHistory.action, "ASSIGNED")
-        ),
-      });
-      const isReassignment = Boolean(current.providerId) || Boolean(current.assignedAt) || Boolean(previousAssignment);
 
       // Fire-and-forget push to vecino - ONLY on first assignment (never on reassignment)
       if (updated.reporterId && !isReassignment) {
@@ -523,11 +534,11 @@ export const incidentRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       await ensureIncidentColumns(ctx.db);
-      // Revert to EN_REVISION and clear provider assignment
+      // Set to RECHAZADA and clear provider assignment — admin will see it as "Rechazada" and can reassign
       const [updated] = await ctx.db
         .update(incident)
         .set({
-          status: "EN_REVISION",
+          status: "RECHAZADA",
           providerId: null,
           estimatedCost: null,
           estimatedDays: null,
@@ -550,7 +561,7 @@ export const incidentRouter = createTRPCRouter({
         actorName: "Proveedor",
         action: "PROVIDER_REJECTED",
         previousStatus: "EN_REVISION",
-        newStatus: "EN_REVISION",
+        newStatus: "RECHAZADA",
         comment: input.reason ? `Motivo: ${input.reason}` : "El proveedor ha rechazado la orden de trabajo.",
       });
 
@@ -608,6 +619,15 @@ export const incidentRouter = createTRPCRouter({
         newStatus: "CADUCADA",
         comment: "La orden de trabajo caducó por falta de respuesta del proveedor.",
       });
+
+      // Notify admin that OT has expired and can be reassigned
+      if (updated.assigneeId) {
+        void sendPushToUser(ctx.db, updated.assigneeId, {
+          title: "OT Caducada",
+          body: `La incidencia "${updated.title}" ha caducado. El proveedor no respondió a tiempo. Puedes reasignarla.`,
+          data: { type: "ot_expired", incidentId: updated.id },
+        }).catch(console.error);
+      }
 
       // Fire-and-forget WS event to tenant room so Admin Panel updates in real-time
       void emitWebSocketEvent(updated.organizationId, "incident-updated", updated);
@@ -689,6 +709,7 @@ export const incidentRouter = createTRPCRouter({
         estimatedCost: z.number().min(0).optional(),
         notes: z.string().max(1000).optional(),
         scheduledAt: z.string().datetime().optional(),
+        scheduledHour: z.string().max(16).optional(),
         estimatedDuration: z.string().max(32).optional(),
       }),
     )
@@ -727,8 +748,19 @@ export const incidentRouter = createTRPCRouter({
         }
         if (input.scheduledAt) {
           const d = new Date(input.scheduledAt);
-          const dateStr = d.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
-          const timeStr = d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+          const dateStr = d.toLocaleDateString("es-ES", {
+            weekday: "long",
+            day: "numeric",
+            month: "long",
+            timeZone: "Europe/Madrid",
+          });
+          const timeStr =
+            input.scheduledHour ||
+            d.toLocaleTimeString("es-ES", {
+              hour: "2-digit",
+              minute: "2-digit",
+              timeZone: "Europe/Madrid",
+            });
           noteLines.push(`📅 Programado: ${dateStr} a las ${timeStr}`);
         }
         if (input.estimatedDuration) noteLines.push(`⏱️ Duración estimada: ${input.estimatedDuration}`);

@@ -32,6 +32,7 @@ interface OfflineEstimate {
   estimatedDays: number;
   notes: string;
   scheduledAt?: string;
+  scheduledHour?: string;
   estimatedDuration?: string;
   createdAt: number;
 }
@@ -252,6 +253,7 @@ export default function JobEstimateScreen() {
               estimatedDays: job.estimatedDays,
               notes: job.notes,
               scheduledAt: job.scheduledAt,
+              scheduledHour: job.scheduledHour,
               estimatedDuration: job.estimatedDuration,
             } as any,
             { onSuccess: () => resolve(), onError: (e: any) => reject(e) },
@@ -403,6 +405,7 @@ export default function JobEstimateScreen() {
         estimatedDays: days,
         notes: "Salida programada",
         scheduledAt: scheduledAtISO,
+        scheduledHour: selectedHour,
         estimatedDuration: selectedDuration,
         createdAt: Date.now(),
       };
@@ -427,6 +430,7 @@ export default function JobEstimateScreen() {
         estimatedDays: days,
         notes: "Salida programada",
         scheduledAt: scheduledAtISO,
+        scheduledHour: selectedHour,
         estimatedDuration: selectedDuration,
       } as any,
       {

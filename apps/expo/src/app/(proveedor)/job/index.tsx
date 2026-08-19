@@ -13,7 +13,7 @@ import {
   Alert,
   Platform,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, Stack, useLocalSearchParams, useFocusEffect } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -186,6 +186,8 @@ function useSessionEmail() {
 export default function ProveedorJobScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ incidentId?: string; providerId?: string }>();
+  const insets = useSafeAreaInsets();
+  const bottomPad = Math.max(insets.bottom, 8);
 
   const { email: sessionEmail } = useSessionEmail();
 
@@ -199,8 +201,8 @@ export default function ProveedorJobScreen() {
   const providerId = params.providerId ?? currentProv?.id ?? DEMO_PROVIDER_ID;
   const tenantId = currentProv?.organizationId ?? DEMO_TENANT_ID;
 
-  const providerName = currentProv?.name ? currentProv.name.split(" ")[0] : "Pedro";
   const initials = getInitials(currentProv?.name);
+
 
   const {
     data: incidents,
@@ -294,8 +296,11 @@ export default function ProveedorJobScreen() {
       if (isExpired) {
         return { label: "Expirada", color: "#ef4444", bg: "#fee2e2" };
       }
-      if (item.status === "EN_REVISION" || item.status === "RECIBIDA") {
-        return { label: "Por responder", color: "#ea580c", bg: "#ffedd5" };
+      if (item.status === "NO_PRESENTADA") {
+        return { label: "No presentada", color: "#d97706", bg: "#fef3c7" };
+      }
+      if (item.status === "RECHAZADA") {
+        return { label: "Rechazada", color: "#ef4444", bg: "#fee2e2" };
       }
       return { label: item.status || "Sin estado", color: "#64748b", bg: "#f1f5f9" };
     },
@@ -490,38 +495,87 @@ export default function ProveedorJobScreen() {
     [searchQuery]
   );
 
-  const filteredPorResponder = useMemo(() => {
-    if (homeFilter !== "todas" && homeFilter !== "porResponder") return [];
-    return filterList(porResponderItems);
-  }, [porResponderItems, filterList, homeFilter]);
+  // Format All Programadas
+  const allProgramadasItems = useMemo(() => {
+    return programadasDB.map((i: any, idx: number) => {
+      const schedDate = i.scheduledAt ? new Date(i.scheduledAt) : null;
+      let timeStr = "Fecha pendiente";
+      if (schedDate) {
+        if (isToday(schedDate)) {
+          timeStr = `Hoy ${schedDate.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}`;
+        } else if (isTomorrow(schedDate)) {
+          timeStr = `Mañana ${schedDate.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}`;
+        } else {
+          timeStr = schedDate.toLocaleDateString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+        }
+      }
+      return {
+        id: i.id,
+        code: i.code || `OT-${i.id ? i.id.substring(0, 4).toUpperCase() : 2458 + idx}`,
+        time: timeStr,
+        title: i.title,
+        community: i.organization?.name || i.communityName || (i.organizationId ? `Org: ${i.organizationId}` : "Sin comunidad"),
+        priority: i.priority ?? (idx % 2 === 0 ? "ALTA" : "MEDIA"),
+        status: i.status,
+        ...getCategoryIcon(i.title),
+        raw: i,
+      };
+    });
+  }, [programadasDB]);
 
-  const filteredHoy = useMemo(() => {
-    let list = hoyItems;
-    if (homeFilter === "porResponder") {
-      list = [];
-    } else if (homeFilter === "enCurso") {
-      list = hoyItems.filter((i) => i.status === "EN_CURSO");
-    } else if (homeFilter === "programadas") {
-      list = hoyItems.filter((i) => i.status === "AGENDADA");
-    } else if (homeFilter === "finalizadas") {
-      list = hoyItems.filter((i) => i.status === "RESUELTA" || i.status === "CERRADA");
-    }
-    return filterList(list);
-  }, [hoyItems, filterList, homeFilter]);
+  // Format All Finalizadas
+  const allFinalizadasItems = useMemo(() => {
+    return finalizadasDB.map((i: any, idx: number) => {
+      const finishDate = i.updatedAt ? new Date(i.updatedAt) : null;
+      const dateStr = finishDate
+        ? finishDate.toLocaleDateString("es-ES", { day: "numeric", month: "short" })
+        : "Finalizada";
+      return {
+        id: i.id,
+        code: i.code || `OT-${i.id ? i.id.substring(0, 4).toUpperCase() : 2458 + idx}`,
+        title: i.title,
+        date: dateStr,
+        community: i.organization?.name || i.communityName || (i.organizationId ? `Org: ${i.organizationId}` : "Sin comunidad"),
+        cost: i.estimatedCost ? `${i.estimatedCost} €` : undefined,
+        status: i.status,
+        ...getCategoryIcon(i.title),
+        raw: i,
+      };
+    });
+  }, [finalizadasDB]);
 
-  const filteredManana = useMemo(() => {
-    let list = mananaItems;
-    if (homeFilter === "porResponder") {
-      list = [];
-    } else if (homeFilter === "enCurso") {
-      list = mananaItems.filter((i) => i.status === "EN_CURSO");
-    } else if (homeFilter === "programadas") {
-      list = mananaItems.filter((i) => i.status === "AGENDADA");
-    } else if (homeFilter === "finalizadas") {
-      list = mananaItems.filter((i) => i.status === "RESUELTA" || i.status === "CERRADA");
-    }
-    return filterList(list);
-  }, [mananaItems, filterList, homeFilter]);
+  // Format All En Curso
+  const allEnCursoItems = useMemo(() => {
+    return enCursoDB.map((i: any, idx: number) => {
+      return {
+        id: i.id,
+        code: i.code || `OT-${i.id ? i.id.substring(0, 4).toUpperCase() : 2458 + idx}`,
+        title: i.title,
+        community: i.organization?.name || i.communityName || (i.organizationId ? `Org: ${i.organizationId}` : "Sin comunidad"),
+        priority: i.priority ?? "ALTA",
+        status: i.status,
+        ...getCategoryIcon(i.title),
+        raw: i,
+      };
+    });
+  }, [enCursoDB]);
+
+  // Upcoming programadas that are not today or tomorrow
+  const proximasProgramadasItems = useMemo(() => {
+    return allProgramadasItems.filter((item: any) => {
+      const schedDate = item.raw?.scheduledAt ? new Date(item.raw.scheduledAt) : null;
+      if (!schedDate) return true;
+      return !isToday(schedDate) && !isTomorrow(schedDate);
+    });
+  }, [allProgramadasItems]);
+
+  const filteredPorResponder = useMemo(() => filterList(porResponderItems), [porResponderItems, filterList]);
+  const filteredHoy = useMemo(() => filterList(hoyItems), [hoyItems, filterList]);
+  const filteredManana = useMemo(() => filterList(mananaItems), [mananaItems, filterList]);
+  const filteredEnCurso = useMemo(() => filterList(allEnCursoItems), [allEnCursoItems, filterList]);
+  const filteredProgramadas = useMemo(() => filterList(allProgramadasItems), [allProgramadasItems, filterList]);
+  const filteredFinalizadas = useMemo(() => filterList(allFinalizadasItems), [allFinalizadasItems, filterList]);
+  const filteredProximas = useMemo(() => filterList(proximasProgramadasItems), [proximasProgramadasItems, filterList]);
 
   // Default collapsed view: 2 items for por responder, 5 items for hoy
   const displayedPorResponder = showAllPorResponder ? filteredPorResponder : filteredPorResponder.slice(0, 2);
@@ -744,6 +798,51 @@ export default function ProveedorJobScreen() {
         </View>
       )}
 
+      {/* ── Stats Summary Grid (ALWAYS VISIBLE — Barra de filtros) ─────────── */}
+      <View style={styles.statsCard}>
+        <TouchableOpacity
+          style={[styles.statCol, homeFilter === "porResponder" && styles.statColActive]}
+          onPress={() => setHomeFilter((prev) => (prev === "porResponder" ? "todas" : "porResponder"))}
+        >
+          <Ionicons name="time-outline" size={22} color="#ea580c" />
+          <Text style={styles.statNumber}>{porResponderCount}</Text>
+          <Text style={styles.statLabel}>Por responder</Text>
+        </TouchableOpacity>
+
+        <View style={styles.statDivider} />
+
+        <TouchableOpacity
+          style={[styles.statCol, homeFilter === "enCurso" && styles.statColActive]}
+          onPress={() => setHomeFilter((prev) => (prev === "enCurso" ? "todas" : "enCurso"))}
+        >
+          <Ionicons name="play-circle-outline" size={22} color="#10b981" />
+          <Text style={styles.statNumber}>{enCursoCount}</Text>
+          <Text style={styles.statLabel}>En curso</Text>
+        </TouchableOpacity>
+
+        <View style={styles.statDivider} />
+
+        <TouchableOpacity
+          style={[styles.statCol, homeFilter === "programadas" && styles.statColActive]}
+          onPress={() => setHomeFilter((prev) => (prev === "programadas" ? "todas" : "programadas"))}
+        >
+          <Ionicons name="calendar-outline" size={22} color="#3b82f6" />
+          <Text style={styles.statNumber}>{programadasCount}</Text>
+          <Text style={styles.statLabel}>Programadas</Text>
+        </TouchableOpacity>
+
+        <View style={styles.statDivider} />
+
+        <TouchableOpacity
+          style={[styles.statCol, homeFilter === "finalizadas" && styles.statColActive]}
+          onPress={() => setHomeFilter((prev) => (prev === "finalizadas" ? "todas" : "finalizadas"))}
+        >
+          <Ionicons name="checkmark-circle-outline" size={22} color="#475569" />
+          <Text style={styles.statNumber}>{finalizadasCount}</Text>
+          <Text style={styles.statLabel}>Finalizadas hoy</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* ── TAB 1: INICIO (DASHBOARD) ──────────────────────────────────────── */}
       {activeTab === "inicio" && (
         <ScrollView
@@ -756,9 +855,9 @@ export default function ProveedorJobScreen() {
         >
           {/* Greeting */}
           <View style={styles.greetingContainer}>
-            <Text style={styles.greetingTitle}>Buenos días, {providerName}</Text>
+            <Text style={styles.greetingTitle}>Hoy</Text>
             <Text style={styles.greetingSubtitle}>
-              Tienes {programadasCount} intervenciones para hoy.
+              Tienes {hoyItems.length} intervenciones para hoy.
             </Text>
           </View>
 
@@ -779,63 +878,18 @@ export default function ProveedorJobScreen() {
             )}
           </View>
 
-          {/* Stats Summary Grid */}
-          <View style={styles.statsCard}>
-            <TouchableOpacity
-              style={[styles.statCol, homeFilter === "porResponder" && styles.statColActive]}
-              onPress={() => setHomeFilter((prev) => (prev === "porResponder" ? "todas" : "porResponder"))}
-            >
-              <Ionicons name="time-outline" size={22} color="#ea580c" />
-              <Text style={styles.statNumber}>{porResponderCount}</Text>
-              <Text style={styles.statLabel}>Por responder</Text>
-            </TouchableOpacity>
-
-            <View style={styles.statDivider} />
-
-            <TouchableOpacity
-              style={[styles.statCol, homeFilter === "enCurso" && styles.statColActive]}
-              onPress={() => setHomeFilter((prev) => (prev === "enCurso" ? "todas" : "enCurso"))}
-            >
-              <Ionicons name="play-circle-outline" size={22} color="#10b981" />
-              <Text style={styles.statNumber}>{enCursoCount}</Text>
-              <Text style={styles.statLabel}>En curso</Text>
-            </TouchableOpacity>
-
-            <View style={styles.statDivider} />
-
-            <TouchableOpacity
-              style={[styles.statCol, homeFilter === "programadas" && styles.statColActive]}
-              onPress={() => setHomeFilter((prev) => (prev === "programadas" ? "todas" : "programadas"))}
-            >
-              <Ionicons name="calendar-outline" size={22} color="#3b82f6" />
-              <Text style={styles.statNumber}>{programadasCount}</Text>
-              <Text style={styles.statLabel}>Programadas</Text>
-            </TouchableOpacity>
-
-            <View style={styles.statDivider} />
-
-            <TouchableOpacity
-              style={[styles.statCol, homeFilter === "finalizadas" && styles.statColActive]}
-              onPress={() => setHomeFilter((prev) => (prev === "finalizadas" ? "todas" : "finalizadas"))}
-            >
-              <Ionicons name="checkmark-circle-outline" size={22} color="#475569" />
-              <Text style={styles.statNumber}>{finalizadasCount}</Text>
-              <Text style={styles.statLabel}>Finalizadas hoy</Text>
-            </TouchableOpacity>
-          </View>
-
           {/* Active Filter Indicator Banner */}
           {homeFilter !== "todas" && (
             <View style={styles.filterActiveBanner}>
               <Text style={styles.filterActiveText}>
                 Filtro activo:{" "}
                 {homeFilter === "porResponder"
-                  ? "Por responder"
+                  ? `Por responder (${porResponderCount})`
                   : homeFilter === "enCurso"
-                  ? "En curso"
+                  ? `En curso (${enCursoCount})`
                   : homeFilter === "programadas"
-                  ? "Programadas"
-                  : "Finalizadas hoy"}
+                  ? `Programadas (${programadasCount})`
+                  : `Finalizadas hoy (${finalizadasCount})`}
               </Text>
               <TouchableOpacity onPress={() => setHomeFilter("todas")}>
                 <Text style={styles.filterClearText}>Mostrar todas</Text>
@@ -843,181 +897,420 @@ export default function ProveedorJobScreen() {
             </View>
           )}
 
-          {/* Section: Por responder */}
-          <View style={styles.sectionContainer}>
-            <View style={styles.sectionHeaderRow}>
-              <Ionicons name="document-text-outline" size={24} color="#ea580c" style={{ marginRight: 8 }} />
-              <View>
-                <Text style={styles.sectionTitle}>Por responder</Text>
-                <Text style={styles.sectionSubtitle}>Responde antes de que expiren.</Text>
+          {/* ── WHEN FILTER IS ACTIVE: DEDICATED FILTERED LIST ── */}
+          {homeFilter === "porResponder" && (
+            <View style={styles.sectionContainer}>
+              <View style={styles.sectionHeaderRow}>
+                <Ionicons name="document-text-outline" size={24} color="#ea580c" style={{ marginRight: 8 }} />
+                <View>
+                  <Text style={styles.sectionTitle}>Por responder ({filteredPorResponder.length})</Text>
+                  <Text style={styles.sectionSubtitle}>Responde antes de que expiren.</Text>
+                </View>
+              </View>
+              <View style={styles.cardContainer}>
+                {filteredPorResponder.length === 0 ? (
+                  <View style={{ padding: 24, alignItems: "center" }}>
+                    <Text style={{ fontSize: 13, color: MUTED }}>No tienes incidencias pendientes de responder.</Text>
+                  </View>
+                ) : (
+                  filteredPorResponder.map((item: any, idx: number) => (
+                    <View key={item.id ?? idx}>
+                      {idx > 0 && <View style={styles.cardDivider} />}
+                      <TouchableOpacity
+                        style={styles.porResponderRow}
+                        onPress={() => handleSelectIncident(item.raw ?? item)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.redLeftAccent} />
+                        <View style={styles.porResponderMainInfo}>
+                          <View style={styles.otHeaderRow}>
+                            <Text style={styles.otCodeText}>{item.code}</Text>
+                            <Text style={styles.otTitleText} numberOfLines={1}>{item.title}</Text>
+                          </View>
+                          <View style={styles.locationRow}>
+                            <Ionicons name="business-outline" size={14} color={MUTED} style={{ marginRight: 4 }} />
+                            <Text style={styles.locationText}>{item.community}</Text>
+                          </View>
+                        </View>
+                        <ItemCountdown targetTimestamp={item.assignedAt} />
+                      </TouchableOpacity>
+                    </View>
+                  ))
+                )}
               </View>
             </View>
+          )}
 
-            <View style={styles.cardContainer}>
-              {displayedPorResponder.length === 0 ? (
-                <View style={{ padding: 20, alignItems: "center" }}>
-                  <Text style={{ fontSize: 13, color: MUTED }}>
-                    {searchQuery ? "No se encontraron coincidencias." : "No tienes incidencias pendientes de responder."}
-                  </Text>
+          {homeFilter === "enCurso" && (
+            <View style={styles.sectionContainer}>
+              <View style={styles.sectionHeaderRow}>
+                <Ionicons name="play-circle-outline" size={24} color="#10b981" style={{ marginRight: 8 }} />
+                <View>
+                  <Text style={styles.sectionTitle}>En curso ({filteredEnCurso.length})</Text>
+                  <Text style={styles.sectionSubtitle}>Intervenciones actualmente activas.</Text>
                 </View>
-              ) : (
-                displayedPorResponder.map((item: any, idx: number) => (
-                  <View key={item.id ?? idx}>
-                    {idx > 0 && <View style={styles.cardDivider} />}
-                    <TouchableOpacity
-                      style={styles.porResponderRow}
-                      onPress={() => handleSelectIncident(item.raw ?? item)}
-                      activeOpacity={0.7}
-                    >
-                      <View style={styles.redLeftAccent} />
-                      <View style={styles.porResponderMainInfo}>
-                        <View style={styles.otHeaderRow}>
-                          <Text style={styles.otCodeText}>{item.code}</Text>
-                          <Text style={styles.otTitleText} numberOfLines={1}>
-                            {item.title}
-                          </Text>
-                        </View>
-                        <View style={styles.locationRow}>
-                          <Ionicons name="business-outline" size={14} color={MUTED} style={{ marginRight: 4 }} />
-                          <Text style={styles.locationText}>{item.community}</Text>
-                        </View>
-                      </View>
-
-                      <ItemCountdown targetTimestamp={item.assignedAt} />
-                    </TouchableOpacity>
+              </View>
+              <View style={styles.cardContainer}>
+                {filteredEnCurso.length === 0 ? (
+                  <View style={{ padding: 24, alignItems: "center" }}>
+                    <Text style={{ fontSize: 13, color: MUTED }}>No hay intervenciones en curso en este momento.</Text>
                   </View>
-                ))
-              )}
-
-              {filteredPorResponder.length > 2 && (
-                <TouchableOpacity
-                  style={styles.viewAllFooter}
-                  onPress={() => setShowAllPorResponder(!showAllPorResponder)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.viewAllText}>
-                    {showAllPorResponder ? "Mostrar menos" : `Ver todas · ${porResponderCount}`}
-                  </Text>
-                  <Ionicons
-                    name={showAllPorResponder ? "chevron-up-outline" : "chevron-forward-outline"}
-                    size={16}
-                    color={TEAL}
-                    style={{ marginLeft: 4 }}
-                  />
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-
-          {/* Section: Hoy */}
-          <View style={styles.sectionContainer}>
-            <View style={styles.titleWithCountRow}>
-              <Text style={styles.sectionMainTitle}>Hoy</Text>
-              <Text style={styles.countText}>{filteredHoy.length} intervenciones</Text>
-            </View>
-
-            <View style={styles.cardContainer}>
-              {filteredHoy.length === 0 ? (
-                <View style={{ padding: 20, alignItems: "center" }}>
-                  <Text style={{ fontSize: 13, color: MUTED }}>No hay intervenciones programadas para hoy.</Text>
-                </View>
-              ) : (
-                <>
-                  {displayedHoy.map((item: any, idx: number) => (
-                    <TouchableOpacity
-                      key={item.id ?? idx}
-                      style={styles.hoyTimelineRow}
-                      onPress={() => handleSelectIncident(item.raw ?? item)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.timeText}>{item.time}</Text>
-
-                      <View style={styles.timelineCol}>
-                        <View style={[styles.timelineDot, { backgroundColor: item.dotColor ?? "#10b981" }]} />
-                        {idx < displayedHoy.length - 1 && <View style={styles.timelineLine} />}
-                      </View>
-
-                      <View style={[styles.categoryIconCircle, { backgroundColor: item.bgColor ?? "#eff6ff" }]}>
-                        <Ionicons name={item.name ?? "water-outline"} size={20} color={item.color ?? "#3b82f6"} />
-                      </View>
-
-                      <View style={styles.hoyMainDetails}>
-                        <Text style={styles.hoyTitle} numberOfLines={1}>{item.title}</Text>
-                        <View style={styles.locationRow}>
-                          <Ionicons name="business-outline" size={13} color={MUTED} style={{ marginRight: 4 }} />
-                          <Text style={styles.locationText}>{item.community}</Text>
+                ) : (
+                  filteredEnCurso.map((item: any, idx: number) => (
+                    <View key={item.id ?? idx}>
+                      {idx > 0 && <View style={styles.cardDivider} />}
+                      <TouchableOpacity
+                        style={styles.porResponderRow}
+                        onPress={() => handleSelectIncident(item.raw ?? item)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={[styles.redLeftAccent, { backgroundColor: "#10b981" }]} />
+                        <View style={styles.porResponderMainInfo}>
+                          <View style={styles.otHeaderRow}>
+                            <Text style={styles.otCodeText}>{item.code}</Text>
+                            <Text style={styles.otTitleText} numberOfLines={1}>{item.title}</Text>
+                          </View>
+                          <View style={styles.locationRow}>
+                            <Ionicons name="business-outline" size={14} color={MUTED} style={{ marginRight: 4 }} />
+                            <Text style={styles.locationText}>{item.community}</Text>
+                          </View>
                         </View>
+                        <PriorityDot priority={item.priority} />
+                        <Ionicons name="chevron-forward-outline" size={18} color="#94a3b8" style={{ marginLeft: 8 }} />
+                      </TouchableOpacity>
+                    </View>
+                  ))
+                )}
+              </View>
+            </View>
+          )}
+
+          {homeFilter === "programadas" && (
+            <View style={styles.sectionContainer}>
+              <View style={styles.sectionHeaderRow}>
+                <Ionicons name="calendar-outline" size={24} color="#3b82f6" style={{ marginRight: 8 }} />
+                <View>
+                  <Text style={styles.sectionTitle}>Programadas ({filteredProgramadas.length})</Text>
+                  <Text style={styles.sectionSubtitle}>Todas las intervenciones agendadas.</Text>
+                </View>
+              </View>
+              <View style={styles.cardContainer}>
+                {filteredProgramadas.length === 0 ? (
+                  <View style={{ padding: 24, alignItems: "center" }}>
+                    <Text style={{ fontSize: 13, color: MUTED }}>No hay intervenciones programadas.</Text>
+                  </View>
+                ) : (
+                  filteredProgramadas.map((item: any, idx: number) => (
+                    <View key={item.id ?? idx}>
+                      {idx > 0 && <View style={styles.cardDivider} />}
+                      <TouchableOpacity
+                        style={styles.hoyTimelineRow}
+                        onPress={() => handleSelectIncident(item.raw ?? item)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.timeText, { minWidth: 65, fontSize: 11 }]}>{item.time}</Text>
+                        <View style={[styles.categoryIconCircle, { backgroundColor: item.bgColor ?? "#eff6ff" }]}>
+                          <Ionicons name={item.name ?? "calendar-outline"} size={20} color={item.color ?? "#3b82f6"} />
+                        </View>
+                        <View style={styles.hoyMainDetails}>
+                          <View style={styles.otHeaderRow}>
+                            <Text style={styles.otCodeText}>{item.code}</Text>
+                            <Text style={styles.hoyTitle} numberOfLines={1}>{item.title}</Text>
+                          </View>
+                          <View style={styles.locationRow}>
+                            <Ionicons name="business-outline" size={13} color={MUTED} style={{ marginRight: 4 }} />
+                            <Text style={styles.locationText}>{item.community}</Text>
+                          </View>
+                        </View>
+                        <PriorityDot priority={item.priority} />
+                        <Ionicons name="chevron-forward-outline" size={18} color="#94a3b8" style={{ marginLeft: 6 }} />
+                      </TouchableOpacity>
+                    </View>
+                  ))
+                )}
+              </View>
+            </View>
+          )}
+
+          {homeFilter === "finalizadas" && (
+            <View style={styles.sectionContainer}>
+              <View style={styles.sectionHeaderRow}>
+                <Ionicons name="checkmark-circle-outline" size={24} color="#475569" style={{ marginRight: 8 }} />
+                <View>
+                  <Text style={styles.sectionTitle}>Finalizadas ({filteredFinalizadas.length})</Text>
+                  <Text style={styles.sectionSubtitle}>Historial de intervenciones resueltas y cerradas.</Text>
+                </View>
+              </View>
+              <View style={styles.cardContainer}>
+                {filteredFinalizadas.length === 0 ? (
+                  <View style={{ padding: 24, alignItems: "center" }}>
+                    <Text style={{ fontSize: 13, color: MUTED }}>No hay intervenciones finalizadas.</Text>
+                  </View>
+                ) : (
+                  filteredFinalizadas.map((item: any, idx: number) => (
+                    <View key={item.id ?? idx}>
+                      {idx > 0 && <View style={styles.cardDivider} />}
+                      <TouchableOpacity
+                        style={styles.porResponderRow}
+                        onPress={() => handleSelectIncident(item.raw ?? item)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={[styles.redLeftAccent, { backgroundColor: "#10b981" }]} />
+                        <View style={styles.porResponderMainInfo}>
+                          <View style={styles.otHeaderRow}>
+                            <Text style={styles.otCodeText}>{item.code}</Text>
+                            <Text style={styles.otTitleText} numberOfLines={1}>{item.title}</Text>
+                          </View>
+                          <View style={styles.locationRow}>
+                            <Ionicons name="business-outline" size={14} color={MUTED} style={{ marginRight: 4 }} />
+                            <Text style={styles.locationText}>{item.community} • {item.date}</Text>
+                          </View>
+                        </View>
+                        {item.cost && (
+                          <Text style={{ fontSize: 12, fontWeight: "700", color: "#10b981", marginRight: 6 }}>
+                            {item.cost}
+                          </Text>
+                        )}
+                        <Ionicons name="chevron-forward-outline" size={18} color="#94a3b8" />
+                      </TouchableOpacity>
+                    </View>
+                  ))
+                )}
+              </View>
+            </View>
+          )}
+
+          {/* ── WHEN NO FILTER (TODAS): SHOW DEFAULT SECTIONS ── */}
+          {homeFilter === "todas" && (
+            <>
+              {/* Section: Por responder */}
+              <View style={styles.sectionContainer}>
+                <View style={styles.sectionHeaderRow}>
+                  <Ionicons name="document-text-outline" size={24} color="#ea580c" style={{ marginRight: 8 }} />
+                  <View>
+                    <Text style={styles.sectionTitle}>Por responder</Text>
+                    <Text style={styles.sectionSubtitle}>Responde antes de que expiren.</Text>
+                  </View>
+                </View>
+
+                <View style={styles.cardContainer}>
+                  {displayedPorResponder.length === 0 ? (
+                    <View style={{ padding: 20, alignItems: "center" }}>
+                      <Text style={{ fontSize: 13, color: MUTED }}>
+                        {searchQuery ? "No se encontraron coincidencias." : "No tienes incidencias pendientes de responder."}
+                      </Text>
+                    </View>
+                  ) : (
+                    displayedPorResponder.map((item: any, idx: number) => (
+                      <View key={item.id ?? idx}>
+                        {idx > 0 && <View style={styles.cardDivider} />}
+                        <TouchableOpacity
+                          style={styles.porResponderRow}
+                          onPress={() => handleSelectIncident(item.raw ?? item)}
+                          activeOpacity={0.7}
+                        >
+                          <View style={styles.redLeftAccent} />
+                          <View style={styles.porResponderMainInfo}>
+                            <View style={styles.otHeaderRow}>
+                              <Text style={styles.otCodeText}>{item.code}</Text>
+                              <Text style={styles.otTitleText} numberOfLines={1}>{item.title}</Text>
+                            </View>
+                            <View style={styles.locationRow}>
+                              <Ionicons name="business-outline" size={14} color={MUTED} style={{ marginRight: 4 }} />
+                              <Text style={styles.locationText}>{item.community}</Text>
+                            </View>
+                          </View>
+                          <ItemCountdown targetTimestamp={item.assignedAt} />
+                        </TouchableOpacity>
                       </View>
+                    ))
+                  )}
 
-                      <PriorityDot priority={item.priority} />
-
-                      <Ionicons name="chevron-forward-outline" size={18} color="#94a3b8" style={{ marginLeft: 6 }} />
-                    </TouchableOpacity>
-                  ))}
-
-                  {filteredHoy.length > 5 && (
+                  {filteredPorResponder.length > 2 && (
                     <TouchableOpacity
                       style={styles.viewAllFooter}
-                      onPress={() => setShowAllHoy((prev) => !prev)}
+                      onPress={() => setShowAllPorResponder(!showAllPorResponder)}
                       activeOpacity={0.7}
                     >
                       <Text style={styles.viewAllText}>
-                        {showAllHoy ? "Mostrar menos" : `Ver todas (${filteredHoy.length - 5} más)`}
+                        {showAllPorResponder ? "Mostrar menos" : `Ver todas · ${porResponderCount}`}
                       </Text>
                       <Ionicons
-                        name={showAllHoy ? "chevron-up-outline" : "chevron-down-outline"}
+                        name={showAllPorResponder ? "chevron-up-outline" : "chevron-forward-outline"}
                         size={16}
                         color={TEAL}
                         style={{ marginLeft: 4 }}
                       />
                     </TouchableOpacity>
                   )}
-                </>
-              )}
-            </View>
-          </View>
-
-          {/* Section: Mañana */}
-          <View style={styles.sectionContainer}>
-            <View style={styles.titleWithCountRow}>
-              <Text style={styles.sectionMainTitle}>Mañana</Text>
-              <Text style={styles.countText}>{filteredManana.length} intervenciones</Text>
-            </View>
-
-            <View style={styles.cardContainer}>
-              {filteredManana.length === 0 ? (
-                <View style={{ padding: 20, alignItems: "center" }}>
-                  <Text style={{ fontSize: 13, color: MUTED }}>No hay intervenciones programadas para mañana.</Text>
                 </View>
-              ) : (
-                <View style={styles.mananaGridRow}>
-                  {filteredManana.map((m: any, idx: number) => (
-                    <View key={m.id} style={styles.mananaCol}>
-                      <Text style={styles.mananaTime}>{m.time}</Text>
-                      <Text style={styles.mananaTitle} numberOfLines={2}>
-                        {m.title}
-                      </Text>
-                      <PriorityDot priority={m.priority} />
-                      {idx < filteredManana.length - 1 && <View style={styles.mananaDivider} />}
+              </View>
+
+              {/* Section: Hoy */}
+              <View style={styles.sectionContainer}>
+                <View style={styles.titleWithCountRow}>
+                  <Text style={styles.sectionMainTitle}>Hoy</Text>
+                  <Text style={styles.countText}>{filteredHoy.length} intervenciones</Text>
+                </View>
+
+                <View style={styles.cardContainer}>
+                  {filteredHoy.length === 0 ? (
+                    <View style={{ padding: 20, alignItems: "center" }}>
+                      <Text style={{ fontSize: 13, color: MUTED }}>No hay intervenciones programadas para hoy.</Text>
                     </View>
-                  ))}
-                  <Ionicons name="chevron-forward-outline" size={18} color="#94a3b8" style={{ alignSelf: "center", marginLeft: 4 }} />
+                  ) : (
+                    <>
+                      {displayedHoy.map((item: any, idx: number) => (
+                        <TouchableOpacity
+                          key={item.id ?? idx}
+                          style={styles.hoyTimelineRow}
+                          onPress={() => handleSelectIncident(item.raw ?? item)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.timeText}>{item.time}</Text>
+
+                          <View style={styles.timelineCol}>
+                            <View style={[styles.timelineDot, { backgroundColor: item.dotColor ?? "#10b981" }]} />
+                            {idx < displayedHoy.length - 1 && <View style={styles.timelineLine} />}
+                          </View>
+
+                          <View style={[styles.categoryIconCircle, { backgroundColor: item.bgColor ?? "#eff6ff" }]}>
+                            <Ionicons name={item.name ?? "water-outline"} size={20} color={item.color ?? "#3b82f6"} />
+                          </View>
+
+                          <View style={styles.hoyMainDetails}>
+                            <Text style={styles.hoyTitle} numberOfLines={1}>{item.title}</Text>
+                            <View style={styles.locationRow}>
+                              <Ionicons name="business-outline" size={13} color={MUTED} style={{ marginRight: 4 }} />
+                              <Text style={styles.locationText}>{item.community}</Text>
+                            </View>
+                          </View>
+
+                          <PriorityDot priority={item.priority} />
+
+                          <Ionicons name="chevron-forward-outline" size={18} color="#94a3b8" style={{ marginLeft: 6 }} />
+                        </TouchableOpacity>
+                      ))}
+
+                      {filteredHoy.length > 5 && (
+                        <TouchableOpacity
+                          style={styles.viewAllFooter}
+                          onPress={() => setShowAllHoy((prev) => !prev)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.viewAllText}>
+                            {showAllHoy ? "Mostrar menos" : `Ver todas (${filteredHoy.length - 5} más)`}
+                          </Text>
+                          <Ionicons
+                            name={showAllHoy ? "chevron-up-outline" : "chevron-down-outline"}
+                            size={16}
+                            color={TEAL}
+                            style={{ marginLeft: 4 }}
+                          />
+                        </TouchableOpacity>
+                      )}
+                    </>
+                  )}
+                </View>
+              </View>
+
+              {/* Section: Mañana */}
+              <View style={styles.sectionContainer}>
+                <View style={styles.titleWithCountRow}>
+                  <Text style={styles.sectionMainTitle}>Mañana</Text>
+                  <Text style={styles.countText}>{filteredManana.length} intervenciones</Text>
+                </View>
+
+                <View style={styles.cardContainer}>
+                  {filteredManana.length === 0 ? (
+                    <View style={{ padding: 20, alignItems: "center" }}>
+                      <Text style={{ fontSize: 13, color: MUTED }}>No hay intervenciones programadas para mañana.</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.mananaGridRow}>
+                      {filteredManana.map((m: any, idx: number) => (
+                        <View key={m.id} style={styles.mananaCol}>
+                          <Text style={styles.mananaTime}>{m.time}</Text>
+                          <Text style={styles.mananaTitle} numberOfLines={2}>
+                            {m.title}
+                          </Text>
+                          <PriorityDot priority={m.priority} />
+                          {idx < filteredManana.length - 1 && <View style={styles.mananaDivider} />}
+                        </View>
+                      ))}
+                      <Ionicons name="chevron-forward-outline" size={18} color="#94a3b8" style={{ alignSelf: "center", marginLeft: 4 }} />
+                    </View>
+                  )}
+
+                  <TouchableOpacity
+                    style={styles.viewAllFooter}
+                    onPress={() => {
+                      setActiveTab("intervenciones");
+                      setIntervencionesFilter("programadas");
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.viewAllText}>Ver agenda completa</Text>
+                    <Ionicons name="chevron-forward-outline" size={16} color={TEAL} style={{ marginLeft: 4 }} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Section: Próximas programadas (if any outside today/tomorrow) */}
+              {filteredProximas.length > 0 && (
+                <View style={styles.sectionContainer}>
+                  <View style={styles.titleWithCountRow}>
+                    <Text style={styles.sectionMainTitle}>Próximas programadas</Text>
+                    <Text style={styles.countText}>{filteredProximas.length} intervenciones</Text>
+                  </View>
+
+                  <View style={styles.cardContainer}>
+                    {filteredProximas.slice(0, 4).map((item: any, idx: number) => (
+                      <View key={item.id ?? idx}>
+                        {idx > 0 && <View style={styles.cardDivider} />}
+                        <TouchableOpacity
+                          style={styles.hoyTimelineRow}
+                          onPress={() => handleSelectIncident(item.raw ?? item)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.timeText, { minWidth: 65, fontSize: 11 }]}>{item.time}</Text>
+                          <View style={[styles.categoryIconCircle, { backgroundColor: item.bgColor ?? "#eff6ff" }]}>
+                            <Ionicons name={item.name ?? "calendar-outline"} size={20} color={item.color ?? "#3b82f6"} />
+                          </View>
+                          <View style={styles.hoyMainDetails}>
+                            <View style={styles.otHeaderRow}>
+                              <Text style={styles.otCodeText}>{item.code}</Text>
+                              <Text style={styles.hoyTitle} numberOfLines={1}>{item.title}</Text>
+                            </View>
+                            <View style={styles.locationRow}>
+                              <Ionicons name="business-outline" size={13} color={MUTED} style={{ marginRight: 4 }} />
+                              <Text style={styles.locationText}>{item.community}</Text>
+                            </View>
+                          </View>
+                          <PriorityDot priority={item.priority} />
+                          <Ionicons name="chevron-forward-outline" size={18} color="#94a3b8" style={{ marginLeft: 6 }} />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+
+                    {filteredProximas.length > 4 && (
+                      <TouchableOpacity
+                        style={styles.viewAllFooter}
+                        onPress={() => {
+                          setActiveTab("intervenciones");
+                          setIntervencionesFilter("programadas");
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.viewAllText}>Ver todas las programadas ({filteredProximas.length})</Text>
+                        <Ionicons name="chevron-forward-outline" size={16} color={TEAL} style={{ marginLeft: 4 }} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 </View>
               )}
-
-              <TouchableOpacity
-                style={styles.viewAllFooter}
-                onPress={() => {
-                  setActiveTab("intervenciones");
-                  setIntervencionesFilter("programadas");
-                }}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.viewAllText}>Ver agenda completa</Text>
-                <Ionicons name="chevron-forward-outline" size={16} color={TEAL} style={{ marginLeft: 4 }} />
-              </TouchableOpacity>
-            </View>
-          </View>
+            </>
+          )}
 
           <View style={{ height: 32 }} />
         </ScrollView>
@@ -1310,7 +1603,7 @@ export default function ProveedorJobScreen() {
       )}
 
       {/* ── Bottom Navigation Tabs ────────────────────────────────────────── */}
-      <View style={styles.bottomTabBar}>
+      <View style={[styles.bottomTabBar, { paddingBottom: bottomPad, paddingTop: 8 }]}>
         <TouchableOpacity
           style={activeTab === "inicio" ? styles.tabItemActive : styles.tabItem}
           onPress={() => {
@@ -1928,7 +2221,6 @@ const styles = StyleSheet.create({
   /* Bottom Tab Bar */
   bottomTabBar: {
     flexDirection: "row",
-    height: 64,
     backgroundColor: "#ffffff",
     borderTopWidth: 1,
     borderTopColor: BORDER,

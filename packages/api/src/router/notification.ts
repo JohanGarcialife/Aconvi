@@ -142,14 +142,25 @@ async function sendDirectFcmPush(
   fcmToken: string,
   notification: { title: string; body: string; data?: Record<string, string> },
 ) {
+  if (fcmToken.startsWith("ExponentPushToken[") || fcmToken.startsWith("ExpoPushToken[")) {
+    console.log("[Push] Token in FCM dispatcher is an Expo token, routing to Expo:", fcmToken.slice(0, 25));
+    await sendExpoPush(fcmToken, notification);
+    return;
+  }
+
   try {
-    const serviceAccount = process.env.FCM_SERVICE_ACCOUNT_JSON
+    const rawSa = process.env.FCM_SERVICE_ACCOUNT_JSON
       ? (JSON.parse(process.env.FCM_SERVICE_ACCOUNT_JSON) as {
           project_id: string;
           client_email: string;
           private_key: string;
         })
       : DEFAULT_FCM_SERVICE_ACCOUNT;
+
+    const serviceAccount = {
+      ...rawSa,
+      private_key: rawSa.private_key ? rawSa.private_key.replace(/\\n/g, "\n") : rawSa.private_key,
+    };
 
     const accessToken = await getFcmAccessToken(serviceAccount);
 
