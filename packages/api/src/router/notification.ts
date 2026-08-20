@@ -206,32 +206,63 @@ async function sendExpoPush(
   expoPushToken: string,
   notification: { title: string; body: string; data?: Record<string, string> },
 ) {
-  const { Expo } = await import("expo-server-sdk");
-  const expo = new Expo();
-
-  if (!Expo.isExpoPushToken(expoPushToken)) {
+  // If token is not an Expo token, route to FCM directly
+  if (!expoPushToken.startsWith("ExponentPushToken[") && !expoPushToken.startsWith("ExpoPushToken[")) {
     const rawToken = String(expoPushToken);
     console.warn("[Push] Token is not an Expo token, routing to direct FCM:", rawToken.slice(0, 25));
     await sendDirectFcmPush(rawToken, notification);
     return;
   }
 
-  const messages = [
-    {
+  // Try expo-server-sdk first, fall back to raw HTTP if not available
+  try {
+    const { Expo } = await import("expo-server-sdk");
+    const expo = new Expo();
+
+    const messages = [
+      {
+        to: expoPushToken,
+        sound: "default" as const,
+        title: notification.title,
+        body: notification.body,
+        data: notification.data ?? {},
+        priority: "high" as const,
+        channelId: "default",
+      },
+    ];
+
+    const chunks = expo.chunkPushNotifications(messages);
+    for (const chunk of chunks) {
+      const results = await expo.sendPushNotificationsAsync(chunk);
+      console.log("[EXPO_PUSH_RESPONSE]", JSON.stringify(results));
+    }
+  } catch (sdkErr) {
+    // expo-server-sdk not available — use raw HTTP API
+    console.warn("[Push] expo-server-sdk unavailable, using raw HTTP:", (sdkErr as Error).message?.slice(0, 60));
+    await sendExpoPushRaw(expoPushToken, notification);
+  }
+}
+
+// ─── Raw Expo Push API (no SDK dependency) ────────────────────────────────────
+async function sendExpoPushRaw(
+  expoPushToken: string,
+  notification: { title: string; body: string; data?: Record<string, string> },
+) {
+  const res = await fetch("https://exp.host/--/api/v2/push/send", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
       to: expoPushToken,
-      sound: "default" as const,
+      sound: "default",
       title: notification.title,
       body: notification.body,
       data: notification.data ?? {},
-      priority: "high" as const,
+      priority: "high",
       channelId: "default",
-    },
-  ];
-
-  const chunks = expo.chunkPushNotifications(messages);
-  for (const chunk of chunks) {
-    await expo.sendPushNotificationsAsync(chunk);
-  }
+    }),
+  });
+  const result = await res.json();
+  console.log("[EXPO_PUSH_RAW_RESPONSE]", JSON.stringify(result));
 }
 
 // ─── Web Push helper ──────────────────────────────────────────────────────────

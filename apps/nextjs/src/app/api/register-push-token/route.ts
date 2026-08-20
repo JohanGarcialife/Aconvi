@@ -44,14 +44,14 @@ export async function POST(req: NextRequest) {
 
     const platform = body.platform ?? "expo";
 
-    // 4. Upsert: delete token if assigned to another user, insert if not present for this user
+    // 4. Reassign token to this user and platform
     await db.execute(sql`DELETE FROM push_token WHERE token = ${body.token}`);
-    const existing = await db.query.pushToken.findFirst({
-      where: and(eq(pushToken.userId, userId), eq(pushToken.token, body.token)),
+    await db.insert(pushToken).values({
+      id: crypto.randomUUID(),
+      userId,
+      token: body.token,
+      platform,
     });
-    if (!existing) {
-      await db.insert(pushToken).values({ id: crypto.randomUUID(), userId, token: body.token, platform });
-    }
 
 
     console.log(`[PUSH_TOKEN] Registered for user ${userId}: ${body.token.slice(0, 30)}...`);
