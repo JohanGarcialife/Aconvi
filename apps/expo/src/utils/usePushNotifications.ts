@@ -104,13 +104,19 @@ export async function acquireAndRegisterPushToken(explicitSessionToken?: string)
 
 // ─── Token acquisition ────────────────────────────────────────────────────────
 async function acquirePushToken(): Promise<{ token: string; platform: string } | null> {
-  // Setup notification channel on Android
+  // Setup notification channel on Android for instant high-priority alerts
   if (Platform.OS === "android") {
     await Notifications.setNotificationChannelAsync("default", {
       name: "Aconvi",
       importance: Notifications.AndroidImportance.MAX,
+      sound: "default",
       vibrationPattern: [0, 250, 250, 250],
       lightColor: "#4aa19b",
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      bypassDnd: false,
+      showBadge: true,
+      enableLights: true,
+      enableVibrate: true,
     });
   }
 

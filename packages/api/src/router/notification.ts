@@ -164,6 +164,14 @@ async function sendDirectFcmPush(
 
     const accessToken = await getFcmAccessToken(serviceAccount);
 
+    // Ensure all data fields are strings for FCM v1 specification
+    const stringData: Record<string, string> = {};
+    if (notification.data) {
+      for (const [k, v] of Object.entries(notification.data)) {
+        stringData[k] = String(v ?? "");
+      }
+    }
+
     const payload = {
       message: {
         token: fcmToken,
@@ -171,12 +179,30 @@ async function sendDirectFcmPush(
           title: notification.title,
           body: notification.body,
         },
-        data: notification.data ?? {},
+        data: stringData,
         android: {
-          priority: "high",
+          priority: "HIGH", // FCM HTTP v1 spec: "HIGH" (wakes device immediately from Doze mode)
+          direct_boot_ok: true,
           notification: {
             sound: "default",
             channel_id: "default",
+            notification_priority: "PRIORITY_MAX",
+            default_sound: true,
+            default_vibrate_timings: true,
+            visibility: "PUBLIC",
+          },
+        },
+        apns: {
+          headers: {
+            "apns-priority": "10",
+            "apns-push-type": "alert",
+          },
+          payload: {
+            aps: {
+              sound: "default",
+              badge: 1,
+              contentAvailable: true,
+            },
           },
         },
       },
