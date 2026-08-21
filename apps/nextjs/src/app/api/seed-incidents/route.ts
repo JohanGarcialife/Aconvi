@@ -178,7 +178,7 @@ export async function GET() {
       console.warn("Some patches failed:", patchErrors);
     }
 
-    const newIncidents = await db.insert(incident).values(demoIncidents).returning({ id: incident.id });
+    const newIncidents = await db.insert(incident).values(demoIncidents as any).returning({ id: incident.id });
     createdCount += newIncidents.length;
 
     // 4. Create dummy history for the created incidents

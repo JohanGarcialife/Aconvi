@@ -71,7 +71,7 @@ export function AuthShowcase() {
             const code = await queryClient.fetchQuery(
               trpc.auth.getLatestOTP.queryOptions({ phoneNumber })
             );
-            if (code) setTestCode(code.split(":")[0]);
+            if (code) setTestCode(code.split(":")[0] ?? null);
           } catch (e) {
             console.error("Failed to fetch test code", e);
           }

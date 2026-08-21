@@ -2,7 +2,6 @@
 
 import { useEffect, useState, createContext, useContext } from "react";
 import { io, Socket } from "socket.io-client";
-import { useToast } from "@acme/ui/use-toast";
 
 interface WebSocketContextType {
   socket: Socket | null;
@@ -17,7 +16,6 @@ const WebSocketContext = createContext<WebSocketContextType>({
 export function WebSocketProvider({ children }: { children: React.ReactNode }) {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const { toast } = useToast();
 
   useEffect(() => {
     // Determine WS URL based on environment. Placeholder:
@@ -40,18 +38,10 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       setIsConnected(false);
     });
 
-    // Global listeners for generic push notifications
-    socketInstance.on("notify-incident-updated", (payload) => {
-      toast({
-        title: "Incidencia Actualizada",
-        description: `La incidencia #${payload.id.slice(0, 5)} cambió a ${payload.status}`,
-      });
-    });
-
     return () => {
       socketInstance.disconnect();
     };
-  }, [toast]);
+  }, []);
 
   return (
     <WebSocketContext.Provider value={{ socket, isConnected }}>

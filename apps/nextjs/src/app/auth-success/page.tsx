@@ -10,7 +10,7 @@ export default function AuthSuccessPage() {
 
   useEffect(() => {
     if (!isPending) {
-      if (session?.user?.role === "SuperAdmin") {
+      if ((session?.user as any)?.role === "SuperAdmin") {
         router.push("/superadmin");
       } else if (session?.user) {
         router.push("/communities");

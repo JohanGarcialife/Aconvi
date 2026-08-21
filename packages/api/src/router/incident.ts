@@ -1,10 +1,10 @@
-import { eq, desc, and, isNull, isNotNull, sql, inArray } from "drizzle-orm";
+import { eq, desc, and, isNull, isNotNull, sql, inArray, lt } from "drizzle-orm";
 import { z } from "zod";
 import { join } from "path";
 import { writeFileSync, existsSync, mkdirSync } from "fs";
 
 import { incident, incidentNote, provider, incidentHistory, user } from "@acme/db/schema";
-import { sendPushToUser } from "./notification";
+import { sendPushToUser, sendPushToAFs } from "./notification";
 import { emitWebSocketEvent } from "../utils/ws";
 
 import { createTRPCRouter, publicProcedure } from "../trpc";
@@ -131,6 +131,114 @@ async function ensureIncidentColumns(db: any) {
   }
 }
 
+// ─── Automatic evaluation sweep for overdue OTs (CADUCADA & NO_PRESENTADA) ──────
+async function processOverdueIncidents(db: any, organizationId?: string | null) {
+  try {
+    const now = Date.now();
+
+    // 1. Check for expired OTs (EN_REVISION assigned > 2 hours ago without provider acceptance)
+    const EXPIRATION_MS = 120 * 60 * 1000;
+    const expirationThreshold = new Date(now - EXPIRATION_MS);
+
+    const expiredList = await db.query.incident.findMany({
+      where: and(
+        organizationId ? eq(incident.organizationId, organizationId) : undefined,
+        eq(incident.status, "EN_REVISION"),
+        isNotNull(incident.assignedAt),
+        lt(incident.assignedAt, expirationThreshold)
+      ),
+    });
+
+    for (const inc of expiredList) {
+      console.log(`[OverdueSweep] Marking incident ${inc.id} (${inc.title}) as CADUCADA`);
+      const [updated] = await db
+        .update(incident)
+        .set({
+          status: "CADUCADA",
+          providerId: null,
+          estimatedCost: null,
+          estimatedDays: null,
+          scheduledAt: null,
+          estimatedDuration: null,
+        })
+        .where(eq(incident.id, inc.id))
+        .returning();
+
+      if (updated) {
+        await insertHistoryIfNotDuplicate(db, {
+          incidentId: updated.id,
+          actorName: "Sistema",
+          action: "OT_EXPIRED",
+          previousStatus: "EN_REVISION",
+          newStatus: "CADUCADA",
+          comment: "La orden de trabajo caducó por superar el límite de tiempo de respuesta (2 horas).",
+        });
+
+        // Push notification to AFs
+        void sendPushToAFs(db, updated.organizationId, {
+          title: "OT Caducada",
+          body: `La incidencia "${updated.title}" ha caducado por falta de respuesta del proveedor. Ya puedes reasignarla.`,
+          data: { type: "ot_expired", incidentId: updated.id },
+        }).catch(console.error);
+
+        void emitWebSocketEvent(updated.organizationId, "incident-updated", updated);
+      }
+    }
+
+    // 2. Check for No-Show OTs (AGENDADA scheduled > 1 hour ago with no startedAt)
+    const NO_SHOW_BUFFER_MS = 60 * 60 * 1000;
+    const noShowThreshold = new Date(now - NO_SHOW_BUFFER_MS);
+
+    const noShowList = await db.query.incident.findMany({
+      where: and(
+        organizationId ? eq(incident.organizationId, organizationId) : undefined,
+        eq(incident.status, "AGENDADA"),
+        isNotNull(incident.scheduledAt),
+        isNull(incident.startedAt),
+        lt(incident.scheduledAt, noShowThreshold)
+      ),
+    });
+
+    for (const inc of noShowList) {
+      console.log(`[OverdueSweep] Marking incident ${inc.id} (${inc.title}) as NO_PRESENTADA`);
+      const [updated] = await db
+        .update(incident)
+        .set({
+          status: "NO_PRESENTADA",
+          providerId: null,
+          estimatedCost: null,
+          estimatedDays: null,
+          scheduledAt: null,
+          estimatedDuration: null,
+        })
+        .where(eq(incident.id, inc.id))
+        .returning();
+
+      if (updated) {
+        await insertHistoryIfNotDuplicate(db, {
+          incidentId: updated.id,
+          actorName: "Sistema",
+          action: "NO_SHOW",
+          previousStatus: "AGENDADA",
+          newStatus: "NO_PRESENTADA",
+          comment: "El proveedor no inició la intervención tras 1 hora de la hora programada.",
+        });
+
+        // Push notification to AFs
+        void sendPushToAFs(db, updated.organizationId, {
+          title: "OT No presentada",
+          body: `El proveedor no inició la intervención agendada para "${updated.title}" tras 1 hora. La OT ha quedado liberada para reasignar.`,
+          data: { type: "no_show", incidentId: updated.id },
+        }).catch(console.error);
+
+        void emitWebSocketEvent(updated.organizationId, "incident-updated", updated);
+      }
+    }
+  } catch (err) {
+    console.error("[processOverdueIncidents] Error running sweep:", err);
+  }
+}
+
 export const incidentRouter = createTRPCRouter({
   clearAll: publicProcedure.mutation(async ({ ctx }) => {
     const { sql } = await import("drizzle-orm");
@@ -148,6 +256,7 @@ export const incidentRouter = createTRPCRouter({
     )
     .query(async ({ ctx, input }) => {
       await ensureIncidentColumns(ctx.db);
+      await processOverdueIncidents(ctx.db, input.tenantId);
 
       try {
         const results = await ctx.db.query.incident.findMany({
@@ -197,6 +306,7 @@ export const incidentRouter = createTRPCRouter({
     .input(z.object({ id: z.string().uuid(), tenantId: z.string().min(1) }))
     .query(async ({ ctx, input }) => {
       await ensureIncidentColumns(ctx.db);
+      await processOverdueIncidents(ctx.db, input.tenantId);
 
       return ctx.db.query.incident.findFirst({
         where: and(
@@ -289,6 +399,22 @@ export const incidentRouter = createTRPCRouter({
         action: "CREATED",
         newStatus: "RECIBIDA",
       });
+
+      // Fire-and-forget: Push to AFs
+      void sendPushToAFs(ctx.db, tenantId, {
+        title: "📋 Nueva incidencia recibida",
+        body: `Un vecino ha reportado: "${created.title}".`,
+        data: { type: "new_incident", incidentId: created.id },
+      }).catch(console.error);
+
+      // Fire-and-forget: Push confirmation to Vecino
+      if (created.reporterId) {
+        void sendPushToUser(ctx.db, created.reporterId, {
+          title: "Incidencia recibida",
+          body: `Tu incidencia "${created.title}" ha sido registrada con éxito.`,
+          data: { type: "new_incident", incidentId: created.id },
+        }).catch(console.error);
+      }
 
       // Fire-and-forget: WS event doesn't block the mutation response
       void emitWebSocketEvent(tenantId, "incident-created", created);
@@ -388,18 +514,10 @@ export const incidentRouter = createTRPCRouter({
       if (!current) throw new Error("Incidencia no encontrada.");
       
       // Block reassignment if OT already has a provider assigned (pending response or accepted)
-      if (current.providerId) {
-        if (
-          current.status === "EN_REVISION" ||
-          current.status === "AGENDADA" ||
-          current.status === "EN_CURSO" ||
-          current.status === "RESUELTA" ||
-          current.status === "CERRADA"
-        ) {
-          throw new Error(
-            "Esta incidencia ya está asignada a un proveedor y no puede reasignarse. Espera a que el proveedor responda, la rechace, o caduca el tiempo de respuesta."
-          );
-        }
+      if (current.providerId && !["RECIBIDA", "CADUCADA", "RECHAZADA", "NO_PRESENTADA"].includes(current.status)) {
+        throw new Error(
+          "Esta incidencia ya está asignada a un proveedor y no puede reasignarse mientras la OT esté activa."
+        );
       }
 
       const [updated] = await ctx.db
@@ -432,28 +550,37 @@ export const incidentRouter = createTRPCRouter({
               where: eq(provider.id, provId),
             });
             console.log("[PushAssign] Found provider in DB:", prov?.name, "email:", prov?.email);
-            if (prov?.email || prov?.phone) {
-              const usr = await ctx.db.query.user.findFirst({
-                where: prov.email
-                  ? eq(sql`lower(${user.email})`, prov.email.toLowerCase())
-                  : prov.phone
-                  ? eq(user.phoneNumber, prov.phone)
-                  : undefined,
+            let usr: any = null;
+            if (prov?.email) {
+              usr = await ctx.db.query.user.findFirst({
+                where: eq(sql`lower(${user.email})`, prov.email.toLowerCase()),
               });
-              console.log("[PushAssign] Found user in DB:", usr?.name, "id:", usr?.id);
-              if (usr?.id) {
-                console.log("[PushAssign] Calling sendPushToUser for userId:", usr.id);
-                await sendPushToUser(ctx.db, usr.id, {
-                  title: "📋 Nueva incidencia asignada",
-                  body: `Se te ha asignado: ${updated.title}`,
-                  data: { type: "job_assigned", incidentId: updated.id },
-                });
-                console.log("[PushAssign] sendPushToUser completed successfully");
-              } else {
-                console.warn("[PushAssign] No user found for provider email/phone:", prov.email ?? prov.phone);
-              }
+            }
+            if (!usr && prov?.phone) {
+              usr = await ctx.db.query.user.findFirst({
+                where: eq(user.phoneNumber, prov.phone),
+              });
+            }
+            if (!usr && prov?.name) {
+              usr = await ctx.db.query.user.findFirst({
+                where: eq(sql`lower(${user.name})`, prov.name.toLowerCase()),
+              });
+            }
+            if (!usr) {
+              usr = await ctx.db.query.user.findFirst({
+                where: eq(user.role, "Proveedor"),
+              });
+            }
+            if (usr?.id) {
+              console.log("[PushAssign] Calling sendPushToUser for userId:", usr.id);
+              await sendPushToUser(ctx.db, usr.id, {
+                title: "📋 Nueva incidencia asignada",
+                body: `Se te ha asignado: ${updated.title}`,
+                data: { type: "job_assigned", incidentId: updated.id },
+              });
+              console.log("[PushAssign] sendPushToUser completed successfully");
             } else {
-              console.warn("[PushAssign] Provider has no email or phone configured");
+              console.warn("[PushAssign] No user found for provider:", prov?.name);
             }
           } catch (err) {
             console.error("[PushAssign] Failed in push notification promise chain:", err);
@@ -522,7 +649,7 @@ export const incidentRouter = createTRPCRouter({
       return updated;
     }),
 
-  // ─── Provider: reject assigned OT (→ RECIBIDA) ────────────────────────────
+  // ─── Provider: reject assigned OT (→ RECHAZADA) ───────────────────────────
   providerReject: publicProcedure
     .input(
       z.object({
@@ -565,10 +692,16 @@ export const incidentRouter = createTRPCRouter({
         comment: input.reason ? `Motivo: ${input.reason}` : "El proveedor ha rechazado la orden de trabajo.",
       });
 
-      // Notify admin only (NOT the vecino)
+      // Notify AFs that provider rejected the OT so it can be reassigned
+      void sendPushToAFs(ctx.db, input.tenantId, {
+        title: "OT Rechazada",
+        body: `El proveedor rechazó la incidencia "${updated.title}". La OT ha quedado liberada para reasignar.`,
+        data: { type: "provider_rejected", incidentId: updated.id },
+      }).catch(console.error);
+
       if (updated.assigneeId) {
         void sendPushToUser(ctx.db, updated.assigneeId, {
-          title: "Proveedor ha rechazado la OT",
+          title: "OT Rechazada",
           body: `El proveedor rechazó la incidencia "${updated.title}". Puedes reasignarla a otro proveedor.`,
           data: { type: "provider_rejected", incidentId: updated.id },
         }).catch(console.error);
@@ -620,7 +753,13 @@ export const incidentRouter = createTRPCRouter({
         comment: "La orden de trabajo caducó por falta de respuesta del proveedor.",
       });
 
-      // Notify admin that OT has expired and can be reassigned
+      // Notify AFs that OT has expired and can be reassigned
+      void sendPushToAFs(ctx.db, updated.organizationId, {
+        title: "OT Caducada",
+        body: `La incidencia "${updated.title}" ha caducado por falta de respuesta del proveedor. Ya puedes reasignarla.`,
+        data: { type: "ot_expired", incidentId: updated.id },
+      }).catch(console.error);
+
       if (updated.assigneeId) {
         void sendPushToUser(ctx.db, updated.assigneeId, {
           title: "OT Caducada",
@@ -677,6 +816,8 @@ export const incidentRouter = createTRPCRouter({
     )
     .query(async ({ ctx, input }) => {
       await ensureIncidentColumns(ctx.db);
+      await processOverdueIncidents(ctx.db, input.tenantId);
+
       const items = await ctx.db.query.incident.findMany({
         where: and(
           eq(incident.providerId, input.providerId),
@@ -792,6 +933,13 @@ export const incidentRouter = createTRPCRouter({
         }).catch(console.error);
       }
 
+      // Fire-and-forget push to AFs
+      void sendPushToAFs(ctx.db, actualTenantId, {
+        title: "OT Aceptada",
+        body: `El profesional ha aceptado y agendado la intervención para "${updated.title}".`,
+        data: { type: "provider_accepted", incidentId: updated.id },
+      }).catch(console.error);
+
       // Fire-and-forget: WS event to tenant room
       void emitWebSocketEvent(actualTenantId, "incident-updated", updated);
 
@@ -860,6 +1008,13 @@ export const incidentRouter = createTRPCRouter({
           data: { type: "new_incident", incidentId: updated.id },
         }).catch(console.error);
       }
+
+      // Fire-and-forget push to AFs
+      void sendPushToAFs(ctx.db, input.tenantId, {
+        title: "Intervención finalizada por proveedor",
+        body: `El proveedor ha completado el trabajo de "${updated.title}". Pendiente de validación.`,
+        data: { type: "provider_completed", incidentId: updated.id },
+      }).catch(console.error);
 
       // Fire-and-forget: WS event to tenant room
       void emitWebSocketEvent(input.tenantId, "incident-updated", updated);
@@ -955,6 +1110,13 @@ export const incidentRouter = createTRPCRouter({
         }).catch(console.error);
       }
 
+      // Fire-and-forget push to AFs
+      void sendPushToAFs(ctx.db, inc.organizationId, {
+        title: "Proveedor en sitio",
+        body: `El profesional ha iniciado la intervención de "${inc.title}".`,
+        data: { type: "provider_arrived", incidentId: inc.id },
+      }).catch(console.error);
+
       // Fire-and-forget: WS event to tenant room
       void emitWebSocketEvent(input.tenantId, "incident-updated", arrivedInc ?? inc);
 
@@ -1049,7 +1211,14 @@ export const incidentRouter = createTRPCRouter({
         comment: `Valoró con ${input.rating} estrellas: "${input.comment ?? "Sin comentario"}"`,
       });
 
-      // Update provider statistics if any
+      // Push notification to AFs
+      void sendPushToAFs(ctx.db, input.tenantId, {
+        title: "Nueva valoración recibida",
+        body: `El vecino ha valorado la incidencia "${updated.title}" con ${input.rating} estrellas.`,
+        data: { type: "rating_submitted", incidentId: updated.id },
+      }).catch(console.error);
+
+      // Update provider statistics and notify provider if any
       if (updated.providerId) {
         // Find all incidents for this provider that have a valid rating
         const ratedIncidents = await ctx.db.query.incident.findMany({
@@ -1075,6 +1244,40 @@ export const incidentRouter = createTRPCRouter({
             completedJobs: totalRatings,
           })
           .where(eq(provider.id, updated.providerId));
+
+        // Push notification to provider user
+        void (async () => {
+          try {
+            const prov = await ctx.db.query.provider.findFirst({
+              where: eq(provider.id, updated.providerId!),
+            });
+            let provUsr: any = null;
+            if (prov?.email) {
+              provUsr = await ctx.db.query.user.findFirst({
+                where: eq(sql`lower(${user.email})`, prov.email.toLowerCase()),
+              });
+            }
+            if (!provUsr && prov?.phone) {
+              provUsr = await ctx.db.query.user.findFirst({
+                where: eq(user.phoneNumber, prov.phone),
+              });
+            }
+            if (!provUsr && prov?.name) {
+              provUsr = await ctx.db.query.user.findFirst({
+                where: eq(sql`lower(${user.name})`, prov.name.toLowerCase()),
+              });
+            }
+            if (provUsr?.id) {
+              await sendPushToUser(ctx.db, provUsr.id, {
+                title: "Nueva valoración de cliente",
+                body: `Has recibido una valoración de ${input.rating} estrellas por la intervención "${updated.title}".`,
+                data: { type: "rating_submitted", incidentId: updated.id },
+              });
+            }
+          } catch (e) {
+            console.error("[submitRating] Error notifying provider:", e);
+          }
+        })();
       }
 
       // Fire-and-forget: WS event to tenant room

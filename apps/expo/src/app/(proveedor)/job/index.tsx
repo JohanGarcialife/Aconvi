@@ -293,7 +293,7 @@ export default function ProveedorJobScreen() {
         return { label: "Programada", color: "#3b82f6", bg: "#dbeafe" };
       }
       const isExpired = (item.status === "EN_REVISION" || item.status === "RECIBIDA") && isOTExpired(item);
-      if (isExpired) {
+      if (isExpired || item.status === "CADUCADA") {
         return { label: "Expirada", color: "#ef4444", bg: "#fee2e2" };
       }
       if (item.status === "NO_PRESENTADA") {
@@ -315,7 +315,7 @@ export default function ProveedorJobScreen() {
 
   const expiradasHoyDB = useMemo(() => {
     return rawIncidents.filter((i: any) => {
-      return (i.status === "EN_REVISION" || i.status === "RECIBIDA") && isOTExpired(i);
+      return i.status === "CADUCADA" || ((i.status === "EN_REVISION" || i.status === "RECIBIDA") && isOTExpired(i));
     });
   }, [rawIncidents, isOTExpired]);
 
@@ -801,8 +801,14 @@ export default function ProveedorJobScreen() {
       {/* ── Stats Summary Grid (ALWAYS VISIBLE — Barra de filtros) ─────────── */}
       <View style={styles.statsCard}>
         <TouchableOpacity
-          style={[styles.statCol, homeFilter === "porResponder" && styles.statColActive]}
-          onPress={() => setHomeFilter((prev) => (prev === "porResponder" ? "todas" : "porResponder"))}
+          style={[
+            styles.statCol,
+            activeTab === "inicio" && homeFilter === "porResponder" && styles.statColActive,
+          ]}
+          onPress={() => {
+            setActiveTab("inicio");
+            setHomeFilter((prev) => (activeTab === "inicio" && prev === "porResponder" ? "todas" : "porResponder"));
+          }}
         >
           <Ionicons name="time-outline" size={22} color="#ea580c" />
           <Text style={styles.statNumber}>{porResponderCount}</Text>
@@ -812,8 +818,14 @@ export default function ProveedorJobScreen() {
         <View style={styles.statDivider} />
 
         <TouchableOpacity
-          style={[styles.statCol, homeFilter === "enCurso" && styles.statColActive]}
-          onPress={() => setHomeFilter((prev) => (prev === "enCurso" ? "todas" : "enCurso"))}
+          style={[
+            styles.statCol,
+            activeTab === "inicio" && homeFilter === "enCurso" && styles.statColActive,
+          ]}
+          onPress={() => {
+            setActiveTab("inicio");
+            setHomeFilter((prev) => (activeTab === "inicio" && prev === "enCurso" ? "todas" : "enCurso"));
+          }}
         >
           <Ionicons name="play-circle-outline" size={22} color="#10b981" />
           <Text style={styles.statNumber}>{enCursoCount}</Text>
@@ -823,8 +835,14 @@ export default function ProveedorJobScreen() {
         <View style={styles.statDivider} />
 
         <TouchableOpacity
-          style={[styles.statCol, homeFilter === "programadas" && styles.statColActive]}
-          onPress={() => setHomeFilter((prev) => (prev === "programadas" ? "todas" : "programadas"))}
+          style={[
+            styles.statCol,
+            activeTab === "inicio" && homeFilter === "programadas" && styles.statColActive,
+          ]}
+          onPress={() => {
+            setActiveTab("inicio");
+            setHomeFilter((prev) => (activeTab === "inicio" && prev === "programadas" ? "todas" : "programadas"));
+          }}
         >
           <Ionicons name="calendar-outline" size={22} color="#3b82f6" />
           <Text style={styles.statNumber}>{programadasCount}</Text>
@@ -834,8 +852,14 @@ export default function ProveedorJobScreen() {
         <View style={styles.statDivider} />
 
         <TouchableOpacity
-          style={[styles.statCol, homeFilter === "finalizadas" && styles.statColActive]}
-          onPress={() => setHomeFilter((prev) => (prev === "finalizadas" ? "todas" : "finalizadas"))}
+          style={[
+            styles.statCol,
+            activeTab === "inicio" && homeFilter === "finalizadas" && styles.statColActive,
+          ]}
+          onPress={() => {
+            setActiveTab("inicio");
+            setHomeFilter((prev) => (activeTab === "inicio" && prev === "finalizadas" ? "todas" : "finalizadas"));
+          }}
         >
           <Ionicons name="checkmark-circle-outline" size={22} color="#475569" />
           <Text style={styles.statNumber}>{finalizadasCount}</Text>
@@ -877,25 +901,6 @@ export default function ProveedorJobScreen() {
               </TouchableOpacity>
             )}
           </View>
-
-          {/* Active Filter Indicator Banner */}
-          {homeFilter !== "todas" && (
-            <View style={styles.filterActiveBanner}>
-              <Text style={styles.filterActiveText}>
-                Filtro activo:{" "}
-                {homeFilter === "porResponder"
-                  ? `Por responder (${porResponderCount})`
-                  : homeFilter === "enCurso"
-                  ? `En curso (${enCursoCount})`
-                  : homeFilter === "programadas"
-                  ? `Programadas (${programadasCount})`
-                  : `Finalizadas hoy (${finalizadasCount})`}
-              </Text>
-              <TouchableOpacity onPress={() => setHomeFilter("todas")}>
-                <Text style={styles.filterClearText}>Mostrar todas</Text>
-              </TouchableOpacity>
-            </View>
-          )}
 
           {/* ── WHEN FILTER IS ACTIVE: DEDICATED FILTERED LIST ── */}
           {homeFilter === "porResponder" && (
@@ -2260,29 +2265,6 @@ const styles = StyleSheet.create({
   statColActive: {
     backgroundColor: "#f0fdfa",
     borderRadius: 12,
-  },
-  filterActiveBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#eff6ff",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: "#bfdbfe",
-  },
-  filterActiveText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#1d4ed8",
-  },
-  filterClearText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: TEAL,
-    textDecorationLine: "underline",
   },
   tabBadge: {
     position: "absolute",

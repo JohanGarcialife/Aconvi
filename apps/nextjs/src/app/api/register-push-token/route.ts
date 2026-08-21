@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
       id: crypto.randomUUID(),
       userId,
       token: body.token,
-      platform,
+      platform: (body.platform as any) ?? "expo",
     });
 
 

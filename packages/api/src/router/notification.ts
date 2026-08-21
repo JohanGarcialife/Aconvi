@@ -39,6 +39,27 @@ export async function sendPushToUser(
   const tokens = await db.query.pushToken.findMany({
     where: eq(pushToken.userId, userId),
   });
+
+  // Also check user.deviceToken if stored directly
+  try {
+    const { user } = await import("@acme/db/schema");
+    const userRec = await db.query.user.findFirst({
+      where: eq(user.id, userId),
+      columns: { deviceToken: true },
+    });
+    if (userRec?.deviceToken) {
+      const alreadyInList = tokens.some((t: any) => t.token === userRec.deviceToken);
+      if (!alreadyInList) {
+        const plat = (userRec.deviceToken.startsWith("ExponentPushToken") || userRec.deviceToken.startsWith("ExpoPushToken"))
+          ? "expo"
+          : "fcm";
+        tokens.push({ token: userRec.deviceToken, platform: plat });
+      }
+    }
+  } catch (err) {
+    console.warn("[sendPushToUser] Could not query user.deviceToken fallback:", err);
+  }
+
   console.log("[sendPushToUser] Found tokens count:", tokens.length);
 
   for (const tok of tokens) {
@@ -57,6 +78,60 @@ export async function sendPushToUser(
         console.error("[sendPushToUser] sendWebPush failed for token:", tok.token?.slice(0, 30), err);
       });
     }
+  }
+}
+
+// ─── Broadcast push to ALL AFs / Admins of an org ─────────────────────────
+// Call this when an event requires attention from the Administrador de Fincas (AF)
+export async function sendPushToAFs(
+  db: any,
+  organizationId: string,
+  notification: { title: string; body: string; data?: Record<string, string> },
+): Promise<{ sent: number; failed: number }> {
+  try {
+    const { member, user } = await import("@acme/db/schema");
+    const { eq, or, inArray, sql } = await import("drizzle-orm");
+
+    // 1. Find all admin/AF members of this organization
+    const orgMembers = await db.query.member.findMany({
+      where: eq(member.organizationId, organizationId),
+    });
+
+    const afMemberUserIds = orgMembers
+      .filter((m: any) => {
+        const r = (m.role || "").toLowerCase();
+        return r === "admin" || r === "owner" || r === "af";
+      })
+      .map((m: any) => m.userId as string);
+
+    // 2. Also find any users globally configured with AF or Admin role
+    const globalAfUsers = await db.query.user.findMany({
+      where: inArray(user.role, ["AF", "SuperAdmin", "AgenteAconvi", "admin", "Admin"]),
+      columns: { id: true },
+    });
+
+    const globalAfUserIds = globalAfUsers.map((u: any) => u.id as string);
+
+    const targetUserIds = [...new Set([...afMemberUserIds, ...globalAfUserIds])];
+    console.log("[sendPushToAFs] Target AF user IDs:", targetUserIds);
+
+    let sent = 0;
+    let failed = 0;
+
+    for (const uid of targetUserIds) {
+      try {
+        await sendPushToUser(db, uid, notification);
+        sent++;
+      } catch (e) {
+        console.error("[sendPushToAFs] Failed sending to AF user:", uid, e);
+        failed++;
+      }
+    }
+
+    return { sent, failed };
+  } catch (err) {
+    console.error("[sendPushToAFs] Error querying AF users:", err);
+    return { sent: 0, failed: 0 };
   }
 }
 

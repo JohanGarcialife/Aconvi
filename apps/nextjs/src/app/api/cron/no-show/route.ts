@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@acme/db/client";
 import { incident, incidentHistory } from "@acme/db/schema";
 import { eq, and, isNotNull, lt } from "drizzle-orm";
-import { emitWebSocketEvent, sendPushToUser } from "@acme/api";
+import { emitWebSocketEvent, sendPushToAFs } from "@acme/api";
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -48,13 +48,12 @@ export async function GET(request: Request) {
         comment: "El proveedor acepto y agendo la intervencion pero no se presento en el plazo de 1 hora desde la hora programada.",
       });
 
-      if (inc.assigneeId) {
-        await sendPushToUser(db, inc.assigneeId, {
-          title: "Profesional no presentado",
-          body: `El profesional no ha iniciado la intervencion "${inc.title}". Puedes reasignarla.`,
-          data: { type: "no_show", incidentId: inc.id },
-        }).catch(console.error);
-      }
+      // Push notification to all AFs of the org
+      void sendPushToAFs(db, inc.organizationId, {
+        title: "OT No presentada",
+        body: `El proveedor no inició la intervención agendada para "${inc.title}" tras 1 hora. La OT ha quedado liberada para reasignar.`,
+        data: { type: "no_show", incidentId: inc.id },
+      }).catch(console.error);
 
       void emitWebSocketEvent(inc.organizationId, "incident-updated", {
         ...inc,

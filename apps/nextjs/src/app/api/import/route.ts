@@ -38,8 +38,8 @@ export async function POST(req: NextRequest) {
       return new NextResponse("El archivo Excel está vacío", { status: 400 });
     }
 
-    const firstSheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[firstSheetName];
+    const firstSheetName = workbook.SheetNames[0]!;
+    const worksheet = workbook.Sheets[firstSheetName]!;
     // Expected headers: Nombre, Email, Teléfono, Coeficiente
     const rawData = xlsx.utils.sheet_to_json<Record<string, any>>(worksheet);
 
@@ -110,13 +110,15 @@ export async function POST(req: NextRequest) {
     // Update job status
     const resultJson = JSON.stringify({ successCount, errorCount, total: rawData.length });
     
-    await db
-      .update(excelImportJob)
-      .set({
-        status: "COMPLETED",
-        resultJson,
-      })
-      .where(eq(excelImportJob.id, job.id));
+    if (job) {
+      await db
+        .update(excelImportJob)
+        .set({
+          status: "COMPLETED",
+          resultJson,
+        })
+        .where(eq(excelImportJob.id, job.id));
+    }
 
     return NextResponse.json({
       ok: true,

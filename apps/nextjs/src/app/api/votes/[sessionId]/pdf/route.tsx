@@ -195,7 +195,7 @@ export async function GET(
     const pdfBuffer = await renderToBuffer(pdfDoc);
     const safeTitle = votingSession.title.toLowerCase().replace(/[^a-z0-9]/g, "-").slice(0, 60);
 
-    return new NextResponse(pdfBuffer, {
+    return new NextResponse(pdfBuffer as any, {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",

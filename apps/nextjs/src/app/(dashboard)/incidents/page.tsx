@@ -19,7 +19,7 @@ const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   AGENDADA:       { label: "Agendada",            cls: "bg-violet-50 text-violet-700 border border-violet-200" },
   EN_CURSO:       { label: "En curso",            cls: "bg-cyan-50 text-cyan-700 border border-cyan-200" },
   RESUELTA:       { label: "Resuelta",            cls: "bg-emerald-50 text-emerald-700 border border-emerald-200" },
-  RECHAZADA:      { label: "Rechazada proveedor", cls: "bg-red-50 text-red-700 border border-red-200" },
+  RECHAZADA:      { label: "Rechazada",           cls: "bg-red-50 text-red-700 border border-red-200" },
   CERRADA:        { label: "Cerrada",             cls: "bg-slate-100 text-slate-600 border border-slate-300" },
   CADUCADA:       { label: "Caducada",            cls: "bg-rose-50 text-rose-700 border border-rose-200" },
   NO_PRESENTADA:  { label: "No presentada",       cls: "bg-orange-50 text-orange-700 border border-orange-200" },
@@ -755,8 +755,14 @@ export default function IncidentsPage() {
                       actionText = "valoró el servicio";
                       dotColor = "bg-amber-500";
                     } else if (h.action === "OT_EXPIRED") {
-                      actionText = "caducó por límite de tiempo";
+                      actionText = "caducó por superar tiempo de respuesta (2h)";
                       dotColor = "bg-rose-500";
+                    } else if (h.action === "NO_SHOW") {
+                      actionText = "no se presentó a la visita (+1h tras hora programada)";
+                      dotColor = "bg-orange-500";
+                    } else if (h.action === "PROVIDER_REJECTED") {
+                      actionText = "rechazó la orden de trabajo";
+                      dotColor = "bg-red-500";
                     }
 
                     return (

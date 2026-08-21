@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
         }).returning();
         simUser = newUser;
       }
-      return createMobileSession(simUser.id, req);
+      return createMobileSession(simUser!.id, req);
     }
 
     // ── Find user ─────────────────────────────────────────────────────────────

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@acme/db/client";
 import { incident, incidentHistory } from "@acme/db/schema";
 import { eq, and, isNotNull, lt } from "drizzle-orm";
-import { emitWebSocketEvent } from "@acme/api";
+import { emitWebSocketEvent, sendPushToAFs } from "@acme/api";
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -46,8 +46,15 @@ export async function GET(request: Request) {
         action: "OT_EXPIRED",
         previousStatus: "EN_REVISION",
         newStatus: "CADUCADA",
-        comment: "OT Caducada por límite de tiempo de respuesta.",
+        comment: "OT Caducada por límite de tiempo de respuesta (2 horas).",
       });
+
+      // Push notification to all AFs of the org
+      void sendPushToAFs(db, inc.organizationId, {
+        title: "OT Caducada",
+        body: `La incidencia "${inc.title}" ha caducado por falta de respuesta del proveedor. Ya puedes reasignarla.`,
+        data: { type: "ot_expired", incidentId: inc.id },
+      }).catch(console.error);
 
       void emitWebSocketEvent(inc.organizationId, "incident-updated", { ...inc, status: "CADUCADA", providerId: null });
       expiredCount++;
