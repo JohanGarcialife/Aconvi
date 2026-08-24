@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@acme/db/client";
 import { incident, incidentHistory } from "@acme/db/schema";
 import { eq, and, isNotNull, lt } from "drizzle-orm";
-import { emitWebSocketEvent, sendPushToAFs } from "@acme/api";
+import { emitWebSocketEvent, sendPushToAFs, sendPushToUser } from "@acme/api";
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -54,6 +54,15 @@ export async function GET(request: Request) {
         body: `El proveedor no inició la intervención agendada para "${inc.title}" tras 1 hora. La OT ha quedado liberada para reasignar.`,
         data: { type: "no_show", incidentId: inc.id },
       }).catch(console.error);
+
+      // Push notification to vecino
+      if (inc.reporterId) {
+        void sendPushToUser(db, inc.reporterId, {
+          title: "Actualización de tu incidencia",
+          body: `La intervención prevista para "${inc.title}" no se ha iniciado. Estamos gestionando una nueva actuación.`,
+          data: { type: "no_show", incidentId: inc.id },
+        }).catch(console.error);
+      }
 
       void emitWebSocketEvent(inc.organizationId, "incident-updated", {
         ...inc,

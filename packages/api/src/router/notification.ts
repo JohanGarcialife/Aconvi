@@ -66,11 +66,11 @@ export async function sendPushToUser(
     console.log("[sendPushToUser] Dispatching token platform:", tok.platform, "token:", tok.token?.slice(0, 30));
     if (tok.platform === "fcm") {
       // Native Android FCM token → FCM V1 API direct
-      await sendDirectFcmPush(tok.token, notification).catch((err) => {
+      await sendDirectFcmPush(tok.token, notification, db).catch((err) => {
         console.error("[sendPushToUser] sendDirectFcmPush failed for token:", tok.token?.slice(0, 30), err);
       });
     } else if (tok.platform === "expo") {
-      await sendExpoPush(tok.token, notification).catch((err) => {
+      await sendExpoPush(tok.token, notification, db).catch((err) => {
         console.error("[sendPushToUser] sendExpoPush failed for token:", tok.token?.slice(0, 30), err);
       });
     } else if (tok.platform === "web") {
@@ -216,10 +216,11 @@ const DEFAULT_FCM_SERVICE_ACCOUNT = {
 async function sendDirectFcmPush(
   fcmToken: string,
   notification: { title: string; body: string; data?: Record<string, string> },
+  db?: any,
 ) {
   if (fcmToken.startsWith("ExponentPushToken[") || fcmToken.startsWith("ExpoPushToken[")) {
     console.log("[Push] Token in FCM dispatcher is an Expo token, routing to Expo:", fcmToken.slice(0, 25));
-    await sendExpoPush(fcmToken, notification);
+    await sendExpoPush(fcmToken, notification, db);
     return;
   }
 
@@ -295,8 +296,22 @@ async function sendDirectFcmPush(
       },
     );
 
-    const result = await res.json();
+    const result = await res.json() as any;
     console.log("[FCM_DIRECT_RESPONSE]", JSON.stringify(result));
+
+    // Auto-cleanup stale/unregistered tokens
+    if (
+      result?.error?.code === 404 ||
+      result?.error?.status === "NOT_FOUND" ||
+      result?.error?.details?.some((d: any) => d.errorCode === "UNREGISTERED" || d.errorCode === "INVALID_ARGUMENT") ||
+      result?.error?.message?.includes("not registered")
+    ) {
+      if (db) {
+        console.log(`[FCM] Removing invalid token from DB: ${fcmToken.slice(0, 25)}...`);
+        const { sql } = await import("drizzle-orm");
+        await db.execute(sql`DELETE FROM push_token WHERE token = ${fcmToken}`).catch(() => {});
+      }
+    }
   } catch (err) {
     console.error("[FCM_DIRECT_ERROR]", err);
   }
@@ -306,12 +321,13 @@ async function sendDirectFcmPush(
 async function sendExpoPush(
   expoPushToken: string,
   notification: { title: string; body: string; data?: Record<string, string> },
+  db?: any,
 ) {
   // If token is not an Expo token, route to FCM directly
   if (!expoPushToken.startsWith("ExponentPushToken[") && !expoPushToken.startsWith("ExpoPushToken[")) {
     const rawToken = String(expoPushToken);
     console.warn("[Push] Token is not an Expo token, routing to direct FCM:", rawToken.slice(0, 25));
-    await sendDirectFcmPush(rawToken, notification);
+    await sendDirectFcmPush(rawToken, notification, db);
     return;
   }
 
@@ -336,11 +352,21 @@ async function sendExpoPush(
     for (const chunk of chunks) {
       const results = await expo.sendPushNotificationsAsync(chunk);
       console.log("[EXPO_PUSH_RESPONSE]", JSON.stringify(results));
+      // Auto-cleanup DeviceNotRegistered
+      if (db && Array.isArray(results)) {
+        for (const ticket of results) {
+          if (ticket.status === "error" && ticket.details?.error === "DeviceNotRegistered") {
+            console.log(`[Expo] Removing unregistered token from DB: ${expoPushToken.slice(0, 25)}...`);
+            const { sql } = await import("drizzle-orm");
+            await db.execute(sql`DELETE FROM push_token WHERE token = ${expoPushToken}`).catch(() => {});
+          }
+        }
+      }
     }
   } catch (sdkErr) {
     // expo-server-sdk not available — use raw HTTP API
     console.warn("[Push] expo-server-sdk unavailable, using raw HTTP:", (sdkErr as Error).message?.slice(0, 60));
-    await sendExpoPushRaw(expoPushToken, notification);
+    await sendExpoPushRaw(expoPushToken, notification, db);
   }
 }
 
@@ -348,6 +374,7 @@ async function sendExpoPush(
 async function sendExpoPushRaw(
   expoPushToken: string,
   notification: { title: string; body: string; data?: Record<string, string> },
+  db?: any,
 ) {
   const res = await fetch("https://exp.host/--/api/v2/push/send", {
     method: "POST",
@@ -362,8 +389,17 @@ async function sendExpoPushRaw(
       channelId: "default",
     }),
   });
-  const result = await res.json();
+  const result = await res.json() as any;
   console.log("[EXPO_PUSH_RAW_RESPONSE]", JSON.stringify(result));
+  if (db && result?.data && Array.isArray(result.data)) {
+    for (const item of result.data) {
+      if (item.status === "error" && item.details?.error === "DeviceNotRegistered") {
+        console.log(`[ExpoRaw] Removing unregistered token from DB: ${expoPushToken.slice(0, 25)}...`);
+        const { sql } = await import("drizzle-orm");
+        await db.execute(sql`DELETE FROM push_token WHERE token = ${expoPushToken}`).catch(() => {});
+      }
+    }
+  }
 }
 
 // ─── Web Push helper ──────────────────────────────────────────────────────────

@@ -102,6 +102,7 @@ export default function NewIncidentScreen() {
   };
 
   const [isUploading, setIsUploading] = useState(false);
+  const [isCompressing, setIsCompressing] = useState(false);
 
   const createIncident = useMutation({
     ...api.incident.create.mutationOptions(),
@@ -160,26 +161,23 @@ export default function NewIncidentScreen() {
       : await ImagePicker.launchImageLibraryAsync({ mediaTypes: "images", allowsEditing: false });
 
     if (!result.canceled && result.assets[0]) {
-      // Bug 1: Show preview INSTANTLY with the original URI so the user sees
-      // the photo immediately. Then compress in the background — the URI in
-      // state is updated silently once compression finishes, so the final
-      // upload always uses the small file but the user perceives zero wait.
       const originalUri = result.assets[0].uri;
       setPhotoUri(originalUri); // ← instant preview
+      setIsCompressing(true);
 
-      // Compress in background (no await blocks the UI)
+      // Compress in background (safe against race conditions)
       ImageManipulator.manipulateAsync(
         originalUri,
         [{ resize: { width: 500 } }],
         { compress: 0.3, format: ImageManipulator.SaveFormat.JPEG },
       )
         .then((manipResult) => {
-          // Silently swap to the compressed file URI; thumbnail stays the same size
           setPhotoUri(manipResult.uri);
+          setIsCompressing(false);
         })
         .catch((err) => {
-          // Compression failed — keep original URI, size will be larger but not blocking
           console.warn("Background compression failed, using original:", err);
+          setIsCompressing(false);
         });
     }
   };
@@ -195,7 +193,7 @@ export default function NewIncidentScreen() {
 
   // ─── Submit ─────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
-    if (isUploading || createIncident.isPending) return;
+    if (isUploading || isCompressing || createIncident.isPending) return;
 
     // Bug 2: show explicit error when category is missing instead of silent no-op
     if (!selectedCategory) {
@@ -214,11 +212,17 @@ export default function NewIncidentScreen() {
     const uploadPhotoToServer = async (base64Data: string): Promise<string | null> => {
       try {
         const { getBaseUrl } = await import("~/utils/base-url");
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 12000);
+
         const res = await fetch(`${getBaseUrl()}/api/upload-photo`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ base64: base64Data }),
+          signal: controller.signal,
         });
+        clearTimeout(timeoutId);
+
         if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
         const json = await res.json() as { url?: string; error?: string };
         if (!json.url) throw new Error(json.error ?? "No URL returned");
@@ -269,7 +273,7 @@ export default function NewIncidentScreen() {
     });
   };
 
-  const isLoading = createIncident.isPending || isUploading;
+  const isLoading = createIncident.isPending || isUploading || isCompressing;
   const canSubmit = !!selectedCategory && description.trim().length > 0 && !isLoading;
 
   return (

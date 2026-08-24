@@ -879,7 +879,7 @@ export default function ProveedorJobScreen() {
         >
           {/* Greeting */}
           <View style={styles.greetingContainer}>
-            <Text style={styles.greetingTitle}>Hoy</Text>
+            <Text style={styles.greetingTitle}>Hola</Text>
             <Text style={styles.greetingSubtitle}>
               Tienes {hoyItems.length} intervenciones para hoy.
             </Text>
@@ -1615,6 +1615,8 @@ export default function ProveedorJobScreen() {
             setShowNotificationsDropdown(false);
             setShowProfileDropdown(false);
             setActiveTab("inicio");
+            setHomeFilter("todas");
+            setSearchQuery("");
           }}
           activeOpacity={0.8}
         >

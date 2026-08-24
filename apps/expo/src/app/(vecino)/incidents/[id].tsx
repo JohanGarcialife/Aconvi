@@ -63,27 +63,37 @@ type TimelineEntry = {
 };
 
 function buildTimeline(history: any[], currentStatus: string): TimelineEntry[] {
+  let acceptCount = 0;
+
   const entries: TimelineEntry[] = (history ?? [])
     .filter((h: any) => !["PROVIDER_REJECTED", "OT_EXPIRED"].includes(h.action))
     .map((h) => {
       const dateStr = format(new Date(h.createdAt), "d 'de' MMMM '•' HH:mm", { locale: es });
       if (h.action === "CREATED") {
-        return { key: h.id, label: "Incidencia recibida", detail: "Hemos recibido tu incidencia.", icon: "✉️", date: dateStr };
+        return { key: h.id, label: "Incidencia recibida", detail: "Hemos recibido tu incidencia y estamos gestionándola.", icon: "✉️", date: dateStr };
       }
       if (h.action === "ASSIGNED" || (h.newStatus === "EN_REVISION" && h.action !== "PROVIDER_ACCEPTED")) {
-        return { key: h.id, label: "Profesional asignado", detail: "Hemos asignado un profesional para atender la incidencia.", icon: "👤", date: dateStr };
+        return { key: h.id, label: "Profesional asignado", detail: "Hemos asignado un profesional para atender tu incidencia.", icon: "👤", date: dateStr };
+      }
+      if (h.action === "NO_SHOW" || h.newStatus === "NO_PRESENTADA") {
+        return { key: h.id, label: "Actualización de la intervención", detail: "La intervención prevista no se ha iniciado. Estamos gestionando una nueva actuación.", icon: "⚠️", date: dateStr };
       }
       if (h.action === "PROVIDER_ACCEPTED" || h.newStatus === "AGENDADA") {
-        return { key: h.id, label: "Intervención confirmada", detail: "El profesional ha confirmado la intervención.", icon: "📅", date: dateStr };
+        acceptCount++;
+        const isReSchedule = acceptCount > 1;
+        return {
+          key: h.id,
+          label: isReSchedule ? "Nueva intervención programada" : "Intervención programada",
+          detail: isReSchedule ? "Hemos programado una nueva intervención." : "La intervención ha sido programada.",
+          icon: "📅",
+          date: dateStr,
+        };
       }
-      if (h.action === "ARRIVED") {
-        return { key: h.id, label: "En intervención", detail: "El profesional ya está atendiendo la incidencia.", icon: "📍", date: dateStr };
-      }
-      if (h.newStatus === "EN_CURSO") {
-        return { key: h.id, label: "En intervención", detail: "El profesional ya está atendiendo la incidencia.", icon: "🔧", date: dateStr };
+      if (h.action === "ARRIVED" || h.newStatus === "EN_CURSO") {
+        return { key: h.id, label: "En intervención", detail: "El profesional ha iniciado la intervención.", icon: "🔧", date: dateStr };
       }
       if (h.action === "COMPLETED" || h.newStatus === "RESUELTA") {
-        return { key: h.id, label: "Resuelta", detail: "La intervención ha finalizado.", icon: "✅", date: dateStr };
+        return { key: h.id, label: "Intervención resuelta", detail: "El profesional ha completado la intervención.", icon: "✅", date: dateStr };
       }
       if (h.action === "RATED") {
         return { key: h.id, label: "Valoración enviada", detail: h.comment ?? "Gracias por compartir tu valoración.", icon: "⭐", date: dateStr };
@@ -173,7 +183,7 @@ export default function IncidentDetailScreen() {
   const displayId = `#INC-${id.slice(0, 8).toUpperCase()}`;
   const createdDate = format(new Date(incident.createdAt), "d 'de' MMMM, HH:mm", { locale: es });
   const isResolved = incident.status === "RESUELTA" || incident.status === "CERRADA";
-  const canRate = incident.status === "CERRADA" && !incident.rating;
+  const canRate = ["RESUELTA", "CERRADA"].includes(incident.status) && !incident.rating;
   const isRejected = incident.status === "RECHAZADA";
 
   return (

@@ -44,7 +44,8 @@ export async function POST(req: NextRequest) {
 
     const platform = body.platform ?? "expo";
 
-    // 4. Reassign token to this user and platform
+    // 4. Ensure each user has only ONE active token per platform
+    await db.execute(sql`DELETE FROM push_token WHERE user_id = ${userId} AND platform = ${(body.platform as any) ?? "expo"}`);
     await db.execute(sql`DELETE FROM push_token WHERE token = ${body.token}`);
     await db.insert(pushToken).values({
       id: crypto.randomUUID(),
