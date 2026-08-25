@@ -32,6 +32,7 @@ export async function GET(request: Request) {
         .update(incident)
         .set({
           status: "CADUCADA",
+          expiredProviderId: inc.providerId,
           providerId: null,
           estimatedCost: null,
           estimatedDays: null,

@@ -221,10 +221,27 @@ export default function ProveedorJobScreen() {
     )
   );
 
+  const {
+    data: expiredIncidents,
+    refetch: refetchExpiredIncidents,
+  } = useQuery(
+    api.incident.expiredByProvider.queryOptions(
+      {
+        providerId: providerId ?? "",
+        tenantId: tenantId,
+      },
+      {
+        enabled: !!providerId,
+        refetchInterval: 10_000,
+      }
+    )
+  );
+
   useFocusEffect(
     useCallback(() => {
       void refetchIncidents();
-    }, [refetchIncidents])
+      void refetchExpiredIncidents();
+    }, [refetchIncidents, refetchExpiredIncidents])
   );
 
   const [activeTab, setActiveTab] = useState<"inicio" | "expiradas" | "perfil" | "intervenciones">("inicio");
@@ -249,7 +266,7 @@ export default function ProveedorJobScreen() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await refetchIncidents();
+    await Promise.all([refetchIncidents(), refetchExpiredIncidents()]);
     setRefreshing(false);
   };
 
@@ -257,10 +274,11 @@ export default function ProveedorJobScreen() {
     const subscription = AppState.addEventListener("change", (nextState) => {
       if (nextState === "active") {
         void refetchIncidents();
+        void refetchExpiredIncidents();
       }
     });
     return () => subscription.remove();
-  }, [refetchIncidents]);
+  }, [refetchIncidents, refetchExpiredIncidents]);
 
   // Handle Logout action
   const handlePerformLogout = useCallback(async () => {
@@ -272,6 +290,7 @@ export default function ProveedorJobScreen() {
 
   // Dynamic DB Data Arrays
   const rawIncidents = (incidents as any[] | undefined) ?? [];
+  const rawExpired = (expiredIncidents as any[] | undefined) ?? [];
 
   const isOTExpired = useCallback((item: any) => {
     const ts = item.assignedAt ?? item.createdAt;
@@ -313,11 +332,22 @@ export default function ProveedorJobScreen() {
     );
   }, [rawIncidents, isOTExpired]);
 
+  // Expiradas hoy: solo aquellas que caducaron durante el día natural actual (00:00 a 23:59)
   const expiradasHoyDB = useMemo(() => {
-    return rawIncidents.filter((i: any) => {
-      return i.status === "CADUCADA" || ((i.status === "EN_REVISION" || i.status === "RECIBIDA") && isOTExpired(i));
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const allCandidates = [...rawExpired, ...rawIncidents.filter((i: any) => i.status === "CADUCADA")];
+    const unique = Array.from(new Map(allCandidates.map((i: any) => [i.id, i])).values());
+
+    return unique.filter((i: any) => {
+      const ts = i.updatedAt ? new Date(i.updatedAt) : (i.createdAt ? new Date(i.createdAt) : null);
+      if (!ts) return false;
+      return ts >= today && ts < tomorrow;
     });
-  }, [rawIncidents, isOTExpired]);
+  }, [rawExpired, rawIncidents]);
 
   const enCursoDB = useMemo(() => {
     return rawIncidents.filter((i: any) => i.status === "EN_CURSO");
@@ -332,7 +362,7 @@ export default function ProveedorJobScreen() {
   }, [rawIncidents]);
 
   const porResponderCount = porResponderDB.length;
-  const expiradasCount = expiradasHoyDB.length;
+  const expiradasCount = rawExpired.length;
   const enCursoCount = enCursoDB.length;
   const programadasCount = programadasDB.length;
   const finalizadasCount = finalizadasDB.length;
@@ -593,7 +623,7 @@ export default function ProveedorJobScreen() {
     } else if (intervencionesFilter === "finalizadas") {
       source = finalizadasDB;
     } else if (intervencionesFilter === "expiradas") {
-      source = expiradasHoyDB;
+      source = rawExpired;
     }
 
     if (!searchQuery.trim()) return source;
@@ -1661,9 +1691,9 @@ export default function ProveedorJobScreen() {
               size={22}
               color={activeTab === "expiradas" ? TEAL : MUTED}
             />
-            {expiradasCount > 0 && (
+            {expiradasHoyDB.length > 0 && (
               <View style={styles.tabBadge}>
-                <Text style={styles.tabBadgeText}>{expiradasCount}</Text>
+                <Text style={styles.tabBadgeText}>{expiradasHoyDB.length}</Text>
               </View>
             )}
           </View>

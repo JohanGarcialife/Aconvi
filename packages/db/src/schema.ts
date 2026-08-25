@@ -109,6 +109,7 @@ export const incident = pgTable("incident", (t) => ({
   providerId: t.uuid("provider_id").references(() => provider.id, {
     onDelete: "set null",
   }),
+  expiredProviderId: t.varchar("expired_provider_id", { length: 128 }),
   estimatedCost: t.real("estimated_cost"),
   estimatedDays: t.integer("estimated_days"),
   rating: t.integer("rating"),

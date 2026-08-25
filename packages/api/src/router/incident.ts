@@ -116,7 +116,8 @@ async function ensureIncidentColumns(db: any) {
       "ALTER TABLE incident ADD COLUMN IF NOT EXISTS rating integer;",
       "ALTER TABLE incident ADD COLUMN IF NOT EXISTS rating_comment text;",
       "ALTER TABLE incident ADD COLUMN IF NOT EXISTS scheduled_at timestamp with time zone;",
-      "ALTER TABLE incident ADD COLUMN IF NOT EXISTS estimated_duration varchar(32);"
+      "ALTER TABLE incident ADD COLUMN IF NOT EXISTS estimated_duration varchar(32);",
+      "ALTER TABLE incident ADD COLUMN IF NOT EXISTS expired_provider_id varchar(128);"
     ];
     for (const stmt of statements) {
       try {
@@ -155,6 +156,7 @@ async function processOverdueIncidents(db: any, organizationId?: string | null) 
         .update(incident)
         .set({
           status: "CADUCADA",
+          expiredProviderId: inc.providerId,
           providerId: null,
           estimatedCost: null,
           estimatedDays: null,
@@ -732,6 +734,7 @@ export const incidentRouter = createTRPCRouter({
         .update(incident)
         .set({
           status: "CADUCADA",
+          expiredProviderId: inc.providerId,
           providerId: null,
           estimatedCost: null,
           estimatedDays: null,
@@ -832,6 +835,36 @@ export const incidentRouter = createTRPCRouter({
       });
 
       // Strip large base64 data URLs in list query to prevent client OutOfMemoryError
+      return items.map((item) => ({
+        ...item,
+        photoUrl: item.photoUrl?.startsWith("data:") ? undefined : item.photoUrl,
+        finalPhotoUrl: item.finalPhotoUrl?.startsWith("data:") ? undefined : item.finalPhotoUrl,
+      }));
+    }),
+
+  // ─── Provider: list incidents that expired while assigned to them ──────────
+  expiredByProvider: publicProcedure
+    .input(
+      z.object({
+        providerId: z.string().min(1),
+        tenantId: z.string().nullish(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      await ensureIncidentColumns(ctx.db);
+
+      const items = await ctx.db.query.incident.findMany({
+        where: and(
+          eq(incident.expiredProviderId, input.providerId),
+          input.tenantId ? eq(incident.organizationId, input.tenantId) : undefined,
+        ),
+        orderBy: desc(incident.updatedAt),
+        with: {
+          reporter: { columns: { id: true, name: true, phoneNumber: true } },
+          organization: true,
+        },
+      });
+
       return items.map((item) => ({
         ...item,
         photoUrl: item.photoUrl?.startsWith("data:") ? undefined : item.photoUrl,

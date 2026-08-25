@@ -88,6 +88,7 @@ export default function IncidentsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
+  const [showBulkConfirmModal, setShowBulkConfirmModal] = useState(false);
   const [closeComment, setCloseComment] = useState("");
   const [closeIban, setCloseIban] = useState("");
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -127,8 +128,6 @@ export default function IncidentsPage() {
             ? old.map((i: any) => i.id === updated.id ? { ...i, ...updated } : i)
             : old,
         );
-        // Background sync to refresh full relations (provider, history…)
-        refetch().catch(() => null);
       },
     })
   );
@@ -216,11 +215,22 @@ export default function IncidentsPage() {
   };
 
   const handleAssign = async () => {
-    if (!selected || !selectedProvider) return;
+    if (!selectedProvider) {
+      showToast("Selecciona un proveedor antes de asignar.", false);
+      return;
+    }
+
+    // If multiple incidents are checked, open the bulk confirmation modal
+    if (checked.size > 1 && (selected ? checked.has(selected.id) : true)) {
+      setShowBulkConfirmModal(true);
+      return;
+    }
+
+    if (!selected) return;
     try {
       // @ts-ignore – tRPC mutateAsync types lag
       await assignProvider.mutateAsync({ tenantId: TENANT_ID, id: selected.id, providerId: selectedProvider.id });
-      // onSuccess already updated the cache — show confirmation
+      await refetch();
       showToast("✅ Proveedor asignado y vecino notificado");
     } catch (err: any) { 
       const msg = err?.message || "Error al asignar el proveedor";
@@ -228,47 +238,43 @@ export default function IncidentsPage() {
     }
   };
 
-  const handleBulkAssign = async () => {
+  const handleBulkAssignClick = () => {
+    if (checked.size === 0) return;
+    if (!selectedProvider) {
+      showToast("Selecciona un proveedor en el panel derecho antes de asignar.", false);
+      return;
+    }
+    setShowBulkConfirmModal(true);
+  };
+
+  const executeBulkAssign = async () => {
     if (!selectedProvider || checked.size === 0) return;
+    setShowBulkConfirmModal(false);
     
     const selectedIncs = incidents.filter((i: any) => checked.has(i.id));
-    
-    const withActiveOT = selectedIncs.filter((i: any) =>
-      i.providerId && ["EN_REVISION", "AGENDADA", "EN_CURSO"].includes(i.status)
-    );
-    const assignable = selectedIncs.filter((i: any) =>
-      !i.providerId || !["EN_REVISION", "AGENDADA", "EN_CURSO"].includes(i.status)
-    );
-
-    let proceedWithActiveOT = false;
-    if (withActiveOT.length > 0) {
-      const titles = withActiveOT.map((i: any) => `• ${i.title}`).join("\n");
-      proceedWithActiveOT = window.confirm(
-        `${withActiveOT.length} de las incidencias seleccionadas tienen una OT activa:\n\n${titles}\n\n¿Deseas reasignar también estas incidencias?`
-      );
-    }
-
-    const toProcess = [...assignable, ...(proceedWithActiveOT ? withActiveOT : [])];
-    if (toProcess.length === 0) return;
+    if (selectedIncs.length === 0) return;
 
     let successCount = 0;
     let failCount = 0;
 
-    for (const inc of toProcess) {
+    for (const inc of selectedIncs) {
       try {
         // @ts-ignore – tRPC mutateAsync types lag
         await assignProvider.mutateAsync({ tenantId: TENANT_ID, id: inc.id, providerId: selectedProvider.id });
         successCount++;
       } catch (err) {
+        console.error(`[bulkAssign] Failed to assign ${inc.id}:`, err);
         failCount++;
       }
     }
 
     setChecked(new Set());
+    await refetch();
+
     if (failCount > 0) {
       showToast(`✅ ${successCount} asignadas, ❌ ${failCount} no se pudieron asignar`, false);
     } else {
-      showToast(`✅ ${successCount} incidencia(s) asignada(s)`);
+      showToast(`✅ ${successCount} ${successCount === 1 ? "orden de trabajo asignada" : "órdenes de trabajo asignadas"} a ${selectedProvider.name}`);
     }
   };
 
@@ -332,6 +338,42 @@ export default function IncidentsPage() {
             <p className="text-xs mt-1 text-slate-100 font-medium leading-relaxed">{toast.msg.replace(/^(✅|⚠️|❌)\s*/, '')}</p>
           </div>
           <button onClick={() => setToast(null)} className="text-white/70 hover:text-white font-bold p-1 transition-colors">✕</button>
+        </div>
+      )}
+
+      {/* ── Bulk Assign Confirmation Modal ─────────────────────────────── */}
+      {showBulkConfirmModal && selectedProvider && checked.size > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="relative mx-4 flex w-full max-w-md flex-col rounded-2xl bg-white shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-6 text-center">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-teal-100 text-teal-600">
+                <CheckCircle2 size={28} />
+              </div>
+              <h2 className="text-lg font-bold text-slate-900">
+                Asignar {checked.size} {checked.size === 1 ? "orden de trabajo" : "órdenes de trabajo"}
+              </h2>
+              <p className="mt-2 text-sm text-slate-600">
+                ¿Quieres asignar {checked.size === 1 ? "esta" : "estas"} <strong className="font-bold text-slate-900">{checked.size} OT</strong> a <strong className="font-bold text-teal-700">{selectedProvider.name}</strong>?
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setShowBulkConfirmModal(false)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={executeBulkAssign}
+                disabled={assignProvider.isPending}
+                className="rounded-xl bg-teal-500 px-5 py-2 text-sm font-bold text-white hover:bg-teal-600 disabled:opacity-50 transition-colors shadow-sm"
+              >
+                {assignProvider.isPending ? "Asignando..." : `Asignar ${checked.size} OT`}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -541,7 +583,7 @@ export default function IncidentsPage() {
                 <span className="text-slate-400">‹</span> {checked.size} seleccionadas
               </button>
               <div className="flex items-center gap-2">
-                <button onClick={handleBulkAssign} className="rounded-lg bg-teal-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-teal-600">Asignar</button>
+                <button onClick={handleBulkAssignClick} className="rounded-lg bg-teal-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-teal-600">Asignar</button>
                 <button className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-slate-500 hover:bg-slate-50">—</button>
               </div>
             </div>
