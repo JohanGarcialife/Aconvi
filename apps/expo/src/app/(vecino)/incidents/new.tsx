@@ -25,16 +25,6 @@ import { api, queryClient } from "~/utils/api";
 import { authClient } from "~/utils/auth";
 import { useMutation } from "@tanstack/react-query";
 
-const sanitizeText = (str: string): string => {
-  const map: Record<string, string> = {
-    'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u',
-    'Á': 'A', 'É': 'E', 'Í': 'I', 'Ó': 'O', 'Ú': 'U',
-    'ñ': 'n', 'Ñ': 'N',
-    'ü': 'u', 'Ü': 'U'
-  };
-  return str.split('').map(c => map[c] || c).join('');
-};
-
 const PRIMARY = "#4aa19b";
 const DARK = "#0f172a";
 const MUTED = "#64748b";
@@ -234,7 +224,7 @@ export default function NewIncidentScreen() {
     };
 
     const catLabel = CATEGORIES.find((c) => c.id === selectedCategory)?.label ?? "Incidencia";
-    const cleanDesc = sanitizeText(description.trim());
+    const cleanDesc = description.trim();
     const finalTitle = cleanDesc
       ? `${catLabel}: ${cleanDesc.slice(0, 60)}`
       : `${catLabel} reportada`;

@@ -89,16 +89,6 @@ const INCIDENT_STATUSES = [
   "CERRADA",
 ] as const;
 
-function sanitizeText(str: string): string {
-  const map: Record<string, string> = {
-    'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u',
-    'Á': 'A', 'É': 'E', 'Í': 'I', 'Ó': 'O', 'Ú': 'U',
-    'ñ': 'n', 'Ñ': 'N',
-    'ü': 'u', 'Ü': 'U'
-  };
-  return str.split('').map(c => map[c] || c).join('');
-}
-
 let columnsEnsured = false;
 
 async function ensureIncidentColumns(db: any) {
@@ -349,8 +339,6 @@ export const incidentRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await ensureIncidentColumns(ctx.db);
       const { tenantId, reporterId: inputReporterId, ...data } = input;
-      const sanitizedTitle = sanitizeText(data.title);
-      const sanitizedDescription = sanitizeText(data.description);
       // Priority: session user ID (from Bearer token) > client-sent reporterId > demo fallback
       const resolvedReporterId = ctx.session?.user?.id ?? inputReporterId ?? DEMO_AUTHOR_ID;
       console.log("[incident.create] resolvedReporterId:", resolvedReporterId, "session:", ctx.session?.user?.id, "input:", inputReporterId);
@@ -366,7 +354,7 @@ export const incidentRouter = createTRPCRouter({
         where: and(
           eq(incident.organizationId, tenantId),
           eq(incident.reporterId, resolvedReporterId),
-          eq(incident.title, sanitizedTitle),
+          eq(incident.title, data.title),
         ),
         orderBy: desc(incident.createdAt),
       });
@@ -374,7 +362,7 @@ export const incidentRouter = createTRPCRouter({
       if (recentDuplicate) {
         const timeDiffMs = Date.now() - new Date(recentDuplicate.createdAt).getTime();
         if (timeDiffMs < 15000) {
-          console.log(`[incident.create] Suppressed duplicate creation (${timeDiffMs}ms ago) for "${sanitizedTitle}"`);
+          console.log(`[incident.create] Suppressed duplicate creation (${timeDiffMs}ms ago) for "${data.title}"`);
           return recentDuplicate;
         }
       }
@@ -384,8 +372,8 @@ export const incidentRouter = createTRPCRouter({
         .values({
           ...data,
           photoUrl: resolvedPhotoUrl,
-          title: sanitizedTitle,
-          description: sanitizedDescription,
+          title: data.title,
+          description: data.description,
           organizationId: tenantId,
           reporterId: resolvedReporterId,
           status: "RECIBIDA",
@@ -803,7 +791,7 @@ export const incidentRouter = createTRPCRouter({
         .values({
           incidentId: input.incidentId,
           authorId: input.authorId ?? DEMO_AUTHOR_ID,
-          content: sanitizeText(input.content),
+          content: input.content,
         })
         .returning();
       return note;
@@ -1219,7 +1207,7 @@ export const incidentRouter = createTRPCRouter({
         .update(incident)
         .set({
           rating: input.rating,
-          ratingComment: input.comment ? sanitizeText(input.comment) : null,
+          ratingComment: input.comment ?? null,
           status: "CERRADA",
         })
         .where(

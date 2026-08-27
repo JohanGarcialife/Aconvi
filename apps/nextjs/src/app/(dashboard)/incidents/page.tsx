@@ -220,8 +220,8 @@ export default function IncidentsPage() {
       return;
     }
 
-    // If multiple incidents are checked, open the bulk confirmation modal
-    if (checked.size > 1 && (selected ? checked.has(selected.id) : true)) {
+    // If any incidents are checked, open the bulk confirmation modal
+    if (checked.size > 0) {
       setShowBulkConfirmModal(true);
       return;
     }
