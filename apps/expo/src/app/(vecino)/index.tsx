@@ -303,23 +303,32 @@ export default function VecinoHome() {
         {/* ── Votación Activa Card ── */}
         {(loadingVoting || activeVoting) && (
           <View style={styles.card}>
-            <SectionTitle title="Votación Activa" />
+            <SectionTitle title={activeVoting?.type === "JUNTA" ? "Junta Extraordinaria" : "Votación Activa"} />
             {loadingVoting ? (
               <ActivityIndicator color={PRIMARY} />
             ) : (
               <>
                 <Text style={styles.cardTitleMedium}>{activeVoting.title}</Text>
-                <Text style={styles.votingAmount}>En curso</Text>
+                <Text style={[styles.votingAmount, activeVoting.type === "JUNTA" ? { color: "#5B21B6", fontSize: 20 } : {}]}>
+                  {activeVoting.type === "JUNTA"
+                    ? `${activeVoting.items?.length || 3} decisiones para votar`
+                    : activeVoting.budget || "En curso"}
+                </Text>
                 <Text style={styles.mutedText}>
                   {activeVoting.closesAt
-                    ? `Fecha límite: ${format(new Date(activeVoting.closesAt), "dd MMM · HH:mm 'h'", { locale: es })}`
+                    ? `Cierre: ${format(new Date(activeVoting.closesAt), "dd 'de' MMMM · HH:mm", { locale: es })}`
                     : "Sin fecha límite"}
                 </Text>
                 <TouchableOpacity
-                  style={styles.primaryButton}
+                  style={[
+                    styles.primaryButton,
+                    activeVoting.type === "JUNTA" ? { backgroundColor: "#5B21B6" } : { backgroundColor: "#009689" },
+                  ]}
                   onPress={() => router.push("/(vecino)/voting")}
                 >
-                  <Text style={styles.primaryButtonText}>Votar ahora</Text>
+                  <Text style={styles.primaryButtonText}>
+                    {activeVoting.type === "JUNTA" ? "Entrar a votar" : "Votar ahora"}
+                  </Text>
                   <Text style={[styles.primaryButtonText, { fontSize: 18, marginLeft: 6 }]}>→</Text>
                 </TouchableOpacity>
               </>

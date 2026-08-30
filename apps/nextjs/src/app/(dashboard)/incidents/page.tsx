@@ -21,8 +21,8 @@ const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   RESUELTA:       { label: "Resuelta",            cls: "bg-emerald-50 text-emerald-700 border border-emerald-200" },
   RECHAZADA:      { label: "Rechazada",           cls: "bg-red-50 text-red-700 border border-red-200" },
   CERRADA:        { label: "Cerrada",             cls: "bg-slate-100 text-slate-600 border border-slate-300" },
-  CADUCADA:       { label: "Caducada",            cls: "bg-rose-50 text-rose-700 border border-rose-200" },
-  NO_PRESENTADA:  { label: "No presentada",       cls: "bg-orange-50 text-orange-700 border border-orange-200" },
+  CADUCADA:       { label: "Sin respuesta",       cls: "bg-rose-50 text-rose-700 border border-rose-200" },
+  NO_PRESENTADA:  { label: "Cita no atendida",    cls: "bg-orange-50 text-orange-700 border border-orange-200" },
 };
 
 const PRIORITY_COLOR: Record<string, string> = {
@@ -318,8 +318,8 @@ export default function IncidentsPage() {
     { key: "EN_CURSO",     label: "En curso" },
     { key: "RESUELTA",     label: "Resueltas" },
     { key: "RECHAZADA",    label: "Rechazadas" },
-    { key: "CADUCADA",     label: "Caducadas" },
-    { key: "NO_PRESENTADA",label: "No presentadas" },
+    { key: "CADUCADA",     label: "Sin respuesta" },
+    { key: "NO_PRESENTADA",label: "Cita no atendida" },
     { key: "CERRADA",      label: "Cerradas" },
   ];
 

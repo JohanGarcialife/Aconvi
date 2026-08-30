@@ -300,7 +300,7 @@ export const communityDocumentRelations = relations(communityDocument, ({ one })
 }));
 
 // ─── Vote Session ──────────────────────────────────────────────────────────────
-// Represents a single voting session (e.g. "Aprobación obras piscina")
+// Represents a single voting session or junta (e.g. "Reparación del ascensor" or "Junta extraordinaria")
 export const voteSession = pgTable("vote_session", {
   id: uuid().notNull().primaryKey().defaultRandom(),
   organizationId: text("organization_id")
@@ -309,10 +309,12 @@ export const voteSession = pgTable("vote_session", {
   authorId: text("author_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
+  type: varchar({ length: 32 }).notNull().default("SINGLE"), // "SINGLE" (Decisión sin junta) | "JUNTA" (Junta con varios puntos)
   title: varchar({ length: 256 }).notNull(),
+  budget: varchar({ length: 64 }), // e.g. "5.500 €"
   description: text(),
-  status: varchar({ length: 32 }).notNull().default("DRAFT"), // DRAFT, OPEN, CLOSED
-  coefficientWeighted: boolean("coefficient_weighted").default(false).notNull(),
+  status: varchar({ length: 32 }).notNull().default("OPEN"), // DRAFT, OPEN, CLOSED
+  coefficientWeighted: boolean("coefficient_weighted").default(true).notNull(),
   closesAt: timestamp("closes_at", { mode: "date", withTimezone: true }),
   createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   closedAt: timestamp("closed_at", { mode: "date", withTimezone: true }),
@@ -327,6 +329,7 @@ export const voteSessionRelations = relations(voteSession, ({ one, many }) => ({
     fields: [voteSession.authorId],
     references: [user.id],
   }),
+  items: many(voteItem),
   options: many(voteOption),
   casts: many(voteCast),
   minute: one(voteMinute, {
@@ -335,7 +338,29 @@ export const voteSessionRelations = relations(voteSession, ({ one, many }) => ({
   }),
 }));
 
-// ─── Vote Option ───────────────────────────────────────────────────────────────
+// ─── Vote Item ─────────────────────────────────────────────────────────────────
+// Each individual agenda point/decision in a Junta or Single session
+export const voteItem = pgTable("vote_item", {
+  id: uuid().notNull().primaryKey().defaultRandom(),
+  sessionId: uuid("session_id")
+    .notNull()
+    .references(() => voteSession.id, { onDelete: "cascade" }),
+  orderIndex: integer("order_index").notNull().default(1),
+  title: varchar({ length: 256 }).notNull(),
+  budget: varchar({ length: 64 }), // e.g. "1.200 €"
+  description: text(),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+});
+
+export const voteItemRelations = relations(voteItem, ({ one, many }) => ({
+  session: one(voteSession, {
+    fields: [voteItem.sessionId],
+    references: [voteSession.id],
+  }),
+  casts: many(voteCast),
+}));
+
+// ─── Vote Option (Legacy fallback) ─────────────────────────────────────────────
 // Each possible answer within a voting session
 export const voteOption = pgTable("vote_option", {
   id: uuid().notNull().primaryKey().defaultRandom(),
@@ -357,19 +382,19 @@ export const voteOptionRelations = relations(voteOption, ({ one, many }) => ({
 }));
 
 // ─── Vote Cast ─────────────────────────────────────────────────────────────────
-// Records each individual vote cast by a resident
+// Records each individual vote cast by a resident (for a session or specific item)
 export const voteCast = pgTable("vote_cast", {
   id: uuid().notNull().primaryKey().defaultRandom(),
   sessionId: uuid("session_id")
     .notNull()
     .references(() => voteSession.id, { onDelete: "cascade" }),
+  itemId: uuid("item_id"), // Optional reference to specific vote_item in Junta
   userId: text("user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
-  optionId: uuid("option_id")
-    .notNull()
-    .references(() => voteOption.id, { onDelete: "cascade" }),
-  coefficient: real("coefficient").notNull().default(1), // resident coefficient at time of vote
+  choice: varchar({ length: 32 }).notNull().default("APPROVE"), // "APPROVE" (Apruebo), "REJECT" (Rechazo), "ABSTAIN" (Me abstengo)
+  optionId: uuid("option_id"), // Optional legacy reference
+  coefficient: real("coefficient").notNull().default(1), // resident coefficient percentage (e.g. 4.5)
   castAt: timestamp("cast_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   ipAddress: varchar("ip_address", { length: 64 }), // for audit/timestamping
 });
@@ -378,6 +403,10 @@ export const voteCastRelations = relations(voteCast, ({ one }) => ({
   session: one(voteSession, {
     fields: [voteCast.sessionId],
     references: [voteSession.id],
+  }),
+  item: one(voteItem, {
+    fields: [voteCast.itemId],
+    references: [voteItem.id],
   }),
   user: one(user, {
     fields: [voteCast.userId],
