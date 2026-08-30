@@ -17,7 +17,7 @@ import * as SecureStore from "expo-secure-store";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { api, queryClient } from "~/utils/api";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -199,11 +199,20 @@ export default function VecinoHome() {
   const [searchVisible, setSearchVisible] = useState(false);
   const [profileVisible, setProfileVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [USER_ID, setUserId] = useState<string>("00000000-0000-0000-0000-000000000000");
+
+  useEffect(() => {
+    SecureStore.getItemAsync("expo_user_id")
+      .then((id) => {
+        if (id) setUserId(id);
+      })
+      .catch(console.warn);
+  }, []);
 
   // ── Data Fetching with real-time polling ──
   const { data: votings, isLoading: loadingVoting, refetch: refetchVoting } = useQuery({
-    ...api.voting.all.queryOptions({ tenantId: TENANT_ID }),
-    refetchInterval: 4000,
+    ...api.voting.all.queryOptions({ tenantId: TENANT_ID, userId: USER_ID }),
+    refetchInterval: 3000,
   });
   const { data: notices, isLoading: loadingNotice, refetch: refetchNotice } = useQuery({
     ...api.notice.all.queryOptions({ tenantId: TENANT_ID }),
@@ -254,9 +263,16 @@ export default function VecinoHome() {
   }, [refetchVoting, refetchNotice, refetchIncident, refetchBooking, refetchCommonAreas, refetchFees]);
 
   // ── Computed Values ──
-  const activeVoting = (votings as any[] | undefined)
-    ?.filter((v: any) => v.status === "OPEN")
-    ?.sort((a: any, b: any) => (a.closesAt && b.closesAt ? new Date(a.closesAt).getTime() - new Date(b.closesAt).getTime() : 0))[0];
+  const allVotings = (votings as any[] | undefined) ?? [];
+  const pendingVotings = allVotings.filter((v: any) => v.status === "OPEN" && !v.hasVoted);
+  const openVotings = allVotings.filter((v: any) => v.status === "OPEN");
+
+  // Prioritize pending open votings where user hasn't voted yet!
+  const activeVoting = pendingVotings.length > 0
+    ? pendingVotings.sort((a: any, b: any) => (a.closesAt && b.closesAt ? new Date(a.closesAt).getTime() - new Date(b.closesAt).getTime() : 0))[0]
+    : openVotings.length > 0
+    ? openVotings[0]
+    : undefined;
 
   const latestNotice = (notices as any[] | undefined)?.[0];
   const latestIncident = (incidents as any[] | undefined)?.find(
@@ -356,12 +372,25 @@ export default function VecinoHome() {
                 <TouchableOpacity
                   style={[
                     styles.primaryButton,
-                    activeVoting.type === "JUNTA" ? { backgroundColor: "#5B21B6" } : { backgroundColor: "#009689" },
+                    activeVoting.hasVoted
+                      ? { backgroundColor: "#0F172A" }
+                      : activeVoting.type === "JUNTA"
+                      ? { backgroundColor: "#5B21B6" }
+                      : { backgroundColor: "#009689" },
                   ]}
-                  onPress={() => router.push("/(vecino)/voting")}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/(vecino)/voting",
+                      params: { sessionId: activeVoting.id },
+                    } as any)
+                  }
                 >
                   <Text style={styles.primaryButtonText}>
-                    {activeVoting.type === "JUNTA" ? "Entrar a votar" : "Votar ahora"}
+                    {activeVoting.hasVoted
+                      ? "Ver mi voto / Resultados"
+                      : activeVoting.type === "JUNTA"
+                      ? "Entrar a votar"
+                      : "Votar ahora"}
                   </Text>
                   <Text style={[styles.primaryButtonText, { fontSize: 18, marginLeft: 6 }]}>→</Text>
                 </TouchableOpacity>

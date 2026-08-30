@@ -11,7 +11,7 @@ import {
   RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter, useFocusEffect } from "expo-router";
+import { useRouter, useFocusEffect, useLocalSearchParams } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { api, queryClient } from "~/utils/api";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -35,16 +35,23 @@ type ChoiceType = "APPROVE" | "REJECT" | "ABSTAIN";
 
 export default function VotingScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ sessionId?: string }>();
   const [USER_ID, setUserId] = useState<string>("00000000-0000-0000-0000-000000000000");
 
   // Selected session to vote on
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(params.sessionId ?? null);
 
   // Step state for active session: 'VOTE' | 'CONFIRM' | 'SUCCESS'
   const [step, setStep] = useState<"VOTE" | "CONFIRM" | "SUCCESS">("VOTE");
 
   // Local choices before confirming: map of itemId -> choice (or '__single__' -> choice)
   const [choices, setChoices] = useState<Record<string, ChoiceType>>({});
+
+  useEffect(() => {
+    if (params.sessionId) {
+      setSelectedSessionId(params.sessionId);
+    }
+  }, [params.sessionId]);
 
   useEffect(() => {
     SecureStore.getItemAsync("expo_user_id")
@@ -192,6 +199,46 @@ export default function VotingScreen() {
     ? format(new Date(activeSession.closesAt), "dd 'de' MMMM · HH:mm", { locale: es })
     : "Sin fecha límite";
 
+  const renderSessionSwitcher = () => {
+    if (!sessions || (sessions as any[]).length <= 1) return null;
+    return (
+      <View style={styles.sessionSwitcherBox}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sessionSwitcherContent}>
+          {(sessions as any[]).map((s: any) => {
+            const isSelected = s.id === activeSession.id;
+            const isVoted = s.hasVoted;
+            const isJuntaType = s.type === "JUNTA";
+            return (
+              <TouchableOpacity
+                key={s.id}
+                onPress={() => {
+                  setSelectedSessionId(s.id);
+                  setStep("VOTE");
+                  setChoices({});
+                }}
+                style={[
+                  styles.sessionPill,
+                  isSelected && (isJuntaType ? styles.sessionPillActivePurple : styles.sessionPillActiveTeal),
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.sessionPillText,
+                    isSelected && styles.sessionPillTextActive,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {isVoted ? "✓ " : isJuntaType ? "⚖️ " : "🗳️ "}
+                  {s.title}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+    );
+  };
+
   // ═════════════════════════════════════════════════════════════════════════════
   // CASO ESPECIAL: USUARIO SIN DERECHO A VOTO
   // ═════════════════════════════════════════════════════════════════════════════
@@ -204,6 +251,7 @@ export default function VotingScreen() {
             <Text style={styles.backBtnText}>← Volver</Text>
           </TouchableOpacity>
         </View>
+        {renderSessionSwitcher()}
 
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.debtCard}>
@@ -248,6 +296,7 @@ export default function VotingScreen() {
             <Text style={styles.backBtnText}>← Inicio</Text>
           </TouchableOpacity>
         </View>
+        {renderSessionSwitcher()}
 
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.successHeader}>
@@ -407,6 +456,7 @@ export default function VotingScreen() {
           </Text>
         </View>
       </View>
+      {renderSessionSwitcher()}
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Title & Date */}
@@ -778,4 +828,40 @@ const styles = StyleSheet.create({
   },
   infoBoxTitle: { fontSize: 13, fontWeight: "700", color: DARK, marginBottom: 4 },
   infoBoxText: { fontSize: 12, color: MUTED, lineHeight: 18 },
+
+  // Session Switcher
+  sessionSwitcherBox: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
+  },
+  sessionSwitcherContent: {
+    gap: 8,
+  },
+  sessionPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "#F1F5F9",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  sessionPillActiveTeal: {
+    backgroundColor: "#009689",
+    borderColor: "#009689",
+  },
+  sessionPillActivePurple: {
+    backgroundColor: "#5B21B6",
+    borderColor: "#5B21B6",
+  },
+  sessionPillText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#475569",
+  },
+  sessionPillTextActive: {
+    color: "#FFFFFF",
+  },
 });
