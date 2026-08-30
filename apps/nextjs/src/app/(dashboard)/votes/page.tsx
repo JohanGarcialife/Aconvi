@@ -73,6 +73,9 @@ function CreateSessionDialog({ onSuccess }: { onSuccess: () => void }) {
         ]);
         onSuccess();
       },
+      onError: (err: any) => {
+        alert(err?.message || "Error al publicar la votación. Inténtalo de nuevo.");
+      },
     }),
   );
 
@@ -94,10 +97,48 @@ function CreateSessionDialog({ onSuccess }: { onSuccess: () => void }) {
     }
   };
 
+  const handleSubmit = () => {
+    const cleanTitle = title.trim();
+    if (!cleanTitle) {
+      alert("Por favor introduce el asunto o título de la votación.");
+      return;
+    }
+
+    let parsedClosesAt: string | undefined = undefined;
+    if (closesAt && closesAt.trim()) {
+      const d = new Date(closesAt);
+      if (!isNaN(d.getTime())) {
+        parsedClosesAt = d.toISOString();
+      }
+    }
+
+    const validItems = items
+      .filter((i) => i.title.trim())
+      .map((i) => ({
+        title: i.title.trim(),
+        budget: i.budget.trim() || undefined,
+      }));
+
+    if (type === "JUNTA" && validItems.length === 0) {
+      alert("Debes añadir al menos un punto del orden del día para la junta.");
+      return;
+    }
+
+    createMutation.mutate({
+      tenantId: TENANT_ID,
+      type,
+      title: cleanTitle,
+      budget: type === "SINGLE" ? budget.trim() || undefined : undefined,
+      description: description.trim() || undefined,
+      closesAt: parsedClosesAt,
+      items: type === "JUNTA" ? validItems : undefined,
+    });
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-[#009689] hover:bg-[#007f74] text-white">
+        <Button className="bg-[#009689] hover:bg-[#007f74] text-white font-bold shadow-sm">
           <Plus className="mr-2 h-4 w-4" />
           Nueva Votación
         </Button>
@@ -160,7 +201,7 @@ function CreateSessionDialog({ onSuccess }: { onSuccess: () => void }) {
             </Label>
             <Input
               id="vote-title"
-              placeholder={type === "JUNTA" ? "Ej: Junta General Extraordinaria 2026" : "Ej: Reparación del ascensor"}
+              placeholder={type === "JUNTA" ? "Ej: Junta General Extraordinaria 2026" : "Ej: Reparación del ascensor principal"}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
@@ -244,6 +285,12 @@ function CreateSessionDialog({ onSuccess }: { onSuccess: () => void }) {
               type="datetime-local"
               value={closesAt}
               onChange={(e) => setClosesAt(e.target.value)}
+              onClick={(e) => {
+                try {
+                  (e.currentTarget as HTMLInputElement).showPicker?.();
+                } catch {}
+              }}
+              className="cursor-pointer"
             />
           </div>
 
@@ -257,22 +304,12 @@ function CreateSessionDialog({ onSuccess }: { onSuccess: () => void }) {
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={createMutation.isPending}>
             Cancelar
           </Button>
           <Button
-            onClick={() =>
-              createMutation.mutate({
-                tenantId: TENANT_ID,
-                type,
-                title,
-                budget: type === "SINGLE" ? budget : undefined,
-                description: description || undefined,
-                closesAt: closesAt ? new Date(closesAt).toISOString() : undefined,
-                items: type === "JUNTA" ? items.filter((i) => i.title.trim()) : undefined,
-              })
-            }
-            disabled={!title.trim() || (type === "JUNTA" && items.filter((i) => i.title.trim()).length === 0) || createMutation.isPending}
+            onClick={handleSubmit}
+            disabled={!title.trim() || createMutation.isPending}
             className="bg-[#009689] hover:bg-[#007f74] text-white font-bold"
           >
             {createMutation.isPending ? "Creando..." : "🗳️ Publicar Votación"}

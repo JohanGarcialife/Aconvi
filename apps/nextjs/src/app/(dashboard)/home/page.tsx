@@ -14,6 +14,7 @@ import {
   Clock,
   AlertTriangle,
   UploadCloud,
+  Vote,
 } from "lucide-react";
 
 const TENANT_ID = "org_aconvi_demo";
@@ -307,6 +308,13 @@ export default function HomePage() {
             desc="Revisa y gestiona las incidencias abiertas."
             href="/incidents"
             color="bg-red-50 text-red-600"
+          />
+          <QuickActionCard
+            icon={Vote}
+            title="Votaciones Online"
+            desc="Crea decisiones individuales y juntas extraordinarias."
+            href="/votes"
+            color="bg-emerald-50 text-emerald-600"
           />
           <QuickActionCard
             icon={UploadCloud}
