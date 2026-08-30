@@ -30,9 +30,9 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       gcTime: 1000 * 60 * 60 * 24, // 24 hours
-      staleTime: 1000 * 60 * 5,    // 5 minutes (was 2m — more cache hits on revisit)
-      retry: 1,                     // 1 retry (was 2 — halves backoff wait on failure)
-      refetchOnWindowFocus: false,  // don't re-fetch on app foreground if data is fresh
+      staleTime: 2000,              // 2 seconds for snappy real-time reactivity
+      retry: 1,                     // 1 retry
+      refetchOnWindowFocus: true,   // re-fetch on app foreground if data changed
     },
   },
 });

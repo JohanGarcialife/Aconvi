@@ -62,67 +62,90 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
   // Initialize push notifications (requests permission, registers token)
   usePushNotifications();
 
-  // Handle notification tap → deep link to correct screen
+  // Handle notification tap & real-time foreground updates
   useEffect(() => {
-    const subscription = Notifications.addNotificationResponseReceivedListener(
-      (response) => {
+    const handleNotificationData = (data: Record<string, string> | undefined) => {
+      if (!data) return;
+
+      // Always invalidate cache when interacting with a notification
+      void queryClient.invalidateQueries();
+
+      // ── Push-first auth confirmation (AF) ─────────────────────────────────
+      if (data?.type === "auth_confirm" && data?.token) {
+        router.push(`/confirm-access?token=${data.token}`);
+        return;
+      }
+
+      // ── Incidencia concreta ────────────────────────────────────────────────
+      if (data?.type === "new_incident" && data?.incidentId) {
+        router.push(`/(vecino)/incidents/${data.incidentId}`);
+        return;
+      }
+      if (!data?.type && data?.incidentId) {
+        router.push(`/(vecino)/incidents/${data.incidentId}`);
+        return;
+      }
+
+      // ── Votación concreta ─────────────────────────────────────────────────
+      if (data?.type === "new_vote") {
+        router.push("/(vecino)/voting");
+        return;
+      }
+
+      // ── Documento nuevo ───────────────────────────────────────────────────
+      if (data?.type === "new_document") {
+        router.push("/(vecino)/documents");
+        return;
+      }
+
+      // ── Comunicado / aviso ────────────────────────────────────────────────
+      if (data?.type === "new_notice" || data?.type === "urgent_notice") {
+        router.push("/(vecino)/communication");
+        return;
+      }
+
+      // ── Reserva / zona común ──────────────────────────────────────────────
+      if (data?.type === "booking_confirmed" || data?.type === "booking_cancelled") {
+        router.push("/(vecino)/common-areas");
+        return;
+      }
+
+      // ── Rating request (vecino after incident close) ───────────────────────
+      if (data?.type === "rating") {
+        router.push("/(vecino)/rating");
+        return;
+      }
+
+      // ── Proveedor: nueva asignación ───────────────────────────────────────
+      if (data?.type === "job_assigned") {
+        router.push("/(proveedor)/job");
+        return;
+      }
+    };
+
+    // Cold start notification check
+    void Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response) {
         const data = response.notification.request.content.data as Record<string, string>;
+        handleNotificationData(data);
+      }
+    });
 
-        // ── Push-first auth confirmation (AF) ─────────────────────────────────
-        if (data?.type === "auth_confirm" && data?.token) {
-          router.push(`/confirm-access?token=${data.token}`);
-          return;
-        }
+    // Foreground listener -> auto refresh queries
+    const receivedSub = Notifications.addNotificationReceivedListener(() => {
+      void queryClient.invalidateQueries();
+    });
 
-        // ── Incidencia concreta ────────────────────────────────────────────────
-        if (data?.type === "new_incident" && data?.incidentId) {
-          router.push(`/(vecino)/incidents/${data.incidentId}`);
-          return;
-        }
-        // Legacy: incidentId without type field
-        if (!data?.type && data?.incidentId) {
-          router.push(`/(vecino)/incidents/${data.incidentId}`);
-          return;
-        }
+    // Tap listener
+    const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data as Record<string, string>;
+      handleNotificationData(data);
+    });
 
-        // ── Votación concreta ─────────────────────────────────────────────────
-        if (data?.type === "new_vote") {
-          router.push("/(vecino)/voting");
-          return;
-        }
-
-        // ── Documento nuevo ───────────────────────────────────────────────────
-        if (data?.type === "new_document") {
-          router.push("/(vecino)/documents");
-          return;
-        }
-
-        // ── Comunicado / aviso ────────────────────────────────────────────────
-        if (data?.type === "new_notice" || data?.type === "urgent_notice") {
-          router.push("/(vecino)/communication");
-          return;
-        }
-
-        // ── Reserva / zona común ──────────────────────────────────────────────
-        if (data?.type === "booking_confirmed" || data?.type === "booking_cancelled") {
-          router.push("/(vecino)/common-areas");
-          return;
-        }
-
-        // ── Rating request (vecino after incident close) ───────────────────────
-        if (data?.type === "rating") {
-          router.push("/(vecino)/rating");
-          return;
-        }
-
-        // ── Proveedor: nueva asignación ───────────────────────────────────────
-        if (data?.type === "job_assigned") {
-          router.push("/(proveedor)/job");
-          return;
-        }
-      },
-    );
-    return () => subscription.remove();
+    return () => {
+      receivedSub.remove();
+      responseSub.remove();
+    };
   }, [router]);
 
   return <>{children}</>;

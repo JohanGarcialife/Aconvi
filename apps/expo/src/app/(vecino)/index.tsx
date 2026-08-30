@@ -11,12 +11,13 @@ import {
   FlatList,
   Alert,
   Platform,
+  RefreshControl,
 } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { api, queryClient } from "~/utils/api";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -197,35 +198,60 @@ export default function VecinoHome() {
   const router = useRouter();
   const [searchVisible, setSearchVisible] = useState(false);
   const [profileVisible, setProfileVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // ── Data Fetching ──
-  const { data: votings, isLoading: loadingVoting } = useQuery({
+  // ── Data Fetching with real-time polling ──
+  const { data: votings, isLoading: loadingVoting, refetch: refetchVoting } = useQuery({
     ...api.voting.all.queryOptions({ tenantId: TENANT_ID }),
-    refetchInterval: 300000,
+    refetchInterval: 4000,
   });
-  const { data: notices, isLoading: loadingNotice } = useQuery({
+  const { data: notices, isLoading: loadingNotice, refetch: refetchNotice } = useQuery({
     ...api.notice.all.queryOptions({ tenantId: TENANT_ID }),
-    refetchInterval: 300000,
+    refetchInterval: 4000,
   });
-  const { data: incidents, isLoading: loadingIncident } = useQuery({
+  const { data: incidents, isLoading: loadingIncident, refetch: refetchIncident } = useQuery({
     ...api.incident.all.queryOptions({ tenantId: TENANT_ID }),
-    refetchInterval: 300000,
+    refetchInterval: 4000,
   });
-  const { data: bookings, isLoading: loadingBooking } = useQuery({
+  const { data: bookings, isLoading: loadingBooking, refetch: refetchBooking } = useQuery({
     ...api.commonArea.myBookings.queryOptions(),
-    refetchInterval: 300000,
+    refetchInterval: 10000,
   });
   
-  const { data: commonAreas, isLoading: loadingCommonAreas } = useQuery({
+  const { data: commonAreas, isLoading: loadingCommonAreas, refetch: refetchCommonAreas } = useQuery({
     ...api.commonArea.all.queryOptions({ tenantId: TENANT_ID }),
-    refetchInterval: 300000,
+    refetchInterval: 10000,
   });
 
   const DEMO_AUTHOR_ID = "user_admin";
-  const { data: fees, isLoading: loadingFees } = useQuery({
+  const { data: fees, isLoading: loadingFees, refetch: refetchFees } = useQuery({
     ...api.fee.myFees.queryOptions({ tenantId: TENANT_ID, userId: DEMO_AUTHOR_ID }),
-    refetchInterval: 300000,
+    refetchInterval: 10000,
   });
+
+  // Auto refetch every time the screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      void refetchVoting();
+      void refetchNotice();
+      void refetchIncident();
+      void refetchFees();
+    }, [refetchVoting, refetchNotice, refetchIncident, refetchFees]),
+  );
+
+  // Manual pull to refresh
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.allSettled([
+      refetchVoting(),
+      refetchNotice(),
+      refetchIncident(),
+      refetchBooking(),
+      refetchCommonAreas(),
+      refetchFees(),
+    ]);
+    setRefreshing(false);
+  }, [refetchVoting, refetchNotice, refetchIncident, refetchBooking, refetchCommonAreas, refetchFees]);
 
   // ── Computed Values ──
   const activeVoting = (votings as any[] | undefined)
@@ -287,6 +313,14 @@ export default function VecinoHome() {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[PRIMARY]}
+            tintColor={PRIMARY}
+          />
+        }
       >
         {/* ── Search Bar ── (abre modal de búsqueda) */}
         <TouchableOpacity

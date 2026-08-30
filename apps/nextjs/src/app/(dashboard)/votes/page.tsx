@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useTRPC } from "~/trpc/react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSocket } from "~/app/_components/socket-provider";
 import { Button } from "@acme/ui/button";
 import { Input } from "@acme/ui/input";
 import { Label } from "@acme/ui/label";
@@ -485,11 +486,35 @@ function SessionCard({
 export default function VotesPage() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const { socket } = useSocket();
   const [statusFilter, setStatusFilter] = useState("ALL");
 
-  const { data: sessions, isLoading } = useQuery(
-    trpc.voting.all.queryOptions({ tenantId: TENANT_ID }),
-  );
+  const { data: sessions, isLoading } = useQuery({
+    ...trpc.voting.all.queryOptions({ tenantId: TENANT_ID }),
+    refetchInterval: 2500,
+  });
+
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleUpdate = () => {
+      void queryClient.invalidateQueries(
+        trpc.voting.all.queryFilter({ tenantId: TENANT_ID }),
+      );
+    };
+
+    socket.on("voting-created", handleUpdate);
+    socket.on("voting-cast", handleUpdate);
+    socket.on("voting-closed", handleUpdate);
+    socket.on("voting-updated", handleUpdate);
+
+    return () => {
+      socket.off("voting-created", handleUpdate);
+      socket.off("voting-cast", handleUpdate);
+      socket.off("voting-closed", handleUpdate);
+      socket.off("voting-updated", handleUpdate);
+    };
+  }, [socket, queryClient, trpc]);
 
   const closeMutation = useMutation(
     trpc.voting.close.mutationOptions({

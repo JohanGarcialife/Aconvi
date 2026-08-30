@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -8,9 +8,10 @@ import {
   ActivityIndicator,
   Alert,
   StatusBar,
+  RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { api, queryClient } from "~/utils/api";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -53,8 +54,15 @@ export default function VotingScreen() {
       .catch(console.warn);
   }, []);
 
-  const { data: sessions, isLoading, refetch } = useQuery(
-    api.voting.all.queryOptions({ tenantId: TENANT_ID, userId: USER_ID }),
+  const { data: sessions, isLoading, refetch } = useQuery({
+    ...api.voting.all.queryOptions({ tenantId: TENANT_ID, userId: USER_ID }),
+    refetchInterval: 3000,
+  });
+
+  useFocusEffect(
+    useCallback(() => {
+      void refetch();
+    }, [refetch]),
   );
 
   const activeSession = (sessions as any[])?.find((s) => s.id === selectedSessionId) ??
@@ -72,6 +80,7 @@ export default function VotingScreen() {
     onSuccess: () => {
       setStep("SUCCESS");
       void queryClient.invalidateQueries(api.voting.all.queryFilter({ tenantId: TENANT_ID }));
+      void refetch();
     },
     onError: (err: any) => {
       Alert.alert("Error al registrar voto", err.message || "No se pudo registrar el voto.");
