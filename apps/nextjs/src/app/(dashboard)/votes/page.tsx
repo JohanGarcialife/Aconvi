@@ -23,7 +23,7 @@ import {
   Vote,
   Plus,
   Play,
-  Square,
+  FileCheck,
   FileText,
   Download,
   Users,
@@ -471,7 +471,7 @@ function SessionCard({
           )}
           {session.status === "OPEN" && (
             <Button size="sm" variant="destructive" onClick={() => onClose(session.id)}>
-              <Square className="h-3.5 w-3.5 mr-1.5" />
+              <FileCheck className="h-3.5 w-3.5 mr-1.5" />
               Cerrar y generar acta
             </Button>
           )}
