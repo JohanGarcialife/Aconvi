@@ -8,17 +8,21 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   scheme: "aconvi", // deep links: aconvi://job/[id], aconvi://rating/[id]
   version: "0.1.0",
   orientation: "portrait",
-  icon: "./assets/icon-light.png",
+  icon: "./assets/icon.png",
   userInterfaceStyle: "light",
   updates: { fallbackToCacheTimeout: 0 },
   newArchEnabled: true,
   assetBundlePatterns: ["**/*"],
+  notification: {
+    icon: "./assets/notification-icon.png",
+    color: "#009689",
+  },
   ios: {
     bundleIdentifier: "com.aconvi.app",
     supportsTablet: true,
     icon: {
-      light: "./assets/icon-light.png",
-      dark: "./assets/icon-light.png",
+      light: "./assets/icon.png",
+      dark: "./assets/icon.png",
     },
   },
   android: {
@@ -26,8 +30,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     googleServicesFile: "./google-services.json",
     permissions: ["android.permission.POST_NOTIFICATIONS"],
     adaptiveIcon: {
-      foregroundImage: "./assets/icon-light.png",
-      backgroundColor: "#4aa19b",
+      foregroundImage: "./assets/icon.png",
+      backgroundColor: "#FFFFFF",
     },
     edgeToEdgeEnabled: true,
   },
@@ -49,11 +53,18 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     "expo-web-browser",
     "expo-sqlite",
     [
+      "expo-notifications",
+      {
+        icon: "./assets/notification-icon.png",
+        color: "#009689",
+      },
+    ],
+    [
       "expo-splash-screen",
       {
         backgroundColor: "#FFFFFF",
-        image: "./assets/icon-light.png",
-        dark: { backgroundColor: "#FFFFFF", image: "./assets/icon-light.png" },
+        image: "./assets/icon.png",
+        dark: { backgroundColor: "#FFFFFF", image: "./assets/icon.png" },
         resizeMode: "contain",
       },
     ],

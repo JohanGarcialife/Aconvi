@@ -272,6 +272,8 @@ async function sendDirectFcmPush(
           priority: "HIGH", // FCM HTTP v1 spec: "HIGH" (wakes device immediately from Doze mode)
           direct_boot_ok: true,
           notification: {
+            icon: "notification_icon",
+            color: "#009689",
             sound: "default",
             channel_id: "default",
             notification_priority: "PRIORITY_MAX",

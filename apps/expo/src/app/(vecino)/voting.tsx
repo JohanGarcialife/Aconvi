@@ -180,7 +180,7 @@ export default function VotingScreen() {
   }
 
   const isJunta = activeSession.type === "JUNTA";
-  const primaryThemeColor = isJunta ? PURPLE : TEAL;
+  const primaryThemeColor = TEAL;
   const isClosed = activeSession.status === "CLOSED";
   const canVote = activeSession.userVotingStatus?.canVote ?? true;
   const isAlreadyVoted = activeSession.hasVoted || step === "SUCCESS";
@@ -219,7 +219,7 @@ export default function VotingScreen() {
                 }}
                 style={[
                   styles.sessionPill,
-                  isSelected && (isJuntaType ? styles.sessionPillActivePurple : styles.sessionPillActiveTeal),
+                  isSelected && styles.sessionPillActiveTeal,
                 ]}
               >
                 <Text
@@ -310,7 +310,7 @@ export default function VotingScreen() {
                 styles.successCircle,
                 isClosed && !isAlreadyVoted
                   ? { backgroundColor: "#F1F5F9" }
-                  : { backgroundColor: isJunta ? "#EDE9FE" : "#DCFCE7" },
+                  : { backgroundColor: "#E6F7F5" },
               ]}
             >
               <Text
@@ -692,7 +692,7 @@ const styles = StyleSheet.create({
   },
   badgeText: { fontSize: 12, fontWeight: "700" },
 
-  scrollContent: { padding: 20, paddingBottom: 40 },
+  scrollContent: { padding: 20, paddingTop: 24, paddingBottom: 48 },
   titleSection: { marginBottom: 20 },
   mainTitle: { fontSize: 24, fontWeight: "800", color: DARK, marginBottom: 4 },
   closeDateText: { fontSize: 13, color: MUTED, fontWeight: "500", marginBottom: 8 },
