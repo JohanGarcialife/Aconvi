@@ -136,20 +136,32 @@ export async function sendPushToAFs(
 }
 
 // ─── Broadcast push to ALL members of an org ─────────────────────────────
-// Call this when publishing a notice/aviso to reach all org vecinos
+// Call this when publishing a notice/aviso or voting session to reach all org vecinos
 export async function sendPushToAllMembers(
   db: any,
   organizationId: string,
   notification: { title: string; body: string; data?: Record<string, string> },
 ): Promise<{ sent: number; failed: number }> {
-  const { member } = await import("@acme/db/schema");
+  const { member, pushToken } = await import("@acme/db/schema");
   const { eq } = await import("drizzle-orm");
 
   const members = await db.query.member.findMany({
     where: eq(member.organizationId, organizationId),
   });
 
-  const userIds = [...new Set(members.map((m: any) => m.userId as string))] as string[];
+  let pushTokens: any[] = [];
+  try {
+    pushTokens = await db.query.pushToken.findMany();
+  } catch (err) {
+    console.warn("[sendPushToAllMembers] Could not query pushToken table:", err);
+  }
+
+  const memberUserIds = members.map((m: any) => m.userId as string);
+  const tokenUserIds = pushTokens.map((p: any) => p.userId as string);
+  const userIds = [...new Set([...memberUserIds, ...tokenUserIds])].filter(Boolean) as string[];
+
+  console.log(`[sendPushToAllMembers] Broadcasting push to ${userIds.length} users:`, userIds);
+
   let sent = 0;
   let failed = 0;
 

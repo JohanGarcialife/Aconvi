@@ -86,9 +86,13 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // ── Votación concreta ─────────────────────────────────────────────────
-      if (data?.type === "new_vote") {
-        router.push("/(vecino)/voting");
+      // ── Votación concreta (nueva o cerrada) ───────────────────────────────────
+      if (data?.type === "new_vote" || data?.type === "vote_closed") {
+        if (data?.sessionId) {
+          router.push({ pathname: "/(vecino)/voting", params: { sessionId: data.sessionId } } as any);
+        } else {
+          router.push("/(vecino)/voting");
+        }
         return;
       }
 

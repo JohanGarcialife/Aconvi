@@ -372,7 +372,9 @@ export default function VecinoHome() {
                 <TouchableOpacity
                   style={[
                     styles.primaryButton,
-                    activeVoting.hasVoted
+                    activeVoting.status === "CLOSED"
+                      ? { backgroundColor: "#475569" }
+                      : activeVoting.hasVoted
                       ? { backgroundColor: "#0F172A" }
                       : activeVoting.type === "JUNTA"
                       ? { backgroundColor: "#5B21B6" }
@@ -386,7 +388,9 @@ export default function VecinoHome() {
                   }
                 >
                   <Text style={styles.primaryButtonText}>
-                    {activeVoting.hasVoted
+                    {activeVoting.status === "CLOSED"
+                      ? "Votación cerrada · Ver resultados"
+                      : activeVoting.hasVoted
                       ? "Ver mi voto / Resultados"
                       : activeVoting.type === "JUNTA"
                       ? "Entrar a votar"

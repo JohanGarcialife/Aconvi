@@ -181,6 +181,7 @@ export default function VotingScreen() {
 
   const isJunta = activeSession.type === "JUNTA";
   const primaryThemeColor = isJunta ? PURPLE : TEAL;
+  const isClosed = activeSession.status === "CLOSED";
   const canVote = activeSession.userVotingStatus?.canVote ?? true;
   const isAlreadyVoted = activeSession.hasVoted || step === "SUCCESS";
 
@@ -228,7 +229,7 @@ export default function VotingScreen() {
                   ]}
                   numberOfLines={1}
                 >
-                  {isVoted ? "✓ " : isJuntaType ? "⚖️ " : "🗳️ "}
+                  {isVoted ? "✓ " : s.status === "CLOSED" ? "🔒 " : isJuntaType ? "⚖️ " : "🗳️ "}
                   {s.title}
                 </Text>
               </TouchableOpacity>
@@ -240,9 +241,9 @@ export default function VotingScreen() {
   };
 
   // ═════════════════════════════════════════════════════════════════════════════
-  // CASO ESPECIAL: USUARIO SIN DERECHO A VOTO
+  // CASO ESPECIAL: USUARIO SIN DERECHO A VOTO (Y SESIÓN NO CERRADA)
   // ═════════════════════════════════════════════════════════════════════════════
-  if (!canVote && !isAlreadyVoted) {
+  if (!canVote && !isAlreadyVoted && !isClosed) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <StatusBar barStyle="dark-content" />
@@ -285,9 +286,13 @@ export default function VotingScreen() {
   }
 
   // ═════════════════════════════════════════════════════════════════════════════
-  // PASO 4: VOTO(S) REGISTRADO(S) (ÉXITO / HISTORIAL SELLADO)
+  // PASO 4: SESIÓN CERRADA O VOTO(S) YA REGISTRADOS
   // ═════════════════════════════════════════════════════════════════════════════
-  if (isAlreadyVoted) {
+  if (isClosed || isAlreadyVoted) {
+    const formattedClosedDate = activeSession.closedAt
+      ? format(new Date(activeSession.closedAt), "dd 'de' MMMM · HH:mm", { locale: es })
+      : formattedClose;
+
     return (
       <SafeAreaView style={styles.safeArea}>
         <StatusBar barStyle="dark-content" />
@@ -300,56 +305,112 @@ export default function VotingScreen() {
 
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.successHeader}>
-            <View style={[styles.successCircle, { backgroundColor: isJunta ? "#EDE9FE" : "#DCFCE7" }]}>
-              <Text style={{ fontSize: 40, color: primaryThemeColor }}>✓</Text>
+            <View
+              style={[
+                styles.successCircle,
+                isClosed && !isAlreadyVoted
+                  ? { backgroundColor: "#F1F5F9" }
+                  : { backgroundColor: isJunta ? "#EDE9FE" : "#DCFCE7" },
+              ]}
+            >
+              <Text
+                style={{
+                  fontSize: 36,
+                  color: isClosed && !isAlreadyVoted ? "#64748B" : primaryThemeColor,
+                }}
+              >
+                {isClosed && !isAlreadyVoted ? "🔒" : "✓"}
+              </Text>
             </View>
             <Text style={styles.successTitle}>
-              {isJunta ? "¡Votos registrados!" : "¡Voto registrado!"}
+              {isClosed
+                ? isAlreadyVoted
+                  ? "Votación cerrada · Voto registrado"
+                  : "Votación cerrada"
+                : isJunta
+                ? "¡Votos registrados!"
+                : "¡Voto registrado!"}
             </Text>
             <Text style={styles.successSubtitle}>
-              {isJunta
+              {isClosed
+                ? isAlreadyVoted
+                  ? `Esta votación fue cerrada el ${formattedClosedDate}. Tus votos quedaron registrados en el acta oficial.`
+                  : `Esta votación fue cerrada por el Administrador de Fincas el ${formattedClosedDate} y ya no admite nuevos votos.`
+                : isJunta
                 ? "Tus respuestas se han registrado correctamente."
                 : "Tu voto se ha registrado correctamente."}
             </Text>
           </View>
 
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryCardTitle}>Resumen de tus votos</Text>
-            {itemsList.map((item: any, idx: number) => {
-              const userChoice = choices[item.id] ||
-                activeSession.userCasts?.find((c: any) => c.itemId === item.id || (!c.itemId && item.id === "__single__"))?.choice ||
-                "APPROVE";
-              const choiceLabel =
-                userChoice === "APPROVE" ? "Apruebo" : userChoice === "REJECT" ? "Rechazo" : "Me abstengo";
-              const choiceColor =
-                userChoice === "APPROVE" ? GREEN_BTN : userChoice === "REJECT" ? RED_BTN : GRAY_BTN;
+          {isAlreadyVoted ? (
+            <View style={styles.summaryCard}>
+              <Text style={styles.summaryCardTitle}>Resumen de tus votos</Text>
+              {itemsList.map((item: any, idx: number) => {
+                const userChoice =
+                  choices[item.id] ||
+                  activeSession.userCasts?.find(
+                    (c: any) => c.itemId === item.id || (!c.itemId && item.id === "__single__"),
+                  )?.choice ||
+                  "APPROVE";
+                const choiceLabel =
+                  userChoice === "APPROVE" ? "Apruebo" : userChoice === "REJECT" ? "Rechazo" : "Me abstengo";
+                const choiceColor =
+                  userChoice === "APPROVE" ? GREEN_BTN : userChoice === "REJECT" ? RED_BTN : GRAY_BTN;
 
-              return (
+                return (
+                  <View key={item.id} style={styles.summaryItemRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.summaryItemTitle}>
+                        {isJunta ? `${idx + 1}. ` : ""}
+                        {item.title}
+                      </Text>
+                      {item.budget ? <Text style={styles.summaryItemBudget}>{item.budget}</Text> : null}
+                    </View>
+                    <View style={[styles.choiceTag, { backgroundColor: choiceColor + "15", borderColor: choiceColor }]}>
+                      <Text style={[styles.choiceTagText, { color: choiceColor }]}>{choiceLabel}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+
+              <View style={styles.summaryFooter}>
+                <Text style={styles.summaryTimestamp}>
+                  🔒 Registro digital emitido conforme a la Ley de Propiedad Horizontal.
+                </Text>
+                <Text style={styles.summaryCoef}>
+                  Coeficiente computado: {activeSession.userVotingStatus?.coefficient ?? 1}%
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.summaryCard}>
+              <Text style={styles.summaryCardTitle}>Puntos incluidos en el acta</Text>
+              {itemsList.map((item: any, idx: number) => (
                 <View key={item.id} style={styles.summaryItemRow}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.summaryItemTitle}>
-                      {isJunta ? `${idx + 1}. ` : ""}{item.title}
+                      {isJunta ? `${idx + 1}. ` : ""}
+                      {item.title}
                     </Text>
                     {item.budget ? <Text style={styles.summaryItemBudget}>{item.budget}</Text> : null}
                   </View>
-                  <View style={[styles.choiceTag, { backgroundColor: choiceColor + "15", borderColor: choiceColor }]}>
-                    <Text style={[styles.choiceTagText, { color: choiceColor }]}>{choiceLabel}</Text>
+                  <View style={[styles.choiceTag, { backgroundColor: "#F1F5F9", borderColor: "#CBD5E1" }]}>
+                    <Text style={[styles.choiceTagText, { color: "#64748B" }]}>Cerrado</Text>
                   </View>
                 </View>
-              );
-            })}
-
-            <View style={styles.summaryFooter}>
-              <Text style={styles.summaryTimestamp}>
-                🕒 Registrado el {format(new Date(), "dd 'de' MMMM · HH:mm", { locale: es })}
-              </Text>
-              <Text style={styles.summaryCoef}>
-                Coeficiente de participación: {activeSession.userVotingStatus?.coefficient ?? 1}%
-              </Text>
+              ))}
+              <View style={styles.summaryFooter}>
+                <Text style={styles.summaryTimestamp}>
+                  El acta oficial ya ha sido generada por el Administrador de Fincas.
+                </Text>
+              </View>
             </View>
-          </View>
+          )}
 
-          <TouchableOpacity style={[styles.primaryActionBtn, { backgroundColor: primaryThemeColor }]} onPress={() => router.back()}>
+          <TouchableOpacity
+            style={[styles.primaryActionBtn, { backgroundColor: primaryThemeColor }]}
+            onPress={() => router.back()}
+          >
             <Text style={styles.primaryActionBtnText}>Volver al Inicio</Text>
           </TouchableOpacity>
         </ScrollView>

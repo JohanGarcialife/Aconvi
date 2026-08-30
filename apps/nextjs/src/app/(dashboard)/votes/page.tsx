@@ -52,11 +52,9 @@ function CreateSessionDialog({ onSuccess }: { onSuccess: () => void }) {
   const [description, setDescription] = useState("");
   const [closesAt, setClosesAt] = useState("");
 
-  // Multi-point items for Junta
+  // Multi-point items for Junta (starts empty)
   const [items, setItems] = useState<Array<{ title: string; budget: string }>>([
-    { title: "Reparación del ascensor", budget: "5.500 €" },
-    { title: "Cambio de empresa de limpieza", budget: "1.200 €" },
-    { title: "Aprobación de cuentas del ejercicio", budget: "" },
+    { title: "", budget: "" },
   ]);
 
   const createMutation = useMutation(
@@ -68,10 +66,7 @@ function CreateSessionDialog({ onSuccess }: { onSuccess: () => void }) {
         setDescription("");
         setClosesAt("");
         setType("SINGLE");
-        setItems([
-          { title: "Reparación del ascensor", budget: "5.500 €" },
-          { title: "Cambio de empresa de limpieza", budget: "1.200 €" },
-        ]);
+        setItems([{ title: "", budget: "" }]);
         onSuccess();
       },
       onError: (err: any) => {

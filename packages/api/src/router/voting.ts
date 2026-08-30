@@ -467,6 +467,18 @@ export const votingRouter = createTRPCRouter({
         .set({ status: "CLOSED", closedAt: now })
         .where(eq(voteSession.id, input.sessionId));
 
+      await emitWebSocketEvent(input.tenantId, "voting-closed", {
+        sessionId: input.sessionId,
+        closedAt: now,
+      });
+
+      // Send push notification to all members that the session is closed
+      await sendPushToAllMembers(ctx.db, input.tenantId, {
+        title: `📋 Votación cerrada: ${session.title}`,
+        body: "El Administrador de Fincas ha cerrado la votación y generado el acta oficial. Ya puedes consultar los resultados.",
+        data: { type: "vote_closed", sessionId: session.id },
+      }).catch(console.warn);
+
       return { ok: true, minuteContent: lines.join("\n") };
     }),
 });
