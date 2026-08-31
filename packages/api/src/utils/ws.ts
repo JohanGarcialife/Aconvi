@@ -4,7 +4,13 @@ export async function emitWebSocketEvent(
   payload: any,
 ) {
   // Use WS_URL in production, fallback to localhost in development
-  const baseUrl = process.env.NEXT_PUBLIC_WS_URL || "http://localhost:3001";
+  const rawUrl = process.env.WS_INTERNAL_URL || process.env.NEXT_PUBLIC_WS_URL || "http://localhost:3001";
+  let baseUrl = rawUrl;
+  if (baseUrl.startsWith("ws://")) {
+    baseUrl = "http://" + baseUrl.slice(5);
+  } else if (baseUrl.startsWith("wss://")) {
+    baseUrl = "https://" + baseUrl.slice(6);
+  }
   const secret = process.env.WS_INTERNAL_SECRET || "aconvi-dev";
 
   // Translate event name and build proper data envelope for websocket server routing

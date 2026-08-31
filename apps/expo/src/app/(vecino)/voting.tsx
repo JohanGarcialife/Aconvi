@@ -72,15 +72,29 @@ export default function VotingScreen() {
     }, [refetch]),
   );
 
-  const activeSession = (sessions as any[])?.find((s) => s.id === selectedSessionId) ??
-    (sessions as any[])?.find((s) => s.status === "OPEN" && !s.hasVoted) ??
-    (sessions as any[])?.[0];
+  const sessionList = (sessions as any[]) ?? [];
+  const pendingOpen = sessionList.find((s) => s.status === "OPEN" && !s.hasVoted);
+
+  const activeSession = selectedSessionId
+    ? sessionList.find((s) => s.id === selectedSessionId) ?? pendingOpen ?? sessionList[0]
+    : pendingOpen ?? sessionList[0];
 
   useEffect(() => {
     if (activeSession && !selectedSessionId) {
       setSelectedSessionId(activeSession.id);
     }
   }, [activeSession, selectedSessionId]);
+
+  useEffect(() => {
+    if (!params.sessionId && pendingOpen && selectedSessionId !== pendingOpen.id) {
+      const currentSelected = sessionList.find((s) => s.id === selectedSessionId);
+      if (!currentSelected || currentSelected.status === "CLOSED" || currentSelected.hasVoted) {
+        setSelectedSessionId(pendingOpen.id);
+        setStep("VOTE");
+        setChoices({});
+      }
+    }
+  }, [sessions, pendingOpen, selectedSessionId, params.sessionId]);
 
   const castMutation = useMutation({
     ...api.voting.cast.mutationOptions(),

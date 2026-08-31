@@ -244,14 +244,22 @@ export const votingRouter = createTRPCRouter({
         { id: crypto.randomUUID(), sessionId, label: "Me abstengo", displayOrder: 2 },
       ]);
 
-      await emitWebSocketEvent(input.tenantId, "voting-created", created);
+      try {
+        await emitWebSocketEvent(input.tenantId, "voting-created", created);
+      } catch (wsErr) {
+        console.warn("[voting.create] WebSocket emit failed:", wsErr);
+      }
 
       // Notify all members
-      await sendPushToAllMembers(ctx.db, input.tenantId, {
-        title: input.type === "JUNTA" ? "🗳️ Junta extraordinaria abierta" : "🗳️ Nueva votación abierta",
-        body: input.title,
-        data: { type: "new_vote", sessionId },
-      }).catch(console.warn);
+      try {
+        await sendPushToAllMembers(ctx.db, input.tenantId, {
+          title: input.type === "JUNTA" ? "🗳️ Junta extraordinaria abierta" : "🗳️ Nueva votación abierta",
+          body: input.title,
+          data: { type: "new_vote", sessionId },
+        });
+      } catch (pushErr) {
+        console.warn("[voting.create] Push broadcast failed:", pushErr);
+      }
 
       return { sessionId };
     }),
@@ -467,17 +475,25 @@ export const votingRouter = createTRPCRouter({
         .set({ status: "CLOSED", closedAt: now })
         .where(eq(voteSession.id, input.sessionId));
 
-      await emitWebSocketEvent(input.tenantId, "voting-closed", {
-        sessionId: input.sessionId,
-        closedAt: now,
-      });
+      try {
+        await emitWebSocketEvent(input.tenantId, "voting-closed", {
+          sessionId: input.sessionId,
+          closedAt: now,
+        });
+      } catch (wsErr) {
+        console.warn("[voting.close] WebSocket emit failed:", wsErr);
+      }
 
       // Send push notification to all members that the session is closed
-      await sendPushToAllMembers(ctx.db, input.tenantId, {
-        title: `📋 Votación cerrada: ${session.title}`,
-        body: "El Administrador de Fincas ha cerrado la votación y generado el acta oficial. Ya puedes consultar los resultados.",
-        data: { type: "vote_closed", sessionId: session.id },
-      }).catch(console.warn);
+      try {
+        await sendPushToAllMembers(ctx.db, input.tenantId, {
+          title: `📋 Votación cerrada: ${session.title}`,
+          body: "El Administrador de Fincas ha cerrado la votación y generado el acta oficial. Ya puedes consultar los resultados.",
+          data: { type: "vote_closed", sessionId: session.id },
+        });
+      } catch (pushErr) {
+        console.warn("[voting.close] Push broadcast failed:", pushErr);
+      }
 
       return { ok: true, minuteContent: lines.join("\n") };
     }),

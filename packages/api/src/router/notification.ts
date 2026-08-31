@@ -8,10 +8,16 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 // The WS server exposes a POST /internal/emit endpoint that forwards events
 // to the correct tenant/user socket rooms from Next.js API routes.
 async function broadcastToWS(event: string, data: unknown): Promise<void> {
-  const wsUrl =
-    process.env.NEXT_PUBLIC_WS_URL ??
+  const rawUrl =
     process.env.WS_INTERNAL_URL ??
+    process.env.NEXT_PUBLIC_WS_URL ??
     "http://localhost:3001";
+  let wsUrl = rawUrl;
+  if (wsUrl.startsWith("ws://")) {
+    wsUrl = "http://" + wsUrl.slice(5);
+  } else if (wsUrl.startsWith("wss://")) {
+    wsUrl = "https://" + wsUrl.slice(6);
+  }
   try {
     await fetch(`${wsUrl}/internal/emit`, {
       method: "POST",
