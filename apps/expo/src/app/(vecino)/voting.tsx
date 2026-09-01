@@ -447,7 +447,7 @@ export default function VotingScreen() {
 
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.confirmHeader}>
-            <View style={[styles.sendCircle, { backgroundColor: isJunta ? "#EDE9FE" : "#CCFBF1" }]}>
+            <View style={[styles.sendCircle, { backgroundColor: "#E6F7F5" }]}>
               <Text style={{ fontSize: 32 }}>✈️</Text>
             </View>
             <Text style={styles.confirmTitle}>

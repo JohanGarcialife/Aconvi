@@ -359,7 +359,7 @@ export default function VecinoHome() {
             ) : (
               <>
                 <Text style={styles.cardTitleMedium}>{activeVoting.title}</Text>
-                <Text style={[styles.votingAmount, activeVoting.type === "JUNTA" ? { color: "#5B21B6", fontSize: 20 } : {}]}>
+                <Text style={[styles.votingAmount, activeVoting.type === "JUNTA" ? { color: "#009689", fontSize: 18 } : {}]}>
                   {activeVoting.type === "JUNTA"
                     ? `${activeVoting.items?.length || 3} decisiones para votar`
                     : activeVoting.budget || "En curso"}
@@ -376,8 +376,6 @@ export default function VecinoHome() {
                       ? { backgroundColor: "#475569" }
                       : activeVoting.hasVoted
                       ? { backgroundColor: "#0F172A" }
-                      : activeVoting.type === "JUNTA"
-                      ? { backgroundColor: "#5B21B6" }
                       : { backgroundColor: "#009689" },
                   ]}
                   onPress={() =>

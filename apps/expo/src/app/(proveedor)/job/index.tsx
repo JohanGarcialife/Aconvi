@@ -313,10 +313,10 @@ export default function ProveedorJobScreen() {
       }
       const isExpired = (item.status === "EN_REVISION" || item.status === "RECIBIDA") && isOTExpired(item);
       if (isExpired || item.status === "CADUCADA") {
-        return { label: "Expirada", color: "#ef4444", bg: "#fee2e2" };
+        return { label: "Sin respuesta", color: "#ef4444", bg: "#fee2e2" };
       }
       if (item.status === "NO_PRESENTADA") {
-        return { label: "No presentada", color: "#d97706", bg: "#fef3c7" };
+        return { label: "Cita no atendida", color: "#d97706", bg: "#fef3c7" };
       }
       if (item.status === "RECHAZADA") {
         return { label: "Rechazada", color: "#ef4444", bg: "#fee2e2" };
