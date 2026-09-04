@@ -1,17 +1,17 @@
 import { relations } from "drizzle-orm";
 import {
-  pgTable,
-  text,
-  timestamp,
-  varchar,
-  uuid,
   boolean,
   integer,
+  pgTable,
   real,
+  text,
+  timestamp,
+  uuid,
+  varchar,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 
-import { user, organization, provider, member } from "./auth-schema";
+import { member, organization, provider, user } from "./auth-schema";
 
 // ─── Re-export from other schemas for convenience ───────────────────────────
 export * from "./auth-schema";
@@ -22,17 +22,19 @@ export const Post = pgTable("post", {
   id: uuid("id").notNull().primaryKey().defaultRandom(),
   title: varchar("title", { length: 256 }).notNull(),
   content: text("content").notNull(),
-  createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
   updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
     .defaultNow()
     .$onUpdate(() => new Date())
     .notNull(),
 });
 
-export const CreatePostSchema = createInsertSchema(Post).omit({ 
-  id: true, 
-  createdAt: true, 
-  updatedAt: true 
+export const CreatePostSchema = createInsertSchema(Post).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
 // ─── Common Area ─────────────────────────────────────────────────────────────
@@ -47,7 +49,9 @@ export const commonArea = pgTable("common_area", {
   openTime: varchar("open_time", { length: 5 }).default("08:00").notNull(),
   closeTime: varchar("close_time", { length: 5 }).default("22:00").notNull(),
   slotDurationMinutes: integer("slot_duration_minutes").default(60).notNull(),
-  createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
 });
 
 export const commonAreaRelations = relations(commonArea, ({ one, many }) => ({
@@ -72,19 +76,24 @@ export const commonAreaBooking = pgTable("common_area_booking", {
   endTime: varchar("end_time", { length: 5 }).notNull(), // HH:mm
   status: varchar({ length: 64 }).notNull().default("CONFIRMADA"), // PENDING, CONFIRMADA, CANCELADA
   notes: text(),
-  createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
 });
 
-export const commonAreaBookingRelations = relations(commonAreaBooking, ({ one }) => ({
-  commonArea: one(commonArea, {
-    fields: [commonAreaBooking.commonAreaId],
-    references: [commonArea.id],
+export const commonAreaBookingRelations = relations(
+  commonAreaBooking,
+  ({ one }) => ({
+    commonArea: one(commonArea, {
+      fields: [commonAreaBooking.commonAreaId],
+      references: [commonArea.id],
+    }),
+    user: one(user, {
+      fields: [commonAreaBooking.userId],
+      references: [user.id],
+    }),
   }),
-  user: one(user, {
-    fields: [commonAreaBooking.userId],
-    references: [user.id],
-  }),
-}));
+);
 
 // ─── Incident ─────────────────────────────────────────────────────────────────
 export const incident = pgTable("incident", (t) => ({
@@ -97,10 +106,12 @@ export const incident = pgTable("incident", (t) => ({
   finalPhotoUrl: t.text("final_photo_url"),
   status: t.varchar({ length: 64 }).notNull().default("RECIBIDA"),
   priority: t.varchar({ length: 64 }).notNull().default("MEDIA"), // BAJA, MEDIA, ALTA, URGENTE
-  organizationId: t.text("organization_id")
+  organizationId: t
+    .text("organization_id")
     .notNull()
     .references(() => organization.id, { onDelete: "cascade" }),
-  reporterId: t.text("reporter_id")
+  reporterId: t
+    .text("reporter_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
   assigneeId: t.text("assignee_id").references(() => user.id, {
@@ -118,9 +129,15 @@ export const incident = pgTable("incident", (t) => ({
   startedAt: t.timestamp("started_at", { mode: "date", withTimezone: true }),
   resolvedAt: t.timestamp("resolved_at", { mode: "date", withTimezone: true }),
   rejectedAt: t.timestamp("rejected_at", { mode: "date", withTimezone: true }),
-  scheduledAt: t.timestamp("scheduled_at", { mode: "date", withTimezone: true }),
+  scheduledAt: t.timestamp("scheduled_at", {
+    mode: "date",
+    withTimezone: true,
+  }),
   estimatedDuration: t.varchar("estimated_duration", { length: 32 }),
-  createdAt: t.timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  createdAt: t
+    .timestamp("created_at", { mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
   updatedAt: t
     .timestamp("updated_at", { mode: "date", withTimezone: true })
     .defaultNow()
@@ -154,14 +171,19 @@ export const incidentRelations = relations(incident, ({ one, many }) => ({
 // ─── Incident Note ────────────────────────────────────────────────────────────
 export const incidentNote = pgTable("incident_note", (t) => ({
   id: t.uuid().notNull().primaryKey().defaultRandom(),
-  incidentId: t.uuid("incident_id")
+  incidentId: t
+    .uuid("incident_id")
     .notNull()
     .references(() => incident.id, { onDelete: "cascade" }),
-  authorId: t.text("author_id")
+  authorId: t
+    .text("author_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
   content: t.text().notNull(),
-  createdAt: t.timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  createdAt: t
+    .timestamp("created_at", { mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
 }));
 
 export const incidentNoteRelations = relations(incidentNote, ({ one }) => ({
@@ -178,7 +200,8 @@ export const incidentNoteRelations = relations(incidentNote, ({ one }) => ({
 // ─── Incident History (Trazabilidad) ──────────────────────────────────────────
 export const incidentHistory = pgTable("incident_history", (t) => ({
   id: t.uuid().notNull().primaryKey().defaultRandom(),
-  incidentId: t.uuid("incident_id")
+  incidentId: t
+    .uuid("incident_id")
     .notNull()
     .references(() => incident.id, { onDelete: "cascade" }),
   actorName: t.varchar("actor_name", { length: 128 }).notNull(),
@@ -186,16 +209,21 @@ export const incidentHistory = pgTable("incident_history", (t) => ({
   previousStatus: t.varchar("previous_status", { length: 64 }),
   newStatus: t.varchar("new_status", { length: 64 }),
   comment: t.text(),
-  createdAt: t.timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  createdAt: t
+    .timestamp("created_at", { mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
 }));
 
-export const incidentHistoryRelations = relations(incidentHistory, ({ one }) => ({
-  incident: one(incident, {
-    fields: [incidentHistory.incidentId],
-    references: [incident.id],
+export const incidentHistoryRelations = relations(
+  incidentHistory,
+  ({ one }) => ({
+    incident: one(incident, {
+      fields: [incidentHistory.incidentId],
+      references: [incident.id],
+    }),
   }),
-}));
-
+);
 
 // ─── Notice ───────────────────────────────────────────────────────────────────
 export const notice = pgTable("notice", (t) => ({
@@ -204,13 +232,18 @@ export const notice = pgTable("notice", (t) => ({
   content: t.text().notNull(),
   type: t.varchar({ length: 32 }).notNull().default("COMUNICADO"), // COMUNICADO | AVISO | URGENTE
   pinned: t.boolean().notNull().default(false),
-  organizationId: t.text("organization_id")
+  organizationId: t
+    .text("organization_id")
     .notNull()
     .references(() => organization.id, { onDelete: "cascade" }),
-  authorId: t.text("author_id")
+  authorId: t
+    .text("author_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
-  createdAt: t.timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  createdAt: t
+    .timestamp("created_at", { mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
   updatedAt: t
     .timestamp("updated_at", { mode: "date", withTimezone: true })
     .defaultNow()
@@ -237,7 +270,9 @@ export const excelImportJob = pgTable("excel_import_job", {
     .references(() => organization.id, { onDelete: "cascade" }),
   status: varchar({ length: 64 }).notNull().default("PENDING"), // PENDING, PROCESSING, COMPLETED, FAILED
   resultJson: text(), // Summary of imports
-  createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
 });
 
 // ─── Push Login Request ────────────────────────────────────────────────────────
@@ -253,20 +288,28 @@ export const pushLoginRequest = pgTable("push_login_request", {
   requestUserAgent: text("request_user_agent"),
   // Once approved, the session token is stored here so the web can pick it up
   sessionToken: text("session_token"),
-  expiresAt: timestamp("expires_at", { mode: "date", withTimezone: true }).notNull(),
-  createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  expiresAt: timestamp("expires_at", {
+    mode: "date",
+    withTimezone: true,
+  }).notNull(),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
   updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
     .defaultNow()
     .$onUpdateFn(() => new Date())
     .notNull(),
 });
 
-export const pushLoginRequestRelations = relations(pushLoginRequest, ({ one }) => ({
-  user: one(user, {
-    fields: [pushLoginRequest.userId],
-    references: [user.id],
+export const pushLoginRequestRelations = relations(
+  pushLoginRequest,
+  ({ one }) => ({
+    user: one(user, {
+      fields: [pushLoginRequest.userId],
+      references: [user.id],
+    }),
   }),
-}));
+);
 
 // ─── Community Document ────────────────────────────────────────────────────────
 // Stores metadata and URLs for community documents (actas, estatutos, etc.)
@@ -285,19 +328,24 @@ export const communityDocument = pgTable("community_document", {
   fileUrl: text("file_url").notNull(),
   fileName: varchar("file_name", { length: 256 }).notNull(),
   mimeType: varchar("mime_type", { length: 128 }),
-  createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
 });
 
-export const communityDocumentRelations = relations(communityDocument, ({ one }) => ({
-  organization: one(organization, {
-    fields: [communityDocument.organizationId],
-    references: [organization.id],
+export const communityDocumentRelations = relations(
+  communityDocument,
+  ({ one }) => ({
+    organization: one(organization, {
+      fields: [communityDocument.organizationId],
+      references: [organization.id],
+    }),
+    author: one(user, {
+      fields: [communityDocument.authorId],
+      references: [user.id],
+    }),
   }),
-  author: one(user, {
-    fields: [communityDocument.authorId],
-    references: [user.id],
-  }),
-}));
+);
 
 // ─── Vote Session ──────────────────────────────────────────────────────────────
 // Represents a single voting session or junta (e.g. "Reparación del ascensor" or "Junta extraordinaria")
@@ -315,9 +363,24 @@ export const voteSession = pgTable("vote_session", {
   description: text(),
   status: varchar({ length: 32 }).notNull().default("OPEN"), // DRAFT, OPEN, CLOSED
   coefficientWeighted: boolean("coefficient_weighted").default(true).notNull(),
+  priority: integer("priority").default(0).notNull(), // 0: Normal, 1: Alta, etc.
   closesAt: timestamp("closes_at", { mode: "date", withTimezone: true }),
-  createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
   closedAt: timestamp("closed_at", { mode: "date", withTimezone: true }),
+  archivedAt: timestamp("archived_at", { mode: "date", withTimezone: true }),
+  // Convocatoria de Junta sincronizada
+  meetingDate: timestamp("meeting_date", { mode: "date", withTimezone: true }),
+  meetingLocation: text("meeting_location"),
+  secondCallDate: timestamp("second_call_date", {
+    mode: "date",
+    withTimezone: true,
+  }),
+  convocationGeneratedAt: timestamp("convocation_generated_at", {
+    mode: "date",
+    withTimezone: true,
+  }),
 });
 
 export const voteSessionRelations = relations(voteSession, ({ one, many }) => ({
@@ -332,6 +395,7 @@ export const voteSessionRelations = relations(voteSession, ({ one, many }) => ({
   items: many(voteItem),
   options: many(voteOption),
   casts: many(voteCast),
+  budgetProposals: many(voteBudgetProposal),
   minute: one(voteMinute, {
     fields: [voteSession.id],
     references: [voteMinute.sessionId],
@@ -349,7 +413,10 @@ export const voteItem = pgTable("vote_item", {
   title: varchar({ length: 256 }).notNull(),
   budget: varchar({ length: 64 }), // e.g. "1.200 €"
   description: text(),
-  createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  onlineVotingEnabled: boolean("online_voting_enabled").default(true).notNull(), // Toggle AF: ¿Votar este punto antes de la junta?
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
 });
 
 export const voteItemRelations = relations(voteItem, ({ one, many }) => ({
@@ -358,7 +425,41 @@ export const voteItemRelations = relations(voteItem, ({ one, many }) => ({
     references: [voteSession.id],
   }),
   casts: many(voteCast),
+  budgetProposals: many(voteBudgetProposal),
 }));
+
+// ─── Vote Budget Proposal (Presupuestos / Alternativas de empresas) ─────────────
+export const voteBudgetProposal = pgTable("vote_budget_proposal", {
+  id: uuid().notNull().primaryKey().defaultRandom(),
+  sessionId: uuid("session_id")
+    .notNull()
+    .references(() => voteSession.id, { onDelete: "cascade" }),
+  itemId: uuid("item_id"), // Referencia opcional a un punto concreto de una Junta
+  companyName: varchar("company_name", { length: 256 }).notNull(),
+  amount: varchar("amount", { length: 64 }).notNull(),
+  description: text("description"),
+  fileUrl: text("file_url"),
+  fileName: varchar("file_name", { length: 256 }),
+  displayOrder: integer("display_order").default(0).notNull(),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export const voteBudgetProposalRelations = relations(
+  voteBudgetProposal,
+  ({ one, many }) => ({
+    session: one(voteSession, {
+      fields: [voteBudgetProposal.sessionId],
+      references: [voteSession.id],
+    }),
+    item: one(voteItem, {
+      fields: [voteBudgetProposal.itemId],
+      references: [voteItem.id],
+    }),
+    casts: many(voteCast),
+  }),
+);
 
 // ─── Vote Option (Legacy fallback) ─────────────────────────────────────────────
 // Each possible answer within a voting session
@@ -394,8 +495,11 @@ export const voteCast = pgTable("vote_cast", {
     .references(() => user.id, { onDelete: "cascade" }),
   choice: varchar({ length: 32 }).notNull().default("APPROVE"), // "APPROVE" (Apruebo), "REJECT" (Rechazo), "ABSTAIN" (Me abstengo)
   optionId: uuid("option_id"), // Optional legacy reference
+  selectedProposalId: uuid("selected_proposal_id"), // Presupuesto preferido (si aplica)
   coefficient: real("coefficient").notNull().default(1), // resident coefficient percentage (e.g. 4.5)
-  castAt: timestamp("cast_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  castAt: timestamp("cast_at", { mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
   ipAddress: varchar("ip_address", { length: 64 }), // for audit/timestamping
 });
 
@@ -416,6 +520,10 @@ export const voteCastRelations = relations(voteCast, ({ one }) => ({
     fields: [voteCast.optionId],
     references: [voteOption.id],
   }),
+  selectedProposal: one(voteBudgetProposal, {
+    fields: [voteCast.selectedProposalId],
+    references: [voteBudgetProposal.id],
+  }),
 }));
 
 // ─── Vote Minute ───────────────────────────────────────────────────────────────
@@ -427,7 +535,9 @@ export const voteMinute = pgTable("vote_minute", {
     .unique()
     .references(() => voteSession.id, { onDelete: "cascade" }),
   content: text().notNull(), // plain text minutes content
-  generatedAt: timestamp("generated_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  generatedAt: timestamp("generated_at", { mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
 });
 
 export const voteMinuteRelations = relations(voteMinute, ({ one }) => ({
@@ -454,7 +564,9 @@ export const agendaTask = pgTable("agenda_task", {
   recurrence: varchar({ length: 32 }).notNull().default("NONE"), // NONE, WEEKLY, MONTHLY, ANNUAL
   isDone: boolean("is_done").notNull().default(false),
   doneAt: timestamp("done_at", { mode: "date", withTimezone: true }),
-  createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
 });
 
 export const agendaTaskRelations = relations(agendaTask, ({ one }) => ({
@@ -482,7 +594,9 @@ export const fee = pgTable("fee", {
   status: varchar("status", { length: 64 }).notNull().default("PENDING"), // PENDING, PAID, OVERDUE
   dueDate: varchar("due_date", { length: 10 }), // ISO date YYYY-MM-DD
   paidAt: timestamp("paid_at", { mode: "date", withTimezone: true }),
-  createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
   updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
     .defaultNow()
     .$onUpdate(() => new Date())

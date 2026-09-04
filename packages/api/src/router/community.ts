@@ -1,7 +1,7 @@
-import { eq, desc, and, count } from "drizzle-orm";
+import { and, count, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { organization, member, user } from "@acme/db/schema";
+import { member, organization, user } from "@acme/db/schema";
 
 import { createTRPCRouter, publicProcedure } from "../trpc";
 
@@ -56,7 +56,9 @@ export const communityRouter = createTRPCRouter({
           id: crypto.randomUUID(),
           name: input.name,
           slug,
-          metadata: input.address ? JSON.stringify({ address: input.address }) : null,
+          metadata: input.address
+            ? JSON.stringify({ address: input.address })
+            : null,
           createdAt: now,
         })
         .returning();
@@ -91,9 +93,10 @@ export const communityRouter = createTRPCRouter({
       if (!current) throw new Error("Comunidad no encontrada");
 
       const currentMeta = current.metadata ? JSON.parse(current.metadata) : {};
-      const newMeta = input.address !== undefined
-        ? { ...currentMeta, address: input.address }
-        : currentMeta;
+      const newMeta =
+        input.address !== undefined
+          ? { ...currentMeta, address: input.address }
+          : currentMeta;
 
       const [updated] = await ctx.db
         .update(organization)
@@ -141,6 +144,8 @@ export const communityRouter = createTRPCRouter({
         memberId: m.id,
         memberRole: m.role,
         coefficient: m.coefficient,
+        votingOverride: m.votingOverride,
+        votingOverrideReason: m.votingOverrideReason,
       }));
     }),
 
@@ -227,7 +232,9 @@ export const communityRouter = createTRPCRouter({
           .update(user)
           .set({
             ...(input.name ? { name: input.name } : {}),
-            ...(input.phone !== undefined ? { phoneNumber: input.phone || null } : {}),
+            ...(input.phone !== undefined
+              ? { phoneNumber: input.phone || null }
+              : {}),
           })
           .where(eq(user.id, input.userId));
       }
@@ -318,7 +325,9 @@ export const communityRouter = createTRPCRouter({
               id: crypto.randomUUID(),
               name: comm.name,
               slug,
-              metadata: comm.address ? JSON.stringify({ address: comm.address }) : null,
+              metadata: comm.address
+                ? JSON.stringify({ address: comm.address })
+                : null,
               createdAt: now,
             })
             .returning();

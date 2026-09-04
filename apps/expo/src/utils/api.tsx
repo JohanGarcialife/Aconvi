@@ -1,13 +1,13 @@
-import { QueryClient, onlineManager } from "@tanstack/react-query";
+import * as SecureStore from "expo-secure-store";
+import { onlineManager, QueryClient } from "@tanstack/react-query";
 import { createTRPCClient, httpBatchLink, loggerLink } from "@trpc/client";
 import { createTRPCOptionsProxy } from "@trpc/tanstack-react-query";
 import superjson from "superjson";
-import NetInfo from "./safe-netinfo";
 
 import type { AppRouter } from "@acme/api";
 
-import * as SecureStore from "expo-secure-store";
 import { getBaseUrl } from "./base-url";
+import NetInfo from "./safe-netinfo";
 
 // ─── Wire React Query's onlineManager to NetInfo ─────────────────────────────
 // IMPORTANT: isInternetReachable starts as null on Android while NetInfo probes
@@ -30,9 +30,9 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       gcTime: 1000 * 60 * 60 * 24, // 24 hours
-      staleTime: 2000,              // 2 seconds for snappy real-time reactivity
-      retry: 1,                     // 1 retry
-      refetchOnWindowFocus: true,   // re-fetch on app foreground if data changed
+      staleTime: 2000, // 2 seconds for snappy real-time reactivity
+      retry: 1, // 1 retry
+      refetchOnWindowFocus: true, // re-fetch on app foreground if data changed
     },
   },
 });
@@ -44,10 +44,22 @@ export const queryClient = new QueryClient({
 export const trpcClient = createTRPCClient<AppRouter>({
   links: [
     loggerLink({
-      enabled: (opts) =>
-        process.env.NODE_ENV === "development" ||
-        (opts.direction === "down" && opts.result instanceof Error),
-      colorMode: "ansi",
+      enabled: (opts) => {
+        if (process.env.NODE_ENV !== "development") return false;
+        // Suppress aborted queries from popping LogBox in development
+        if (opts.direction === "down" && opts.result instanceof Error) {
+          const msg = opts.result.message?.toLowerCase() ?? "";
+          if (
+            msg.includes("abort") ||
+            opts.result.name === "AbortError" ||
+            (opts.result as any)?.cause?.name === "AbortError"
+          ) {
+            return false;
+          }
+        }
+        return true;
+      },
+      colorMode: "none",
     }),
     httpBatchLink({
       transformer: superjson,

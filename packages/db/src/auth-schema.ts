@@ -1,5 +1,15 @@
 import { relations } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, index, real, varchar, uuid, integer } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  index,
+  integer,
+  pgTable,
+  real,
+  text,
+  timestamp,
+  uuid,
+  varchar,
+} from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -7,9 +17,13 @@ export const user = pgTable("user", {
   email: text("email").unique(),
   emailVerified: boolean("email_verified").default(false).notNull(),
   phoneNumber: text("phone_number").unique(),
-  phoneNumberVerified: boolean("phone_number_verified").default(false).notNull(),
+  phoneNumberVerified: boolean("phone_number_verified")
+    .default(false)
+    .notNull(),
   image: text("image"),
-  createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
   updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
     .defaultNow()
     .$onUpdate(() => new Date())
@@ -26,16 +40,24 @@ export const user = pgTable("user", {
   mobilePinHash: text("mobile_pin_hash"),
   // ─── Device token del móvil vinculado (Expo / FCM / APNs)
   deviceToken: text("device_token"),
-  deviceActivatedAt: timestamp("device_activated_at", { mode: "date", withTimezone: true }),
+  deviceActivatedAt: timestamp("device_activated_at", {
+    mode: "date",
+    withTimezone: true,
+  }),
 });
 
 export const session = pgTable(
   "session",
   {
     id: text("id").primaryKey(),
-    expiresAt: timestamp("expires_at", { mode: "date", withTimezone: true }).notNull(),
+    expiresAt: timestamp("expires_at", {
+      mode: "date",
+      withTimezone: true,
+    }).notNull(),
     token: text("token").notNull().unique(),
-    createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
     updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
       .$onUpdate(() => new Date())
       .notNull(),
@@ -61,11 +83,19 @@ export const account = pgTable(
     accessToken: text("access_token"),
     refreshToken: text("refresh_token"),
     idToken: text("id_token"),
-    accessTokenExpiresAt: timestamp("access_token_expires_at", { mode: "date", withTimezone: true }),
-    refreshTokenExpiresAt: timestamp("refresh_token_expires_at", { mode: "date", withTimezone: true }),
+    accessTokenExpiresAt: timestamp("access_token_expires_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    refreshTokenExpiresAt: timestamp("refresh_token_expires_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
     scope: text("scope"),
     password: text("password"),
-    createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
     updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
       .$onUpdate(() => new Date())
       .notNull(),
@@ -79,8 +109,13 @@ export const verification = pgTable(
     id: text("id").primaryKey(),
     identifier: text("identifier").notNull(),
     value: text("value").notNull(),
-    expiresAt: timestamp("expires_at", { mode: "date", withTimezone: true }).notNull(),
-    createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+    expiresAt: timestamp("expires_at", {
+      mode: "date",
+      withTimezone: true,
+    }).notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
     updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
       .defaultNow()
       .$onUpdate(() => new Date())
@@ -94,7 +129,10 @@ export const organization = pgTable("organization", {
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   logo: text("logo"),
-  createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", {
+    mode: "date",
+    withTimezone: true,
+  }).notNull(),
   metadata: text("metadata"),
 });
 
@@ -108,7 +146,12 @@ export const member = pgTable("member", {
     .references(() => user.id, { onDelete: "cascade" }),
   role: text("role").default("member").notNull(),
   coefficient: real("coefficient").default(100).notNull(), // 0–100, participación en votaciones
-  createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).notNull(),
+  votingOverride: boolean("voting_override").default(false).notNull(),
+  votingOverrideReason: text("voting_override_reason"),
+  createdAt: timestamp("created_at", {
+    mode: "date",
+    withTimezone: true,
+  }).notNull(),
 });
 
 export const invitation = pgTable("invitation", {
@@ -119,8 +162,13 @@ export const invitation = pgTable("invitation", {
   email: text("email").notNull(),
   role: text("role"),
   status: text("status").default("pending").notNull(),
-  expiresAt: timestamp("expires_at", { mode: "date", withTimezone: true }).notNull(),
-  createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  expiresAt: timestamp("expires_at", {
+    mode: "date",
+    withTimezone: true,
+  }).notNull(),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
   inviterId: text("inviter_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
@@ -143,7 +191,9 @@ export const provider = pgTable("provider", {
   phone: varchar("phone", { length: 32 }),
   email: varchar("email", { length: 256 }),
   iban: varchar("iban", { length: 34 }),
-  createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
   updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
     .defaultNow()
     .$onUpdate(() => new Date())

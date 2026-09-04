@@ -1,9 +1,17 @@
-import { useColorScheme } from "react-native";
+import { LogBox, useColorScheme } from "react-native";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useEffect, useRef } from "react";
 import * as Notifications from "expo-notifications";
+
+// Suppress transient query cancellation / network retry popups in Expo development
+LogBox.ignoreLogs([
+  "TRPCClientError",
+  "The operation was aborted",
+  "query #",
+  "mutation #",
+]);
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";

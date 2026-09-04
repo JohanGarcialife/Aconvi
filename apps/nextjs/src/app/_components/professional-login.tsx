@@ -307,19 +307,38 @@ export function ProfessionalLogin() {
                   />
                 ))}
               </div>
-              <button
-                onClick={() => { setStatus("idle"); setRequestId(null); setPollCount(0); }}
-                style={{
-                  background: "transparent",
-                  color: "#00BDA5",
-                  border: "none",
-                  cursor: "pointer",
-                  fontWeight: 600,
-                  fontSize: "14px",
-                }}
-              >
-                Cancelar y volver
-              </button>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px", alignItems: "center" }}>
+                <button
+                  type="button"
+                  onClick={() => { setStatus("activation"); setErrorMessage(""); }}
+                  style={{
+                    background: "rgba(0,189,165,0.08)",
+                    color: "#027580",
+                    border: "1px solid #00BDA5",
+                    borderRadius: "8px",
+                    padding: "10px 18px",
+                    cursor: "pointer",
+                    fontWeight: 600,
+                    fontSize: "14px",
+                  }}
+                >
+                  🔑 Acceder con PIN de activación (123456)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setStatus("idle"); setRequestId(null); setPollCount(0); }}
+                  style={{
+                    background: "transparent",
+                    color: "#6b7280",
+                    border: "none",
+                    cursor: "pointer",
+                    fontWeight: 500,
+                    fontSize: "13px",
+                  }}
+                >
+                  Cancelar y volver
+                </button>
+              </div>
             </>
           )}
         </div>
@@ -353,9 +372,46 @@ export function ProfessionalLogin() {
         >
           Acceso Corporativo
         </h1>
-        <p style={{ color: "#6b7280", fontSize: "14px", marginBottom: "32px", textAlign: "center" }}>
+        <p style={{ color: "#6b7280", fontSize: "14px", marginBottom: "24px", textAlign: "center" }}>
           Introduce tu usuario corporativo para recibir la notificación de acceso.
         </p>
+
+        {/* Demo Helper Banner */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            background: "#F0FDFA",
+            border: "1px solid #CCFBF1",
+            borderRadius: "8px",
+            padding: "8px 14px",
+            marginBottom: "20px",
+            width: "100%",
+            maxWidth: "440px",
+            boxSizing: "border-box",
+          }}
+        >
+          <span style={{ fontSize: "13px", color: "#0F766E" }}>
+            💡 Acceso rápido AF: <strong>jluis.test</strong> (PIN: 123456)
+          </span>
+          <button
+            type="button"
+            onClick={() => setUsername("jluis.test")}
+            style={{
+              background: "#027580",
+              color: "#fff",
+              border: "none",
+              borderRadius: "6px",
+              padding: "5px 10px",
+              fontSize: "12px",
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Completar
+          </button>
+        </div>
 
         <form
           onSubmit={handleSubmit}

@@ -1,18 +1,23 @@
-import { eq, and, desc } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { fee } from "@acme/db/schema";
+
 import { createTRPCRouter, publicProcedure } from "../trpc";
 
 export const feeRouter = createTRPCRouter({
   // ─── List user fees ────────────────────────────────────────────────────────
   myFees: publicProcedure
-    .input(z.object({ tenantId: z.string().min(1), userId: z.string().min(1) }))
+    .input(
+      z.object({ tenantId: z.string().min(1), userId: z.string().optional() }),
+    )
     .query(({ ctx, input }) => {
+      const resolvedUserId =
+        input.userId ?? ctx.session?.user?.id ?? "user_admin";
       return ctx.db.query.fee.findMany({
         where: and(
           eq(fee.organizationId, input.tenantId),
-          eq(fee.userId, input.userId)
+          eq(fee.userId, resolvedUserId),
         ),
         orderBy: desc(fee.createdAt),
       });
@@ -26,10 +31,7 @@ export const feeRouter = createTRPCRouter({
         .update(fee)
         .set({ status: "PAID", paidAt: new Date() })
         .where(
-          and(
-            eq(fee.id, input.id),
-            eq(fee.organizationId, input.tenantId)
-          )
+          and(eq(fee.id, input.id), eq(fee.organizationId, input.tenantId)),
         )
         .returning();
 
@@ -46,7 +48,7 @@ export const feeRouter = createTRPCRouter({
         amount: z.number().positive(),
         description: z.string().min(1),
         dueDate: z.string().optional(),
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       const [created] = await ctx.db

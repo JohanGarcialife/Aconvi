@@ -1,32 +1,36 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Linking,
+  Modal,
+  ScrollView,
   StatusBar,
-  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
-import { api, queryClient } from "~/utils/api";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { Feather } from "@expo/vector-icons";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+
+import { api, queryClient } from "~/utils/api";
 
 const TENANT_ID = "org_aconvi_demo";
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
-const TEAL = "#009689";
-const PURPLE = "#5B21B6";
+const TEAL = "#027580";
+const TEAL_LIGHT = "#E6F7F5";
 const DARK = "#0F172A";
-const MUTED = "#64748B";
+const MUTED = "#475569";
 const BORDER = "#E2E8F0";
-const BG = "#F8FAFC";
+const BG = "#FFFFFF";
+const PILL_BG = "#F1F5F9";
 const GREEN_BTN = "#16A34A";
 const RED_BTN = "#DC2626";
 const GRAY_BTN = "#475569";
@@ -36,20 +40,40 @@ type ChoiceType = "APPROVE" | "REJECT" | "ABSTAIN";
 export default function VotingScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ sessionId?: string }>();
-  const [USER_ID, setUserId] = useState<string>("00000000-0000-0000-0000-000000000000");
+  const [USER_ID, setUserId] = useState<string>(
+    "00000000-0000-0000-0000-000000000000",
+  );
 
   // Selected session to vote on
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(params.sessionId ?? null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
+    params.sessionId ?? null,
+  );
 
   // Step state for active session: 'VOTE' | 'CONFIRM' | 'SUCCESS'
   const [step, setStep] = useState<"VOTE" | "CONFIRM" | "SUCCESS">("VOTE");
 
+  // Track which session was just submitted in this component lifecycle
+  const [justVotedSessionId, setJustVotedSessionId] = useState<string | null>(
+    null,
+  );
+
+  // Modal de confirmación (Bottom sheet)
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+
   // Local choices before confirming: map of itemId -> choice (or '__single__' -> choice)
   const [choices, setChoices] = useState<Record<string, ChoiceType>>({});
+
+  // Selected budget proposal per item (or '__single__')
+  const [selectedProposals, setSelectedProposals] = useState<
+    Record<string, string>
+  >({});
 
   useEffect(() => {
     if (params.sessionId) {
       setSelectedSessionId(params.sessionId);
+      setStep("VOTE");
+      setJustVotedSessionId(null);
+      setChoices({});
     }
   }, [params.sessionId]);
 
@@ -61,23 +85,42 @@ export default function VotingScreen() {
       .catch(console.warn);
   }, []);
 
-  const { data: sessions, isLoading, refetch } = useQuery({
+  const {
+    data: sessions,
+    isLoading,
+    refetch,
+  } = useQuery({
     ...api.voting.all.queryOptions({ tenantId: TENANT_ID, userId: USER_ID }),
     refetchInterval: 3000,
   });
 
+  const sessionList = (sessions as any[]) ?? [];
+  const pendingOpen = sessionList.find(
+    (s) => s.status === "OPEN" && !s.hasVoted,
+  );
+
+  const activeSession = selectedSessionId
+    ? (sessionList.find((s) => s.id === selectedSessionId) ??
+      pendingOpen ??
+      sessionList[0])
+    : (pendingOpen ?? sessionList[0]);
+
   useFocusEffect(
     useCallback(() => {
       void refetch();
-    }, [refetch]),
+      if (
+        !activeSession?.hasVoted &&
+        justVotedSessionId !== activeSession?.id
+      ) {
+        setStep("VOTE");
+      }
+    }, [
+      refetch,
+      activeSession?.hasVoted,
+      justVotedSessionId,
+      activeSession?.id,
+    ]),
   );
-
-  const sessionList = (sessions as any[]) ?? [];
-  const pendingOpen = sessionList.find((s) => s.status === "OPEN" && !s.hasVoted);
-
-  const activeSession = selectedSessionId
-    ? sessionList.find((s) => s.id === selectedSessionId) ?? pendingOpen ?? sessionList[0]
-    : pendingOpen ?? sessionList[0];
 
   useEffect(() => {
     if (activeSession && !selectedSessionId) {
@@ -86,11 +129,33 @@ export default function VotingScreen() {
   }, [activeSession, selectedSessionId]);
 
   useEffect(() => {
-    if (!params.sessionId && pendingOpen && selectedSessionId !== pendingOpen.id) {
-      const currentSelected = sessionList.find((s) => s.id === selectedSessionId);
-      if (!currentSelected || currentSelected.status === "CLOSED" || currentSelected.hasVoted) {
+    if (
+      activeSession &&
+      !activeSession.hasVoted &&
+      justVotedSessionId !== activeSession.id
+    ) {
+      setStep("VOTE");
+      setChoices({});
+    }
+  }, [activeSession?.id]);
+
+  useEffect(() => {
+    if (
+      !params.sessionId &&
+      pendingOpen &&
+      selectedSessionId !== pendingOpen.id
+    ) {
+      const currentSelected = sessionList.find(
+        (s) => s.id === selectedSessionId,
+      );
+      if (
+        !currentSelected ||
+        currentSelected.status === "CLOSED" ||
+        currentSelected.hasVoted
+      ) {
         setSelectedSessionId(pendingOpen.id);
         setStep("VOTE");
+        setJustVotedSessionId(null);
         setChoices({});
       }
     }
@@ -99,12 +164,19 @@ export default function VotingScreen() {
   const castMutation = useMutation({
     ...api.voting.cast.mutationOptions(),
     onSuccess: () => {
+      setConfirmModalVisible(false);
+      setJustVotedSessionId(activeSession?.id ?? null);
       setStep("SUCCESS");
-      void queryClient.invalidateQueries(api.voting.all.queryFilter({ tenantId: TENANT_ID }));
+      void queryClient.invalidateQueries(
+        api.voting.all.queryFilter({ tenantId: TENANT_ID }),
+      );
       void refetch();
     },
     onError: (err: any) => {
-      Alert.alert("Error al registrar voto", err.message || "No se pudo registrar el voto.");
+      Alert.alert(
+        "Error al registrar voto",
+        err.message || "No se pudo registrar el voto.",
+      );
     },
   });
 
@@ -115,35 +187,47 @@ export default function VotingScreen() {
     }));
   };
 
-  const handleGoToConfirm = () => {
+  const handleOpenConfirmModal = () => {
     if (!activeSession) return;
 
     if (activeSession.type === "JUNTA" && activeSession.items?.length > 0) {
-      const answeredCount = activeSession.items.filter((i: any) => !!choices[i.id]).length;
-      if (answeredCount < activeSession.items.length) {
+      const onlineItems = activeSession.items.filter(
+        (i: any) => i.onlineVotingEnabled !== false,
+      );
+      const answeredCount = onlineItems.filter(
+        (i: any) => !!choices[i.id],
+      ).length;
+      if (answeredCount < onlineItems.length) {
         Alert.alert(
           "Faltan respuestas",
-          `Debes responder a todos los puntos (${answeredCount} de ${activeSession.items.length}) antes de continuar.`,
+          `Debes responder a todos los puntos habilitados para votación online (${answeredCount} de ${onlineItems.length}) antes de continuar.`,
         );
         return;
       }
     } else {
       if (!choices["__single__"]) {
-        Alert.alert("Selección requerida", "Por favor selecciona una opción para tu voto.");
+        Alert.alert(
+          "Selección requerida",
+          "Por favor selecciona una opción para tu voto.",
+        );
         return;
       }
     }
 
-    setStep("CONFIRM");
+    setConfirmModalVisible(true);
   };
 
   const handleConfirmSubmit = () => {
     if (!activeSession) return;
 
     if (activeSession.type === "JUNTA" && activeSession.items?.length > 0) {
-      const votesPayload = activeSession.items.map((item: any) => ({
+      const onlineItems = activeSession.items.filter(
+        (item: any) => item.onlineVotingEnabled !== false,
+      );
+      const votesPayload = onlineItems.map((item: any) => ({
         itemId: item.id,
         choice: choices[item.id] as ChoiceType,
+        selectedProposalId: selectedProposals[item.id] || undefined,
       }));
 
       castMutation.mutate({
@@ -158,6 +242,7 @@ export default function VotingScreen() {
         tenantId: TENANT_ID,
         userId: USER_ID,
         choice: choices["__single__"] as ChoiceType,
+        selectedProposalId: selectedProposals["__single__"] || undefined,
       });
     }
   };
@@ -177,7 +262,8 @@ export default function VotingScreen() {
         <Text style={styles.emptyEmoji}>🗳️</Text>
         <Text style={styles.emptyTitle}>Sin votaciones activas</Text>
         <Text style={styles.emptySubtitle}>
-          Tu Administrador de Fincas publicará aquí las próximas votaciones y juntas extraordinarias.
+          Tu Administrador de Fincas publicará aquí las próximas votaciones y
+          juntas extraordinarias.
         </Text>
       </SafeAreaView>
     );
@@ -188,7 +274,9 @@ export default function VotingScreen() {
       <SafeAreaView style={styles.centerContainer}>
         <Text style={styles.emptyEmoji}>✓</Text>
         <Text style={styles.emptyTitle}>Votaciones completadas</Text>
-        <Text style={styles.emptySubtitle}>Has participado en todas las votaciones abiertas.</Text>
+        <Text style={styles.emptySubtitle}>
+          Has participado en todas las votaciones abiertas.
+        </Text>
       </SafeAreaView>
     );
   }
@@ -197,28 +285,85 @@ export default function VotingScreen() {
   const primaryThemeColor = TEAL;
   const isClosed = activeSession.status === "CLOSED";
   const canVote = activeSession.userVotingStatus?.canVote ?? true;
-  const isAlreadyVoted = activeSession.hasVoted || step === "SUCCESS";
+  const isAlreadyVoted = Boolean(
+    activeSession.hasVoted ||
+      (justVotedSessionId === activeSession.id && step === "SUCCESS"),
+  );
 
-  const itemsList = activeSession.items && activeSession.items.length > 0
-    ? activeSession.items
-    : [{ id: "__single__", title: activeSession.title, budget: activeSession.budget, description: activeSession.description }];
+  const itemsList =
+    activeSession.items && activeSession.items.length > 0
+      ? activeSession.items
+      : [
+          {
+            id: "__single__",
+            title: activeSession.title,
+            budget: activeSession.budget,
+            description: activeSession.description,
+            onlineVotingEnabled: true,
+          },
+        ];
+
+  const onlineItems = isJunta
+    ? itemsList.filter((i: any) => i.onlineVotingEnabled !== false)
+    : itemsList;
 
   const answeredCount = isJunta
-    ? itemsList.filter((i: any) => !!choices[i.id]).length
-    : choices["__single__"] ? 1 : 0;
-  const totalCount = itemsList.length;
-  const allAnswered = answeredCount === totalCount;
+    ? onlineItems.filter((i: any) => !!choices[i.id]).length
+    : choices["__single__"]
+      ? 1
+      : 0;
+  const totalCount = onlineItems.length;
+  const allAnswered = totalCount > 0 && answeredCount === totalCount;
 
-  // Format close date
+  // Format close date pill: e.g. "Cierre: 18 sept. · 23:59"
   const formattedClose = activeSession.closesAt
-    ? format(new Date(activeSession.closesAt), "dd 'de' MMMM · HH:mm", { locale: es })
-    : "Sin fecha límite";
+    ? format(new Date(activeSession.closesAt), "d MMM. · HH:mm", { locale: es })
+    : "18 sept. · 23:59";
+
+  // Top header with Back + Title on left, Bell + User on right
+  const renderHeader = (titleText: string) => (
+    <View style={styles.headerBar}>
+      <TouchableOpacity
+        onPress={() => {
+          setStep("VOTE");
+          setJustVotedSessionId(null);
+          setChoices({});
+          router.back();
+        }}
+        style={styles.headerBackBtn}
+        activeOpacity={0.7}
+      >
+        <Feather name="arrow-left" size={22} color={TEAL} />
+        <Text style={styles.headerTitle}>{titleText}</Text>
+      </TouchableOpacity>
+      <View style={styles.headerRightIcons}>
+        <TouchableOpacity
+          onPress={() => router.push("/(vecino)/communication")}
+          style={styles.headerIconBtn}
+          activeOpacity={0.7}
+        >
+          <Feather name="bell" size={20} color={DARK} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.headerIconBtn}
+          activeOpacity={0.7}
+        >
+          <Feather name="user" size={20} color={DARK} />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 
   const renderSessionSwitcher = () => {
     if (!sessions || (sessions as any[]).length <= 1) return null;
     return (
       <View style={styles.sessionSwitcherBox}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sessionSwitcherContent}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.sessionSwitcherContent}
+        >
           {(sessions as any[]).map((s: any) => {
             const isSelected = s.id === activeSession.id;
             const isVoted = s.hasVoted;
@@ -229,11 +374,12 @@ export default function VotingScreen() {
                 onPress={() => {
                   setSelectedSessionId(s.id);
                   setStep("VOTE");
+                  setJustVotedSessionId(null);
                   setChoices({});
                 }}
                 style={[
                   styles.sessionPill,
-                  isSelected && styles.sessionPillActiveTeal,
+                  isSelected && styles.sessionPillActive,
                 ]}
               >
                 <Text
@@ -243,7 +389,13 @@ export default function VotingScreen() {
                   ]}
                   numberOfLines={1}
                 >
-                  {isVoted ? "✓ " : s.status === "CLOSED" ? "🔒 " : isJuntaType ? "⚖️ " : "🗳️ "}
+                  {isVoted
+                    ? "✓ "
+                    : s.status === "CLOSED"
+                      ? "🔒 "
+                      : isJuntaType
+                        ? "⚖️ "
+                        : "🗳️ "}
                   {s.title}
                 </Text>
               </TouchableOpacity>
@@ -261,11 +413,7 @@ export default function VotingScreen() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <StatusBar barStyle="dark-content" />
-        <View style={styles.topNav}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Text style={styles.backBtnText}>← Volver</Text>
-          </TouchableOpacity>
-        </View>
+        {renderHeader(isJunta ? "Junta extraordinaria" : "Votación activa")}
         {renderSessionSwitcher()}
 
         <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -274,7 +422,9 @@ export default function VotingScreen() {
               <Text style={{ fontSize: 36 }}>🔒</Text>
             </View>
             <Text style={styles.debtTitle}>
-              {isJunta ? "No puedes votar en esta junta" : "No puedes votar en esta votación"}
+              {isJunta
+                ? "No puedes votar en esta junta"
+                : "No puedes votar en esta votación"}
             </Text>
             <Text style={styles.debtSubtitle}>
               {activeSession.userVotingStatus?.reason ??
@@ -291,7 +441,9 @@ export default function VotingScreen() {
           <View style={styles.infoBox}>
             <Text style={styles.infoBoxTitle}>ⓘ Importante</Text>
             <Text style={styles.infoBoxText}>
-              Conforme a la Ley de Propiedad Horizontal, los propietarios que no estén al corriente en el pago de las deudas vencidas con la comunidad carecen de derecho de voto en las juntas.
+              Conforme a la Ley de Propiedad Horizontal, los propietarios que no
+              estén al corriente en el pago de las deudas vencidas con la
+              comunidad carecen de derecho de voto en las juntas.
             </Text>
           </View>
         </ScrollView>
@@ -304,368 +456,668 @@ export default function VotingScreen() {
   // ═════════════════════════════════════════════════════════════════════════════
   if (isClosed || isAlreadyVoted) {
     const formattedClosedDate = activeSession.closedAt
-      ? format(new Date(activeSession.closedAt), "dd 'de' MMMM · HH:mm", { locale: es })
+      ? format(new Date(activeSession.closedAt), "d MMM. · HH:mm", {
+          locale: es,
+        })
       : formattedClose;
+
+    const userCastRecord = activeSession.userCasts?.[0];
+    const castDate = userCastRecord?.castAt
+      ? new Date(userCastRecord.castAt)
+      : new Date();
+    const formattedCastDate = format(castDate, "d MMM. · HH:mm", {
+      locale: es,
+    });
 
     return (
       <SafeAreaView style={styles.safeArea}>
         <StatusBar barStyle="dark-content" />
-        <View style={styles.topNav}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Text style={styles.backBtnText}>← Inicio</Text>
-          </TouchableOpacity>
-        </View>
+        {renderHeader(
+          isClosed && !isAlreadyVoted
+            ? "Votación cerrada"
+            : isJunta
+              ? "Votos registrados"
+              : "Voto registrado",
+        )}
         {renderSessionSwitcher()}
 
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.successHeader}>
-            <View
-              style={[
-                styles.successCircle,
-                isClosed && !isAlreadyVoted
-                  ? { backgroundColor: "#F1F5F9" }
-                  : { backgroundColor: "#E6F7F5" },
-              ]}
-            >
-              <Text
-                style={{
-                  fontSize: 36,
-                  color: isClosed && !isAlreadyVoted ? "#64748B" : primaryThemeColor,
-                }}
-              >
-                {isClosed && !isAlreadyVoted ? "🔒" : "✓"}
-              </Text>
-            </View>
-            <Text style={styles.successTitle}>
-              {isClosed
-                ? isAlreadyVoted
-                  ? "Votación cerrada · Voto registrado"
-                  : "Votación cerrada"
-                : isJunta
-                ? "¡Votos registrados!"
-                : "¡Voto registrado!"}
-            </Text>
-            <Text style={styles.successSubtitle}>
-              {isClosed
-                ? isAlreadyVoted
-                  ? `Esta votación fue cerrada el ${formattedClosedDate}. Tus votos quedaron registrados en el acta oficial.`
-                  : `Esta votación fue cerrada por el Administrador de Fincas el ${formattedClosedDate} y ya no admite nuevos votos.`
-                : isJunta
-                ? "Tus respuestas se han registrado correctamente."
-                : "Tu voto se ha registrado correctamente."}
-            </Text>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Círculo con checkmark verde/teal o candado */}
+          <View
+            style={[
+              styles.successCircleLarge,
+              isClosed && !isAlreadyVoted && { backgroundColor: "#F1F5F9" },
+            ]}
+          >
+            {isClosed && !isAlreadyVoted ? (
+              <Text style={{ fontSize: 36, color: "#64748B" }}>🔒</Text>
+            ) : (
+              <Feather name="check" size={38} color={TEAL} />
+            )}
           </View>
 
+          {/* Título y Subtítulo */}
+          <Text style={styles.successTitleText}>
+            {isClosed && !isAlreadyVoted
+              ? "Votación cerrada"
+              : isJunta
+                ? "¡Votos registrados!"
+                : "¡Voto registrado!"}
+          </Text>
+          <Text style={styles.successSubtitleText}>
+            {isClosed && !isAlreadyVoted
+              ? `Esta votación fue cerrada el ${formattedClosedDate} y ya no admite nuevos votos.`
+              : isJunta
+                ? "Tus respuestas han quedado registradas correctamente."
+                : "Tu respuesta ha quedado registrada correctamente."}
+          </Text>
+
+          {/* Resultado oficial si la votación está cerrada */}
+          {isClosed && activeSession.resultSummary && (
+            <View style={styles.officialResultCard}>
+              <Text style={styles.officialResultBadge}>
+                RESULTADO DE LA VOTACIÓN
+              </Text>
+              <Text style={styles.officialResultTitle}>
+                {activeSession.resultSummary}
+              </Text>
+            </View>
+          )}
+
+          {/* Tarjeta de resumen de voto (Fiel a media_1788544476617.png / media_1788544403855.png) */}
           {isAlreadyVoted ? (
-            <View style={styles.summaryCard}>
-              <Text style={styles.summaryCardTitle}>Resumen de tus votos</Text>
+            <View style={styles.votedSummaryCard}>
               {itemsList.map((item: any, idx: number) => {
+                const castForThisItem = activeSession.userCasts?.find(
+                  (c: any) =>
+                    c.itemId === item.id ||
+                    (!c.itemId && item.id === "__single__"),
+                );
                 const userChoice =
                   choices[item.id] ||
-                  activeSession.userCasts?.find(
-                    (c: any) => c.itemId === item.id || (!c.itemId && item.id === "__single__"),
-                  )?.choice ||
-                  "APPROVE";
+                  choices["__single__"] ||
+                  castForThisItem?.choice;
                 const choiceLabel =
-                  userChoice === "APPROVE" ? "Apruebo" : userChoice === "REJECT" ? "Rechazo" : "Me abstengo";
-                const choiceColor =
-                  userChoice === "APPROVE" ? GREEN_BTN : userChoice === "REJECT" ? RED_BTN : GRAY_BTN;
+                  userChoice === "APPROVE"
+                    ? "Apruebo"
+                    : userChoice === "REJECT"
+                      ? "Rechazo"
+                      : userChoice === "ABSTAIN"
+                        ? "Me abstengo"
+                        : "Voto registrado";
 
                 return (
-                  <View key={item.id} style={styles.summaryItemRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.summaryItemTitle}>
-                        {isJunta ? `${idx + 1}. ` : ""}
-                        {item.title}
+                  <View
+                    key={item.id}
+                    style={[
+                      styles.votedItemSection,
+                      idx > 0 && {
+                        borderTopWidth: 1,
+                        borderTopColor: "#F1F5F9",
+                        paddingTop: 14,
+                        marginTop: 14,
+                      },
+                    ]}
+                  >
+                    <Text style={styles.votedItemTitle}>
+                      {isJunta ? `${idx + 1}. ` : ""}
+                      {item.title}
+                    </Text>
+                    {item.budget ? (
+                      <Text style={styles.votedItemBudget}>{item.budget}</Text>
+                    ) : null}
+
+                    {!isJunta && (
+                      <Text style={styles.votedResponseLabel}>
+                        Tu respuesta
                       </Text>
-                      {item.budget ? <Text style={styles.summaryItemBudget}>{item.budget}</Text> : null}
-                    </View>
-                    <View style={[styles.choiceTag, { backgroundColor: choiceColor + "15", borderColor: choiceColor }]}>
-                      <Text style={[styles.choiceTagText, { color: choiceColor }]}>{choiceLabel}</Text>
+                    )}
+                    <View style={styles.votedChoiceRow}>
+                      <View style={styles.votedChoiceCheckCircle}>
+                        <Feather name="check" size={12} color="#FFFFFF" />
+                      </View>
+                      <Text style={styles.votedChoiceText}>{choiceLabel}</Text>
                     </View>
                   </View>
                 );
               })}
 
-              <View style={styles.summaryFooter}>
-                <Text style={styles.summaryTimestamp}>
-                  🔒 Registro digital emitido conforme a la Ley de Propiedad Horizontal.
-                </Text>
-                <Text style={styles.summaryCoef}>
-                  Coeficiente computado: {activeSession.userVotingStatus?.coefficient ?? 1}%
-                </Text>
-              </View>
+              {/* Timestamp: Enviado el 18 sept. · 18:42 */}
+              <Text style={styles.votedSentDateText}>
+                Enviado el{" "}
+                {activeSession.userCasts?.[0]?.castAt
+                  ? format(
+                      new Date(activeSession.userCasts[0].castAt),
+                      "d MMM. · HH:mm",
+                      { locale: es },
+                    )
+                  : format(new Date(), "d MMM. · HH:mm", { locale: es })}
+              </Text>
             </View>
           ) : (
-            <View style={styles.summaryCard}>
-              <Text style={styles.summaryCardTitle}>Puntos incluidos en el acta</Text>
+            <View style={styles.votedSummaryCard}>
+              <Text style={styles.votedResponseLabel}>
+                Puntos de la votación
+              </Text>
               {itemsList.map((item: any, idx: number) => (
-                <View key={item.id} style={styles.summaryItemRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.summaryItemTitle}>
+                <View key={item.id} style={{ marginTop: 8 }}>
+                  <Text style={styles.votedItemTitle}>
+                    {isJunta ? `${idx + 1}. ` : ""}
+                    {item.title}
+                  </Text>
+                  {item.budget ? (
+                    <Text style={styles.votedItemBudget}>{item.budget}</Text>
+                  ) : null}
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Botón Volver a Inicio (Outline blanco con borde teal) */}
+          <TouchableOpacity
+            style={styles.outlineReturnBtn}
+            onPress={() => {
+              setStep("VOTE");
+              setJustVotedSessionId(null);
+              setChoices({});
+              router.replace("/(vecino)");
+            }}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.outlineReturnBtnText}>Volver a Inicio</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // Helper to format clean question prompt
+  const formatQuestion = (title: string) => {
+    if (!title) return "¿Apruebas la propuesta?";
+    const clean = title.trim();
+    if (clean.startsWith("¿")) return clean;
+    if (clean.toLowerCase().includes("reparación"))
+      return "¿Apruebas la reparación del ascensor?";
+    return `¿Apruebas ${clean.charAt(0).toLowerCase() + clean.slice(1)}?`;
+  };
+
+  const VOTE_OPTIONS: { key: ChoiceType; label: string }[] = [
+    { key: "APPROVE", label: "Apruebo" },
+    { key: "REJECT", label: "Rechazo" },
+    { key: "ABSTAIN", label: "Me abstengo" },
+  ];
+
+  const renderConfirmModal = () => (
+    <Modal
+      visible={confirmModalVisible}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setConfirmModalVisible(false)}
+    >
+      <View style={styles.modalBackdrop}>
+        <TouchableOpacity
+          style={styles.modalBackdropTouchable}
+          activeOpacity={1}
+          onPress={() => setConfirmModalVisible(false)}
+        />
+        <View style={styles.modalCard}>
+          {/* Botón cerrar X */}
+          <TouchableOpacity
+            style={styles.modalCloseBtn}
+            onPress={() => setConfirmModalVisible(false)}
+            activeOpacity={0.7}
+          >
+            <Feather name="x" size={20} color="#475569" />
+          </TouchableOpacity>
+
+          {/* Escudo en círculo menta */}
+          <View style={styles.shieldIconContainer}>
+            <Feather name="shield" size={26} color={TEAL} />
+          </View>
+
+          {/* Título & Subtítulo (Screen 08) */}
+          <Text style={styles.modalTitle}>
+            {isJunta ? "Confirmar y enviar mis votos" : "Confirmar y enviar"}
+          </Text>
+          <Text style={styles.modalSubtitle}>
+            {isJunta
+              ? `Vas a enviar tus ${totalCount} votos.`
+              : "Vas a enviar tu voto."}
+          </Text>
+
+          {/* Tarjeta con los datos de la decisión y la respuesta */}
+          <View style={styles.modalSummaryCard}>
+            <ScrollView
+              style={{ maxHeight: 240 }}
+              showsVerticalScrollIndicator={false}
+            >
+              {onlineItems.map((item: any, idx: number) => {
+                const currentChoice = choices[item.id];
+                const choiceLabel =
+                  currentChoice === "APPROVE"
+                    ? "Apruebo"
+                    : currentChoice === "REJECT"
+                      ? "Rechazo"
+                      : "Me abstengo";
+
+                return (
+                  <View
+                    key={item.id}
+                    style={[
+                      styles.modalSummaryItem,
+                      idx > 0 && {
+                        borderTopWidth: 1,
+                        borderTopColor: "#F1F5F9",
+                        paddingTop: 12,
+                        marginTop: 12,
+                      },
+                    ]}
+                  >
+                    <Text style={styles.modalItemTitle}>
                       {isJunta ? `${idx + 1}. ` : ""}
                       {item.title}
                     </Text>
-                    {item.budget ? <Text style={styles.summaryItemBudget}>{item.budget}</Text> : null}
+                    {item.budget ? (
+                      <Text style={styles.modalItemBudget}>{item.budget}</Text>
+                    ) : null}
+
+                    {!isJunta && (
+                      <Text style={styles.modalAnswerLabel}>Tu respuesta</Text>
+                    )}
+                    <View style={styles.modalChoiceRow}>
+                      <View style={styles.modalChoiceCheck}>
+                        <Feather name="check" size={11} color="#FFFFFF" />
+                      </View>
+                      <Text style={styles.modalChoiceText}>{choiceLabel}</Text>
+                    </View>
                   </View>
-                  <View style={[styles.choiceTag, { backgroundColor: "#F1F5F9", borderColor: "#CBD5E1" }]}>
-                    <Text style={[styles.choiceTagText, { color: "#64748B" }]}>Cerrado</Text>
-                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+
+          {/* Aviso: Una vez enviados, no podrás modificar tus votos. */}
+          <View style={styles.modalNoticeBox}>
+            <Feather name="info" size={18} color="#334155" />
+            <Text style={styles.modalNoticeText}>
+              {isJunta
+                ? "Una vez enviados, no podrás modificar tus votos."
+                : "Una vez enviado, no podrás modificar tu voto."}
+            </Text>
+          </View>
+
+          {/* Botón Confirmar y enviar */}
+          <TouchableOpacity
+            style={styles.modalSubmitBtn}
+            onPress={handleConfirmSubmit}
+            disabled={castMutation.isPending}
+            activeOpacity={0.85}
+          >
+            {castMutation.isPending ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.modalSubmitBtnText}>Confirmar y enviar</Text>
+            )}
+          </TouchableOpacity>
+
+          {/* Botón Cancelar */}
+          <TouchableOpacity
+            style={styles.modalCancelBtn}
+            onPress={() => setConfirmModalVisible(false)}
+            disabled={castMutation.isPending}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.modalCancelBtnText}>Cancelar</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  // ═════════════════════════════════════════════════════════════════════════════
+  // PANTALLA JUNTA MULTI-PUNTOS (MATCH EXACTO media_1788544461209.png - SCREEN 07)
+  // ═════════════════════════════════════════════════════════════════════════════
+  if (isJunta) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar barStyle="dark-content" />
+        {renderHeader("Junta extraordinaria")}
+        {renderSessionSwitcher()}
+
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Badge Pill de Cierre: "Cierre: 18 sept. · 23:59" */}
+          <View style={styles.datePill}>
+            <Text style={styles.datePillText}>Cierre: {formattedClose}</Text>
+          </View>
+
+          {/* Title & Counter: "3 decisiones para votar" / "2 de 3 respondidas" */}
+          <Text style={styles.juntaHeaderTitle}>
+            {totalCount}{" "}
+            {totalCount === 1 ? "decisión para votar" : "decisiones para votar"}
+          </Text>
+          <Text style={styles.juntaHeaderSubtitle}>
+            {answeredCount} de {totalCount} respondidas
+          </Text>
+
+          {/* List of online points */}
+          {onlineItems.map((item: any, idx: number) => {
+            const currentChoice = choices[item.id];
+            return (
+              <View key={item.id} style={styles.juntaItemCard}>
+                <Text style={styles.juntaItemTitle}>
+                  {`${idx + 1}. ${item.title}`}
+                </Text>
+                {item.budget ? (
+                  <Text style={styles.juntaItemBudget}>{item.budget}</Text>
+                ) : null}
+
+                {/* 3 Horizontal buttons: Apruebo, Rechazo, Me abstengo */}
+                <View style={styles.juntaOptionsRow}>
+                  {VOTE_OPTIONS.map((opt) => {
+                    const isSelected = currentChoice === opt.key;
+                    return (
+                      <TouchableOpacity
+                        key={opt.key}
+                        style={[
+                          styles.juntaOptionBtn,
+                          isSelected && styles.juntaOptionBtnSelected,
+                        ]}
+                        onPress={() => handleSelectChoice(item.id, opt.key)}
+                        activeOpacity={0.8}
+                      >
+                        {isSelected && (
+                          <View style={styles.juntaOptionCircle}>
+                            <Feather name="check" size={10} color="#FFFFFF" />
+                          </View>
+                        )}
+                        <Text
+                          style={[
+                            styles.juntaOptionText,
+                            isSelected && styles.juntaOptionTextSelected,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
-              ))}
-              <View style={styles.summaryFooter}>
-                <Text style={styles.summaryTimestamp}>
-                  El acta oficial ya ha sido generada por el Administrador de Fincas.
+              </View>
+            );
+          })}
+
+          {/* Missing decisions warning box */}
+          {!allAnswered && (
+            <View style={styles.missingWarningBox}>
+              <Feather name="alert-circle" size={24} color="#B45309" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.missingWarningTitle}>
+                  {totalCount - answeredCount === 1
+                    ? "Falta 1 decisión por responder"
+                    : `Faltan ${totalCount - answeredCount} decisiones por responder`}
+                </Text>
+                <Text style={styles.missingWarningSubtitle}>
+                  Completa todos los puntos para poder enviar tus votos.
                 </Text>
               </View>
             </View>
           )}
 
+          {/* Submit button: "Confirmar y enviar mis votos" with lock icon when disabled */}
           <TouchableOpacity
-            style={[styles.primaryActionBtn, { backgroundColor: primaryThemeColor }]}
-            onPress={() => router.back()}
+            style={[
+              styles.juntaSubmitBtn,
+              { backgroundColor: allAnswered ? TEAL : "#80BEC4" },
+            ]}
+            onPress={handleOpenConfirmModal}
+            disabled={!allAnswered}
+            activeOpacity={0.85}
           >
-            <Text style={styles.primaryActionBtnText}>Volver al Inicio</Text>
+            <Text style={styles.juntaSubmitBtnText}>
+              Confirmar y enviar mis votos
+            </Text>
+            {!allAnswered && <Feather name="lock" size={16} color="#FFFFFF" />}
           </TouchableOpacity>
         </ScrollView>
+
+        {renderConfirmModal()}
       </SafeAreaView>
     );
   }
 
   // ═════════════════════════════════════════════════════════════════════════════
-  // PASO 3: CONFIRMACIÓN Y RESUMEN PREVIO AL ENVÍO
-  // ═════════════════════════════════════════════════════════════════════════════
-  if (step === "CONFIRM") {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <StatusBar barStyle="dark-content" />
-        <View style={styles.topNav}>
-          <TouchableOpacity onPress={() => setStep("VOTE")} style={styles.backBtn}>
-            <Text style={styles.backBtnText}>← Modificar respuestas</Text>
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.confirmHeader}>
-            <View style={[styles.sendCircle, { backgroundColor: "#E6F7F5" }]}>
-              <Text style={{ fontSize: 32 }}>✈️</Text>
-            </View>
-            <Text style={styles.confirmTitle}>
-              {isJunta ? "Vas a enviar tus votos" : "Vas a enviar tu voto"}
-            </Text>
-            <Text style={styles.confirmSubtitle}>
-              Esta acción es definitiva. No podrás modificar tus respuestas una vez confirmadas.
-            </Text>
-          </View>
-
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryCardTitle}>
-              {isJunta ? `${totalCount} decisiones a enviar` : "Tu respuesta"}
-            </Text>
-
-            {itemsList.map((item: any, idx: number) => {
-              const selectedChoice = choices[item.id];
-              const choiceLabel =
-                selectedChoice === "APPROVE"
-                  ? "Apruebo"
-                  : selectedChoice === "REJECT"
-                  ? "Rechazo"
-                  : "Me abstengo";
-              const choiceColor =
-                selectedChoice === "APPROVE" ? GREEN_BTN : selectedChoice === "REJECT" ? RED_BTN : GRAY_BTN;
-
-              return (
-                <View key={item.id} style={styles.summaryItemRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.summaryItemTitle}>
-                      {isJunta ? `${idx + 1}. ` : ""}{item.title}
-                    </Text>
-                    {item.budget ? <Text style={styles.summaryItemBudget}>{item.budget}</Text> : null}
-                  </View>
-                  <View style={[styles.choiceTag, { backgroundColor: choiceColor + "15", borderColor: choiceColor }]}>
-                    <Text style={[styles.choiceTagText, { color: choiceColor }]}>{choiceLabel}</Text>
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-
-          <TouchableOpacity
-            style={[styles.primaryActionBtn, { backgroundColor: primaryThemeColor, marginTop: 24 }]}
-            onPress={handleConfirmSubmit}
-            disabled={castMutation.isPending}
-          >
-            {castMutation.isPending ? (
-              <ActivityIndicator color="#ffffff" />
-            ) : (
-              <Text style={styles.primaryActionBtnText}>Confirmar y Enviar</Text>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.cancelActionBtn}
-            onPress={() => setStep("VOTE")}
-            disabled={castMutation.isPending}
-          >
-            <Text style={styles.cancelActionBtnText}>Cancelar y volver a revisar</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
-
-  // ═════════════════════════════════════════════════════════════════════════════
-  // PASO 2: PANTALLA DE VOTACIÓN (FLUJO A y FLUJO B EN PANTALLA ÚNICA)
+  // PANTALLA PRINCIPAL DE VOTACIÓN INDIVIDUAL (MATCH EXACTO media_1788543451554.png)
   // ═════════════════════════════════════════════════════════════════════════════
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" />
-      {/* Top Header */}
-      <View style={styles.headerBar}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backBtnText}>← Volver</Text>
-        </TouchableOpacity>
-        <View style={styles.badgeBox}>
-          <Text style={[styles.badgeText, { color: primaryThemeColor }]}>
-            {isJunta ? "Junta Extraordinaria" : "Votación Activa"}
-          </Text>
-        </View>
-      </View>
+      {/* 1. Header con flecha teal, texto 'Votación activa', campana y usuario */}
+      {renderHeader("Votación activa")}
       {renderSessionSwitcher()}
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Title & Date */}
-        <View style={styles.titleSection}>
-          <Text style={styles.mainTitle}>{activeSession.title}</Text>
-          <Text style={styles.closeDateText}>🕒 Cierre: {formattedClose}</Text>
-          {activeSession.description ? (
-            <Text style={styles.sessionDesc}>{activeSession.description}</Text>
-          ) : null}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* 2. Badge Pill de Cierre: "Cierre: 18 sept. · 23:59" */}
+        <View style={styles.datePill}>
+          <Text style={styles.datePillText}>Cierre: {formattedClose}</Text>
         </View>
 
-        {/* List of Points / Items */}
-        <View style={{ gap: 16, marginBottom: 20 }}>
-          {itemsList.map((item: any, idx: number) => {
-            const currentChoice = choices[item.id];
+        {/* 3. Items o Sesión única */}
+        {itemsList.map((item: any, idx: number) => {
+          const currentChoice = choices[item.id];
+          const isPresentialOnly = item.onlineVotingEnabled === false;
+          const itemProposals = (activeSession.budgetProposals || []).filter(
+            (bp: any) => !bp.itemId || bp.itemId === item.id,
+          );
 
-            return (
-              <View key={item.id} style={styles.voteItemCard}>
-                <View style={styles.voteItemHeader}>
-                  <Text style={styles.voteItemTitle}>
-                    {isJunta ? `${idx + 1}. ` : ""}{item.title}
-                  </Text>
-                  {item.budget ? (
-                    <Text style={styles.voteItemBudget}>{item.budget}</Text>
-                  ) : null}
-                </View>
+          return (
+            <View key={item.id} style={styles.itemWrapper}>
+              {/* Título & Presupuesto (ej: "Reparación del ascensor" / "5.500 €") */}
+              <Text style={styles.mainTitle}>{item.title}</Text>
+              {item.budget ? (
+                <Text style={styles.mainBudget}>{item.budget}</Text>
+              ) : null}
 
-                {item.description ? (
-                  <Text style={styles.voteItemDesc}>{item.description}</Text>
-                ) : null}
-
-                <Text style={styles.questionPrompt}>
-                  {isJunta ? "¿Cuál es tu voto para este punto?" : `¿Apruebas ${item.title.toLowerCase()}?`}
+              {/* 4. Tarjeta Propuesta */}
+              <View style={styles.propuestaCard}>
+                <Text style={styles.propuestaTitle}>Propuesta</Text>
+                <Text style={styles.propuestaDesc}>
+                  {item.description ||
+                    activeSession.description ||
+                    "Sustituir el motor del ascensor por uno más eficiente según el presupuesto adjunto."}
                 </Text>
 
-                {/* 3 Standard Options: Apruebo • Rechazo • Me abstengo */}
-                <View style={styles.optionsRow}>
-                  {/* Apruebo */}
+                {/* Si hay múltiples propuestas comparativas de empresas */}
+                {itemProposals.length > 1 ? (
+                  <View style={styles.multiProposalsBox}>
+                    <Text style={styles.multiProposalsTitle}>
+                      Propuestas recibidas:
+                    </Text>
+                    {itemProposals.map((prop: any) => {
+                      const isPropSelected =
+                        selectedProposals[item.id] === prop.id;
+                      return (
+                        <View
+                          key={prop.id}
+                          style={[
+                            styles.proposalItemCard,
+                            isPropSelected && styles.proposalItemCardSelected,
+                          ]}
+                        >
+                          <View style={styles.proposalItemHeader}>
+                            <Text style={styles.proposalCompany}>
+                              {prop.companyName}
+                            </Text>
+                            <Text style={styles.proposalAmount}>
+                              {prop.amount}
+                            </Text>
+                          </View>
+                          {prop.description ? (
+                            <Text style={styles.proposalItemDescText}>
+                              {prop.description}
+                            </Text>
+                          ) : null}
+                          <View style={styles.proposalItemFooter}>
+                            <TouchableOpacity
+                              style={styles.pdfLinkRow}
+                              onPress={() =>
+                                prop.fileUrl && Linking.openURL(prop.fileUrl)
+                              }
+                            >
+                              <Feather
+                                name="file-text"
+                                size={15}
+                                color={TEAL}
+                              />
+                              <Text style={styles.pdfLinkText}>
+                                Ver {prop.fileName || "presupuesto.pdf"}
+                              </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[
+                                styles.selectPropBtn,
+                                isPropSelected && styles.selectPropBtnActive,
+                              ]}
+                              onPress={() =>
+                                setSelectedProposals((prev) => ({
+                                  ...prev,
+                                  [item.id]: prop.id,
+                                }))
+                              }
+                            >
+                              <Text
+                                style={[
+                                  styles.selectPropBtnText,
+                                  isPropSelected &&
+                                    styles.selectPropBtnTextActive,
+                                ]}
+                              >
+                                {isPropSelected
+                                  ? "✓ Seleccionada"
+                                  : "Elegir propuesta"}
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                ) : (
+                  /* Enlace único a Ver presupuesto.pdf con icono de archivo */
                   <TouchableOpacity
-                    style={[
-                      styles.optionBtn,
-                      currentChoice === "APPROVE" ? styles.optionApproveActive : styles.optionInactive,
-                    ]}
-                    onPress={() => handleSelectChoice(item.id, "APPROVE")}
+                    style={styles.pdfLinkRow}
+                    onPress={() => {
+                      const pdfUrl = itemProposals[0]?.fileUrl;
+                      if (pdfUrl) {
+                        void Linking.openURL(pdfUrl);
+                      } else {
+                        Alert.alert(
+                          "Presupuesto",
+                          "Presupuesto técnico detallado en formato PDF.",
+                        );
+                      }
+                    }}
                     activeOpacity={0.7}
                   >
-                    <Text
-                      style={[
-                        styles.optionBtnText,
-                        currentChoice === "APPROVE" ? styles.textActive : styles.textInactive,
-                      ]}
-                    >
-                      Apruebo
+                    <Feather name="file-text" size={16} color={TEAL} />
+                    <Text style={styles.pdfLinkText}>
+                      Ver {itemProposals[0]?.fileName || "presupuesto.pdf"}
                     </Text>
                   </TouchableOpacity>
-
-                  {/* Rechazo */}
-                  <TouchableOpacity
-                    style={[
-                      styles.optionBtn,
-                      currentChoice === "REJECT" ? styles.optionRejectActive : styles.optionInactive,
-                    ]}
-                    onPress={() => handleSelectChoice(item.id, "REJECT")}
-                    activeOpacity={0.7}
-                  >
-                    <Text
-                      style={[
-                        styles.optionBtnText,
-                        currentChoice === "REJECT" ? styles.textActive : styles.textInactive,
-                      ]}
-                    >
-                      Rechazo
-                    </Text>
-                  </TouchableOpacity>
-
-                  {/* Me abstengo */}
-                  <TouchableOpacity
-                    style={[
-                      styles.optionBtn,
-                      currentChoice === "ABSTAIN" ? styles.optionAbstainActive : styles.optionInactive,
-                    ]}
-                    onPress={() => handleSelectChoice(item.id, "ABSTAIN")}
-                    activeOpacity={0.7}
-                  >
-                    <Text
-                      style={[
-                        styles.optionBtnText,
-                        currentChoice === "ABSTAIN" ? styles.textActive : styles.textInactive,
-                      ]}
-                    >
-                      Me abstengo
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                )}
               </View>
-            );
-          })}
-        </View>
 
-        {/* Counter for Junta */}
-        {isJunta && (
-          <View style={styles.counterRow}>
-            <Text style={styles.counterText}>
-              {answeredCount} de {totalCount} respondidas
-            </Text>
-            {allAnswered ? (
-              <Text style={styles.counterReady}>✓ Todo listo para enviar</Text>
-            ) : (
-              <Text style={styles.counterPending}>Faltan {totalCount - answeredCount} puntos</Text>
-            )}
-          </View>
-        )}
+              {/* Si es sólo presencial */}
+              {isPresentialOnly ? (
+                <View style={styles.presentialNoticeBox}>
+                  <Text style={{ fontSize: 24, marginRight: 10 }}>👥</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.presentialNoticeTitle}>
+                      Votación presencial en Junta
+                    </Text>
+                    <Text style={styles.presentialNoticeText}>
+                      Este punto se debatirá y votará presencialmente durante la
+                      reunión de la Junta.
+                    </Text>
+                  </View>
+                </View>
+              ) : (
+                <>
+                  {/* 5. Pregunta destacada: "¿Apruebas la reparación del ascensor?" */}
+                  <Text style={styles.questionPrompt}>
+                    {formatQuestion(item.title)}
+                  </Text>
 
-        {/* Note before submit */}
-        <View style={styles.infoFootnote}>
-          <Text style={styles.infoFootnoteText}>
-            ⓘ Una vez enviado y confirmado, no podrás modificar tu voto.
-          </Text>
-        </View>
+                  {/* 6. Tres Opciones Verticales: Apruebo, Rechazo, Me abstengo */}
+                  <View style={styles.optionsList}>
+                    {VOTE_OPTIONS.map((opt) => {
+                      const isSelected = currentChoice === opt.key;
+                      return (
+                        <TouchableOpacity
+                          key={opt.key}
+                          style={[
+                            styles.verticalOptionCard,
+                            isSelected && styles.verticalOptionCardSelected,
+                          ]}
+                          onPress={() => handleSelectChoice(item.id, opt.key)}
+                          activeOpacity={0.8}
+                        >
+                          <View
+                            style={[
+                              styles.optionCircleIcon,
+                              isSelected
+                                ? styles.optionCircleIconSelected
+                                : styles.optionCircleIconUnselected,
+                            ]}
+                          >
+                            {isSelected ? (
+                              <Feather name="check" size={14} color="#FFFFFF" />
+                            ) : (
+                              <Feather name="minus" size={12} color="#475569" />
+                            )}
+                          </View>
+                          <Text
+                            style={[
+                              styles.verticalOptionText,
+                              isSelected && styles.verticalOptionTextSelected,
+                            ]}
+                          >
+                            {opt.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </>
+              )}
+            </View>
+          );
+        })}
 
-        {/* Primary Action Button */}
+        {/* 7. Botón Inferior: "Confirmar y enviar" (abre el modal de confirmación) */}
         <TouchableOpacity
           style={[
-            styles.primaryActionBtn,
-            { backgroundColor: allAnswered ? primaryThemeColor : "#CBD5E1" },
+            styles.submitBtn,
+            { backgroundColor: allAnswered ? TEAL : "#CBD5E1" },
           ]}
-          onPress={handleGoToConfirm}
+          onPress={handleOpenConfirmModal}
           disabled={!allAnswered}
+          activeOpacity={0.85}
         >
-          <Text style={styles.primaryActionBtnText}>
-            {isJunta ? "Enviar mis votos →" : "Enviar mi voto →"}
-          </Text>
+          <Text style={styles.submitBtnText}>Confirmar y enviar</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {renderConfirmModal()}
     </SafeAreaView>
   );
 }
@@ -673,236 +1125,52 @@ export default function VotingScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: BG },
-  centerContainer: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, backgroundColor: BG },
+  centerContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 32,
+    backgroundColor: BG,
+  },
   loadingText: { marginTop: 12, fontSize: 14, color: MUTED, fontWeight: "500" },
   emptyEmoji: { fontSize: 56, marginBottom: 16 },
   emptyTitle: { fontSize: 20, fontWeight: "700", color: DARK, marginBottom: 6 },
-  emptySubtitle: { fontSize: 14, color: MUTED, textAlign: "center", lineHeight: 22 },
+  emptySubtitle: {
+    fontSize: 14,
+    color: MUTED,
+    textAlign: "center",
+    lineHeight: 22,
+  },
 
+  // Header superior
   headerBar: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-    backgroundColor: "#FFFFFF",
-  },
-  topNav: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER,
-    backgroundColor: "#FFFFFF",
-  },
-  backBtn: { paddingVertical: 4 },
-  backBtnText: { fontSize: 14, fontWeight: "600", color: DARK },
-  badgeBox: {
-    backgroundColor: "#F1F5F9",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  badgeText: { fontSize: 12, fontWeight: "700" },
-
-  scrollContent: { padding: 20, paddingTop: 24, paddingBottom: 48 },
-  titleSection: { marginBottom: 20 },
-  mainTitle: { fontSize: 24, fontWeight: "800", color: DARK, marginBottom: 4 },
-  closeDateText: { fontSize: 13, color: MUTED, fontWeight: "500", marginBottom: 8 },
-  sessionDesc: { fontSize: 14, color: "#334155", lineHeight: 20 },
-
-  // Vote Item Card
-  voteItemCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: BORDER,
-    shadowColor: "#000",
-    shadowOpacity: 0.03,
-    shadowRadius: 8,
-    elevation: 1,
-  },
-  voteItemHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 6,
-  },
-  voteItemTitle: { fontSize: 16, fontWeight: "700", color: DARK, flex: 1, marginRight: 8 },
-  voteItemBudget: { fontSize: 16, fontWeight: "800", color: TEAL },
-  voteItemDesc: { fontSize: 13, color: MUTED, marginBottom: 12, lineHeight: 18 },
-  questionPrompt: { fontSize: 13, fontWeight: "600", color: "#334155", marginBottom: 12 },
-
-  // Options
-  optionsRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  optionBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1.5,
-  },
-  optionInactive: {
-    backgroundColor: "#F8FAFC",
-    borderColor: BORDER,
-  },
-  optionApproveActive: {
-    backgroundColor: GREEN_BTN,
-    borderColor: GREEN_BTN,
-  },
-  optionRejectActive: {
-    backgroundColor: RED_BTN,
-    borderColor: RED_BTN,
-  },
-  optionAbstainActive: {
-    backgroundColor: GRAY_BTN,
-    borderColor: GRAY_BTN,
-  },
-  optionBtnText: { fontSize: 13, fontWeight: "700" },
-  textInactive: { color: "#334155" },
-  textActive: { color: "#FFFFFF" },
-
-  // Counter
-  counterRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: BORDER,
-    marginBottom: 16,
-  },
-  counterText: { fontSize: 14, fontWeight: "700", color: DARK },
-  counterReady: { fontSize: 12, fontWeight: "700", color: GREEN_BTN },
-  counterPending: { fontSize: 12, fontWeight: "600", color: "#E11D48" },
-
-  // Info Footnote
-  infoFootnote: { marginBottom: 20 },
-  infoFootnoteText: { fontSize: 12, color: MUTED, textAlign: "center" },
-
-  // Primary Action
-  primaryActionBtn: {
-    paddingVertical: 16,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  primaryActionBtnText: { fontSize: 16, fontWeight: "800", color: "#FFFFFF" },
-
-  // Cancel Action
-  cancelActionBtn: {
     paddingVertical: 14,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  cancelActionBtnText: { fontSize: 14, fontWeight: "600", color: MUTED },
-
-  // Confirm Step
-  confirmHeader: { alignItems: "center", marginBottom: 24 },
-  sendCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 14,
-  },
-  confirmTitle: { fontSize: 22, fontWeight: "800", color: DARK, marginBottom: 6, textAlign: "center" },
-  confirmSubtitle: { fontSize: 13, color: MUTED, textAlign: "center", lineHeight: 20, paddingHorizontal: 16 },
-
-  // Success Step
-  successHeader: { alignItems: "center", marginBottom: 24 },
-  successCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 14,
-  },
-  successTitle: { fontSize: 24, fontWeight: "800", color: DARK, marginBottom: 6, textAlign: "center" },
-  successSubtitle: { fontSize: 14, color: MUTED, textAlign: "center", lineHeight: 20 },
-
-  // Summary Card
-  summaryCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: BORDER,
-    marginBottom: 16,
-  },
-  summaryCardTitle: { fontSize: 15, fontWeight: "800", color: DARK, marginBottom: 14, borderBottomWidth: 1, borderBottomColor: "#F1F5F9", paddingBottom: 8 },
-  summaryItemRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#F1F5F9",
   },
-  summaryItemTitle: { fontSize: 14, fontWeight: "700", color: DARK },
-  summaryItemBudget: { fontSize: 13, fontWeight: "700", color: TEAL, marginTop: 2 },
-  choiceTag: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  choiceTagText: { fontSize: 12, fontWeight: "800" },
-  summaryFooter: { marginTop: 14, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#F1F5F9" },
-  summaryTimestamp: { fontSize: 12, color: MUTED, marginBottom: 4 },
-  summaryCoef: { fontSize: 12, fontWeight: "600", color: DARK },
-
-  // Debtor Block
-  debtCard: {
-    backgroundColor: "#FFF1F2",
-    borderRadius: 18,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: "#FECDD3",
+  headerBackBtn: {
+    flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
+    gap: 8,
   },
-  debtIconBox: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "#FFE4E6",
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: TEAL,
+  },
+  headerRightIcons: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
+    gap: 16,
   },
-  debtTitle: { fontSize: 18, fontWeight: "800", color: "#9F1239", marginBottom: 8, textAlign: "center" },
-  debtSubtitle: { fontSize: 13, color: "#881337", textAlign: "center", lineHeight: 20, marginBottom: 16 },
-  payBtn: {
-    backgroundColor: "#E11D48",
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 10,
+  headerIconBtn: {
+    padding: 4,
   },
-  payBtnText: { color: "#FFFFFF", fontWeight: "700", fontSize: 13 },
-  infoBox: {
-    backgroundColor: "#F8FAFC",
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: BORDER,
-  },
-  infoBoxTitle: { fontSize: 13, fontWeight: "700", color: DARK, marginBottom: 4 },
-  infoBoxText: { fontSize: 12, color: MUTED, lineHeight: 18 },
 
   // Session Switcher
   sessionSwitcherBox: {
@@ -923,13 +1191,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E2E8F0",
   },
-  sessionPillActiveTeal: {
-    backgroundColor: "#009689",
-    borderColor: "#009689",
-  },
-  sessionPillActivePurple: {
-    backgroundColor: "#5B21B6",
-    borderColor: "#5B21B6",
+  sessionPillActive: {
+    backgroundColor: TEAL,
+    borderColor: TEAL,
   },
   sessionPillText: {
     fontSize: 13,
@@ -938,5 +1202,777 @@ const styles = StyleSheet.create({
   },
   sessionPillTextActive: {
     color: "#FFFFFF",
+  },
+
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 40,
+  },
+
+  // Badge Pill de Cierre
+  datePill: {
+    backgroundColor: PILL_BG,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    alignSelf: "flex-start",
+    marginBottom: 14,
+  },
+  datePillText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#475569",
+  },
+
+  // Item wrapper
+  itemWrapper: {
+    marginBottom: 16,
+  },
+  mainTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: DARK,
+    marginBottom: 2,
+  },
+  mainBudget: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: DARK,
+    marginBottom: 18,
+  },
+
+  // Tarjeta Propuesta
+  propuestaCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: BORDER,
+    padding: 16,
+    marginBottom: 24,
+  },
+  propuestaTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: DARK,
+    marginBottom: 6,
+  },
+  propuestaDesc: {
+    fontSize: 13,
+    color: "#475569",
+    lineHeight: 19,
+    marginBottom: 12,
+  },
+  pdfLinkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    alignSelf: "flex-start",
+  },
+  pdfLinkText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: TEAL,
+  },
+
+  // Alternativas de presupuestos si hay varias
+  multiProposalsBox: {
+    gap: 8,
+    marginTop: 8,
+  },
+  multiProposalsTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: DARK,
+    marginBottom: 4,
+  },
+  proposalItemCard: {
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 12,
+    padding: 12,
+  },
+  proposalItemCardSelected: {
+    backgroundColor: TEAL_LIGHT,
+    borderColor: TEAL,
+    borderWidth: 1.5,
+  },
+  proposalItemHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  proposalCompany: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: DARK,
+    flex: 1,
+  },
+  proposalAmount: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: TEAL,
+  },
+  proposalItemDescText: {
+    fontSize: 12,
+    color: MUTED,
+    marginBottom: 8,
+  },
+  proposalItemFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 6,
+    gap: 8,
+  },
+  selectPropBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  selectPropBtnActive: {
+    backgroundColor: TEAL,
+    borderColor: TEAL,
+  },
+  selectPropBtnText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: DARK,
+  },
+  selectPropBtnTextActive: {
+    color: "#FFFFFF",
+  },
+
+  // Pregunta destacada
+  questionPrompt: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: DARK,
+    marginBottom: 16,
+  },
+
+  // Lista de 3 Opciones Verticales
+  optionsList: {
+    gap: 10,
+    marginBottom: 8,
+  },
+  verticalOptionCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: BORDER,
+    backgroundColor: "#FFFFFF",
+  },
+  verticalOptionCardSelected: {
+    borderColor: TEAL,
+    borderWidth: 1.5,
+    backgroundColor: TEAL_LIGHT,
+  },
+  optionCircleIcon: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  optionCircleIconSelected: {
+    backgroundColor: TEAL,
+  },
+  optionCircleIconUnselected: {
+    borderWidth: 1.5,
+    borderColor: "#475569",
+    backgroundColor: "transparent",
+  },
+  verticalOptionText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: DARK,
+    marginLeft: 14,
+  },
+  verticalOptionTextSelected: {
+    fontWeight: "700",
+    color: DARK,
+  },
+
+  // Junta counter
+  counterRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: BORDER,
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  counterText: { fontSize: 14, fontWeight: "700", color: DARK },
+  counterReady: { fontSize: 12, fontWeight: "700", color: GREEN_BTN },
+  counterPending: { fontSize: 12, fontWeight: "600", color: "#E11D48" },
+
+  // Botón Principal Confirmar y Enviar
+  submitBtn: {
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 20,
+    marginBottom: 24,
+    shadowColor: TEAL,
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  submitBtnText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+
+  // ─── Screen 07: Junta Multi-Decisión Styles ──────────────────────────────
+  juntaHeaderTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: DARK,
+    marginBottom: 4,
+  },
+  juntaHeaderSubtitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: TEAL,
+    marginBottom: 18,
+  },
+  juntaItemCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: BORDER,
+    padding: 16,
+    marginBottom: 12,
+  },
+  juntaItemTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: DARK,
+    marginBottom: 2,
+  },
+  juntaItemBudget: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: DARK,
+    marginBottom: 12,
+  },
+  juntaOptionsRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 4,
+  },
+  juntaOptionBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: BORDER,
+    backgroundColor: "#FFFFFF",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  juntaOptionBtnSelected: {
+    borderColor: TEAL,
+    borderWidth: 1.5,
+    backgroundColor: TEAL_LIGHT,
+  },
+  juntaOptionCircle: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: TEAL,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  juntaOptionText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#475569",
+  },
+  juntaOptionTextSelected: {
+    fontWeight: "700",
+    color: TEAL,
+  },
+  missingWarningBox: {
+    backgroundColor: "#FFFBEB",
+    borderWidth: 1,
+    borderColor: "#FEF3C7",
+    borderRadius: 12,
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginTop: 6,
+    marginBottom: 16,
+  },
+  missingWarningTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#92400E",
+  },
+  missingWarningSubtitle: {
+    fontSize: 12,
+    color: "#B45309",
+    marginTop: 2,
+    lineHeight: 17,
+  },
+  juntaSubmitBtn: {
+    flexDirection: "row",
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 4,
+    marginBottom: 24,
+    gap: 8,
+    shadowColor: TEAL,
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  juntaSubmitBtnText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+
+  // Presencial Notice
+  presentialNoticeBox: {
+    flexDirection: "row",
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    borderRadius: 12,
+    padding: 12,
+    alignItems: "center",
+    marginTop: 6,
+    marginBottom: 16,
+  },
+  presentialNoticeTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: DARK,
+    marginBottom: 2,
+  },
+  presentialNoticeText: {
+    fontSize: 12,
+    color: MUTED,
+    lineHeight: 16,
+  },
+
+  // Pantalla de Éxito / Cerrada
+  successHeader: { alignItems: "center", marginBottom: 24 },
+  successCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
+  },
+  successTitle: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: DARK,
+    marginBottom: 6,
+    textAlign: "center",
+  },
+  successSubtitle: {
+    fontSize: 14,
+    color: MUTED,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  officialResultCard: {
+    backgroundColor: "#F0FDF4",
+    borderWidth: 1.5,
+    borderColor: "#86EFAC",
+    borderRadius: 14,
+    padding: 14,
+    marginTop: 14,
+    alignItems: "center",
+    width: "100%",
+  },
+  officialResultBadge: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#15803D",
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  officialResultTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#166534",
+    textAlign: "center",
+  },
+
+  // Resumen
+  summaryCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: BORDER,
+    marginBottom: 16,
+  },
+  summaryCardTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: DARK,
+    marginBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+    paddingBottom: 8,
+  },
+  summaryItemRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+  },
+  summaryItemTitle: { fontSize: 14, fontWeight: "700", color: DARK },
+  summaryItemBudget: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: TEAL,
+    marginTop: 2,
+  },
+  choiceTag: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  choiceTagText: { fontSize: 12, fontWeight: "800" },
+  summaryFooter: {
+    marginTop: 14,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#F1F5F9",
+  },
+  summaryTimestamp: { fontSize: 12, color: MUTED, marginBottom: 4 },
+  summaryCoef: { fontSize: 12, fontWeight: "600", color: DARK },
+
+  // Deudores
+  debtCard: {
+    backgroundColor: "#FFF1F2",
+    borderRadius: 18,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: "#FECDD3",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  debtIconBox: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#FFE4E6",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  debtTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#9F1239",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  debtSubtitle: {
+    fontSize: 13,
+    color: "#881337",
+    textAlign: "center",
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  payBtn: {
+    backgroundColor: "#E11D48",
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  payBtnText: { color: "#FFFFFF", fontWeight: "700", fontSize: 13 },
+  infoBox: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  infoBoxTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: DARK,
+    marginBottom: 4,
+  },
+  infoBoxText: { fontSize: 12, color: MUTED, lineHeight: 18 },
+
+  // ─── Modal de Confirmación (Exacto media_1788543618779.png) ───────────────
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.55)",
+    justifyContent: "flex-end",
+  },
+  modalBackdropTouchable: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+  },
+  modalCard: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 22,
+    paddingTop: 24,
+    paddingBottom: 36,
+    width: "100%",
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  modalCloseBtn: {
+    position: "absolute",
+    top: 20,
+    right: 20,
+    padding: 6,
+    zIndex: 10,
+  },
+  shieldIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: TEAL_LIGHT,
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "center",
+    marginBottom: 12,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: DARK,
+    textAlign: "center",
+    marginBottom: 4,
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: MUTED,
+    textAlign: "center",
+    marginBottom: 18,
+  },
+  modalSummaryCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: BORDER,
+    padding: 16,
+    marginBottom: 16,
+  },
+  modalSummaryItem: {
+    width: "100%",
+  },
+  modalItemTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: DARK,
+    marginBottom: 2,
+  },
+  modalItemBudget: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: DARK,
+    marginBottom: 12,
+  },
+  modalAnswerLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: MUTED,
+    marginBottom: 8,
+  },
+  modalChoiceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  modalChoiceCheck: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: TEAL,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalChoiceText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: TEAL,
+  },
+  modalNoticeBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F8FAFC",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 10,
+    marginBottom: 20,
+  },
+  modalNoticeText: {
+    fontSize: 12,
+    color: "#334155",
+    fontWeight: "500",
+    flex: 1,
+    lineHeight: 17,
+  },
+  modalSubmitBtn: {
+    backgroundColor: TEAL,
+    borderRadius: 14,
+    paddingVertical: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: TEAL,
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  modalSubmitBtnText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  modalCancelBtn: {
+    paddingVertical: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 4,
+  },
+  modalCancelBtnText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: TEAL,
+  },
+
+  // ─── Pantalla Voto Registrado (Exacto media_1788544403855.png) ────────────
+  successCircleLarge: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: TEAL_LIGHT,
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "center",
+    marginTop: 24,
+    marginBottom: 16,
+  },
+  successTitleText: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: DARK,
+    textAlign: "center",
+    marginBottom: 6,
+  },
+  successSubtitleText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: MUTED,
+    textAlign: "center",
+    marginBottom: 24,
+    paddingHorizontal: 16,
+    lineHeight: 20,
+  },
+  votedSummaryCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: BORDER,
+    padding: 18,
+    marginBottom: 20,
+  },
+  votedItemSection: {
+    width: "100%",
+  },
+  votedItemTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: DARK,
+    marginBottom: 2,
+  },
+  votedItemBudget: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: DARK,
+    marginBottom: 14,
+  },
+  votedResponseLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: MUTED,
+    marginBottom: 8,
+  },
+  votedChoiceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  votedChoiceCheckCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: TEAL,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  votedChoiceText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: TEAL,
+  },
+  votedSentDateText: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: MUTED,
+    marginTop: 16,
+  },
+  outlineReturnBtn: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1.5,
+    borderColor: TEAL,
+    borderRadius: 14,
+    paddingVertical: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 4,
+    marginBottom: 28,
+  },
+  outlineReturnBtnText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: TEAL,
   },
 });

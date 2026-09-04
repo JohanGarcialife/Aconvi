@@ -182,6 +182,10 @@ export default function VecinoLayout() {
         name="rating"
         options={{ href: null, headerShown: false }}
       />
+      <Tabs.Screen
+        name="votes-history"
+        options={{ href: null, headerShown: false }}
+      />
     </Tabs>
   );
 }
