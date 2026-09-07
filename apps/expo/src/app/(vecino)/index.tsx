@@ -497,6 +497,9 @@ export default function VecinoHome() {
   const openVotings = allVotings.filter(
     (v: any) => v.status === "OPEN" && !v.isArchived,
   );
+  const closedVotings = allVotings.filter(
+    (v: any) => v.status === "CLOSED" && !v.isArchived,
+  );
 
   // Sort open votings: non-voted first, then priority desc, then closesAt asc
   const sortedOpen = [...openVotings].sort((a: any, b: any) => {
@@ -510,19 +513,29 @@ export default function VecinoHome() {
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 
+  // Sort closed votings: closedAt desc (most recent first)
+  const sortedClosed = [...closedVotings].sort((a: any, b: any) => {
+    const timeA = a.closedAt ? new Date(a.closedAt).getTime() : new Date(a.createdAt).getTime();
+    const timeB = b.closedAt ? new Date(b.closedAt).getTime() : new Date(b.createdAt).getTime();
+    return timeB - timeA;
+  });
+
+  // Client requirement: Abiertas (según urgencia) → cerradas
+  const displayVotings = [...sortedOpen, ...sortedClosed];
+
   const handleVotingScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       const offsetX = event.nativeEvent.contentOffset.x;
       const slide = Math.round(offsetX / (cardWidth + cardGap));
       if (
         slide >= 0 &&
-        slide < sortedOpen.length &&
+        slide < displayVotings.length &&
         slide !== activeVotingSlide
       ) {
         setActiveVotingSlide(slide);
       }
     },
-    [activeVotingSlide, sortedOpen.length, cardWidth, cardGap],
+    [activeVotingSlide, displayVotings.length, cardWidth, cardGap],
   );
 
   const latestNotice = (notices as any[] | undefined)?.[0];
@@ -618,7 +631,7 @@ export default function VecinoHome() {
             <SectionTitle title="Votación Activa" />
             <ActivityIndicator color={PRIMARY} />
           </View>
-        ) : sortedOpen.length > 0 ? (
+        ) : displayVotings.length > 0 ? (
           <View style={styles.carouselContainer}>
             <ScrollView
               horizontal
@@ -630,9 +643,10 @@ export default function VecinoHome() {
               onScroll={handleVotingScroll}
               scrollEventThrottle={16}
             >
-              {sortedOpen.map((voting: any) => {
+              {displayVotings.map((voting: any) => {
                 const isJunta = voting.type === "JUNTA";
                 const isVoted = voting.hasVoted;
+                const isClosed = voting.status === "CLOSED";
                 return (
                   <View
                     key={voting.id}
@@ -650,16 +664,41 @@ export default function VecinoHome() {
                         style={[
                           styles.sectionTitle,
                           {
-                            color: PRIMARY,
+                            color: isClosed ? "#64748b" : PRIMARY,
                             fontSize: 12,
                             letterSpacing: 0.8,
                             fontWeight: "700",
                           },
                         ]}
                       >
-                        {isJunta ? "JUNTA EXTRAORDINARIA" : "VOTACIÓN ACTIVA"}
+                        {isClosed
+                          ? isJunta
+                            ? "JUNTA CERRADA"
+                            : "VOTACIÓN CERRADA"
+                          : isJunta
+                            ? "JUNTA EXTRAORDINARIA"
+                            : "VOTACIÓN ACTIVA"}
                       </Text>
-                      {voting.closesAt ? (
+                      {isClosed ? (
+                        <View
+                          style={{
+                            backgroundColor: "#f1f5f9",
+                            paddingHorizontal: 8,
+                            paddingVertical: 3,
+                            borderRadius: 12,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              fontWeight: "600",
+                              color: "#64748b",
+                            }}
+                          >
+                            🔒 Finalizada
+                          </Text>
+                        </View>
+                      ) : voting.closesAt ? (
                         <CountdownTimer closesAt={voting.closesAt} />
                       ) : null}
                     </View>
@@ -674,7 +713,32 @@ export default function VecinoHome() {
                           } decisiones para votar`
                         : voting.title}
                     </Text>
-                    {isJunta ? (
+
+                    {isClosed && voting.resultSummary ? (
+                      <View
+                        style={{
+                          backgroundColor: "#f0fdfa",
+                          borderWidth: 1,
+                          borderColor: "#ccfbf1",
+                          borderRadius: 8,
+                          paddingHorizontal: 10,
+                          paddingVertical: 6,
+                          marginBottom: 8,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontWeight: "700",
+                            color: PRIMARY,
+                          }}
+                        >
+                          {voting.resultSummary}
+                        </Text>
+                      </View>
+                    ) : null}
+
+                    {isJunta && !isClosed ? (
                       <Text
                         style={{
                           color: PRIMARY,
@@ -691,24 +755,30 @@ export default function VecinoHome() {
                           3}{" "}
                         respondidas
                       </Text>
-                    ) : (
-                      voting.budget && (
-                        <Text style={styles.votingAmount}>{voting.budget}</Text>
-                      )
-                    )}
+                    ) : !isClosed && voting.budget ? (
+                      <Text style={styles.votingAmount}>{voting.budget}</Text>
+                    ) : null}
+
                     <Text
                       style={[
                         styles.mutedText,
                         { fontSize: 13, marginBottom: 14 },
                       ]}
                     >
-                      {voting.closesAt
-                        ? `Cierre: ${format(new Date(voting.closesAt), "d MMM. · HH:mm", { locale: es })}`
-                        : "Sin fecha límite"}
+                      {isClosed
+                        ? voting.closedAt
+                          ? `Finalizada el ${format(new Date(voting.closedAt), "d MMM. · HH:mm", { locale: es })}`
+                          : "Votación finalizada"
+                        : voting.closesAt
+                          ? `Cierre: ${format(new Date(voting.closesAt), "d MMM. · HH:mm", { locale: es })}`
+                          : "Sin fecha límite"}
                     </Text>
 
                     <TouchableOpacity
-                      style={styles.primaryButton}
+                      style={[
+                        styles.primaryButton,
+                        isClosed && { backgroundColor: "#0f766e" },
+                      ]}
                       activeOpacity={0.8}
                       onPress={() =>
                         router.push({
@@ -718,11 +788,13 @@ export default function VecinoHome() {
                       }
                     >
                       <Text style={styles.primaryButtonText}>
-                        {isVoted
-                          ? "Ver mi voto / Resultados"
-                          : isJunta
-                            ? "Entrar a votar"
-                            : "Votar ahora"}
+                        {isClosed
+                          ? "Ver resultados"
+                          : isVoted
+                            ? "Ver mi voto / Resultados"
+                            : isJunta
+                              ? "Entrar a votar"
+                              : "Votar ahora"}
                       </Text>
                       <Text style={styles.primaryButtonArrow}>→</Text>
                     </TouchableOpacity>
@@ -732,9 +804,9 @@ export default function VecinoHome() {
             </ScrollView>
 
             {/* Dots de paginación si hay múltiples votaciones activas */}
-            {sortedOpen.length > 1 && (
+            {displayVotings.length > 1 && (
               <View style={styles.carouselPagination}>
-                {sortedOpen.map((v: any, index: number) => (
+                {displayVotings.map((v: any, index: number) => (
                   <View
                     key={v.id ?? index}
                     style={[

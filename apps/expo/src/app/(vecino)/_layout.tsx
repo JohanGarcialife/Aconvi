@@ -155,6 +155,7 @@ export default function VecinoLayout() {
         options={{
           href: null,
           title: "Votaciones",
+          tabBarStyle: { display: "none" },
           tabBarIcon: ({ focused }) => (
             <TabIcon name="Votaciones" focused={focused} />
           ),

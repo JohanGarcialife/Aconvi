@@ -12,6 +12,7 @@ import {
   useWindowDimensions,
   Modal,
   Dimensions,
+  TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, Stack, useLocalSearchParams } from "expo-router";
@@ -41,11 +42,13 @@ async function loadEstimateQueue(): Promise<OfflineEstimate[]> {
   const raw = await AsyncStorage.getItem(OFFLINE_ESTIMATE_QUEUE_KEY);
   return raw ? JSON.parse(raw) : [];
 }
+
 async function addEstimateToQueue(job: OfflineEstimate) {
   const queue = await loadEstimateQueue();
   queue.push(job);
   await AsyncStorage.setItem(OFFLINE_ESTIMATE_QUEUE_KEY, JSON.stringify(queue));
 }
+
 async function removeEstimateFromQueue(id: string) {
   const queue = await loadEstimateQueue();
   await AsyncStorage.setItem(
@@ -73,10 +76,17 @@ interface NativeSliderProps {
 function NativeSlider({ value, min, max, step = 5, onChange, disabled = false }: NativeSliderProps) {
   const TRACK_WIDTH = useWindowDimensions().width - 80;
   const THUMB = 24;
-  const pct = (value - min) / (max - min);
+  const safeRange = Math.max(1, max - min);
+  const pct = Math.max(0, Math.min(1, (value - min) / safeRange));
   const thumbX = useRef(new Animated.Value(pct * (TRACK_WIDTH - THUMB))).current;
   const startX = useRef(0);
   const startVal = useRef(value);
+
+  useEffect(() => {
+    const r = Math.max(1, max - min);
+    const p = Math.max(0, Math.min(1, (value - min) / r));
+    thumbX.setValue(p * (TRACK_WIDTH - THUMB));
+  }, [value, min, max, TRACK_WIDTH]);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -88,11 +98,12 @@ function NativeSlider({ value, min, max, step = 5, onChange, disabled = false }:
       },
       onPanResponderMove: (_, g) => {
         if (disabled) return;
+        const r = Math.max(1, max - min);
         const ratio = g.dx / (TRACK_WIDTH - THUMB);
-        const raw = startVal.current + ratio * (max - min);
+        const raw = startVal.current + ratio * r;
         const clamped = Math.max(min, Math.min(max, raw));
         const stepped = Math.round(clamped / step) * step;
-        const newPct = (stepped - min) / (max - min);
+        const newPct = (stepped - min) / r;
         thumbX.setValue(newPct * (TRACK_WIDTH - THUMB));
         onChange(stepped);
       },
@@ -190,8 +201,63 @@ export default function JobEstimateScreen() {
   const [departure, setDeparture] = useState(40);
   const [labor, setLabor] = useState(80);
   const [materials, setMaterials] = useState(35);
+  const [departureText, setDepartureText] = useState("40");
+  const [laborText, setLaborText] = useState("80");
+  const [materialsText, setMaterialsText] = useState("35");
   const [days, setDays] = useState(1);
   const [goNow, setGoNow] = useState(true);
+
+  const handleDepartureSlider = (val: number) => {
+    setDeparture(val);
+    setDepartureText(val.toString());
+  };
+
+  const handleDepartureText = (text: string) => {
+    setDepartureText(text);
+    const cleaned = text.replace(",", ".");
+    const parsed = parseFloat(cleaned);
+    if (!isNaN(parsed) && parsed >= 0) {
+      setDeparture(parsed);
+    } else if (text.trim() === "") {
+      setDeparture(0);
+    }
+  };
+
+  const handleLaborSlider = (val: number) => {
+    setLabor(val);
+    setLaborText(val.toString());
+  };
+
+  const handleLaborText = (text: string) => {
+    setLaborText(text);
+    const cleaned = text.replace(",", ".");
+    const parsed = parseFloat(cleaned);
+    if (!isNaN(parsed) && parsed >= 0) {
+      setLabor(parsed);
+    } else if (text.trim() === "") {
+      setLabor(0);
+    }
+  };
+
+  const handleMaterialsSlider = (val: number) => {
+    setMaterials(val);
+    setMaterialsText(val.toString());
+  };
+
+  const handleMaterialsText = (text: string) => {
+    setMaterialsText(text);
+    const cleaned = text.replace(",", ".");
+    const parsed = parseFloat(cleaned);
+    if (!isNaN(parsed) && parsed >= 0) {
+      setMaterials(parsed);
+    } else if (text.trim() === "") {
+      setMaterials(0);
+    }
+  };
+
+  const departureMax = Math.max(150, Math.ceil(((departure || 0) * 1.25) / 50) * 50);
+  const laborMax = Math.max(200, Math.ceil(((labor || 0) * 1.25) / 50) * 50);
+  const materialsMax = Math.max(100, Math.ceil(((materials || 0) * 1.25) / 50) * 50);
 
   // Bottom Sheet
   const [showSchedule, setShowSchedule] = useState(false);
@@ -221,7 +287,7 @@ export default function JobEstimateScreen() {
   };
 
   const dateChips = generateDateChips(14);
-  const total = departure + labor + materials;
+  const total = Math.round(((departure || 0) + (labor || 0) + (materials || 0)) * 100) / 100;
 
   const acceptMutation = useMutation(
     api.incident.providerAccept.mutationOptions({
@@ -608,16 +674,33 @@ export default function JobEstimateScreen() {
           <View style={styles.sliderHeader}>
             <Ionicons name="car-outline" size={18} color={DARK} style={{ marginRight: 8 }} />
             <Text style={styles.sliderLabel}>Desplazamiento</Text>
-            <View style={styles.sliderBadge}>
-              <Text style={styles.sliderBadgeText}>{departure} €</Text>
+            <View style={styles.editableInputContainer}>
+              <TextInput
+                style={styles.editableAmountInput}
+                value={departureText}
+                onChangeText={handleDepartureText}
+                keyboardType="decimal-pad"
+                placeholder="0"
+                placeholderTextColor="#94a3b8"
+                editable={!isIncidentExpired}
+                selectTextOnFocus
+              />
+              <Text style={styles.euroText}>€</Text>
             </View>
           </View>
-          <NativeSlider value={departure} min={0} max={150} step={5} onChange={setDeparture} disabled={isIncidentExpired} />
+          <NativeSlider
+            value={departure}
+            min={0}
+            max={departureMax}
+            step={5}
+            onChange={handleDepartureSlider}
+            disabled={isIncidentExpired}
+          />
           <View style={styles.scaleRow}>
             <Text style={styles.scaleMark}>0 €</Text>
-            <Text style={styles.scaleMark}>50 €</Text>
-            <Text style={styles.scaleMark}>100 €</Text>
-            <Text style={styles.scaleMark}>150 €</Text>
+            <Text style={styles.scaleMark}>{Math.round(departureMax / 3)} €</Text>
+            <Text style={styles.scaleMark}>{Math.round((departureMax * 2) / 3)} €</Text>
+            <Text style={styles.scaleMark}>{departureMax} €</Text>
           </View>
         </View>
 
@@ -625,16 +708,33 @@ export default function JobEstimateScreen() {
           <View style={styles.sliderHeader}>
             <Ionicons name="build-outline" size={18} color={DARK} style={{ marginRight: 8 }} />
             <Text style={styles.sliderLabel}>Mano de obra</Text>
-            <View style={styles.sliderBadge}>
-              <Text style={styles.sliderBadgeText}>{labor} €</Text>
+            <View style={styles.editableInputContainer}>
+              <TextInput
+                style={styles.editableAmountInput}
+                value={laborText}
+                onChangeText={handleLaborText}
+                keyboardType="decimal-pad"
+                placeholder="0"
+                placeholderTextColor="#94a3b8"
+                editable={!isIncidentExpired}
+                selectTextOnFocus
+              />
+              <Text style={styles.euroText}>€</Text>
             </View>
           </View>
-          <NativeSlider value={labor} min={0} max={200} step={10} onChange={setLabor} disabled={isIncidentExpired} />
+          <NativeSlider
+            value={labor}
+            min={0}
+            max={laborMax}
+            step={10}
+            onChange={handleLaborSlider}
+            disabled={isIncidentExpired}
+          />
           <View style={styles.scaleRow}>
             <Text style={styles.scaleMark}>0 €</Text>
-            <Text style={styles.scaleMark}>80 €</Text>
-            <Text style={styles.scaleMark}>160 €</Text>
-            <Text style={styles.scaleMark}>200 €</Text>
+            <Text style={styles.scaleMark}>{Math.round(laborMax / 3)} €</Text>
+            <Text style={styles.scaleMark}>{Math.round((laborMax * 2) / 3)} €</Text>
+            <Text style={styles.scaleMark}>{laborMax} €</Text>
           </View>
         </View>
 
@@ -642,16 +742,33 @@ export default function JobEstimateScreen() {
           <View style={styles.sliderHeader}>
             <Ionicons name="briefcase-outline" size={18} color={DARK} style={{ marginRight: 8 }} />
             <Text style={styles.sliderLabel}>Materiales</Text>
-            <View style={styles.sliderBadge}>
-              <Text style={styles.sliderBadgeText}>{materials} €</Text>
+            <View style={styles.editableInputContainer}>
+              <TextInput
+                style={styles.editableAmountInput}
+                value={materialsText}
+                onChangeText={handleMaterialsText}
+                keyboardType="decimal-pad"
+                placeholder="0"
+                placeholderTextColor="#94a3b8"
+                editable={!isIncidentExpired}
+                selectTextOnFocus
+              />
+              <Text style={styles.euroText}>€</Text>
             </View>
           </View>
-          <NativeSlider value={materials} min={0} max={100} step={5} onChange={setMaterials} disabled={isIncidentExpired} />
+          <NativeSlider
+            value={materials}
+            min={0}
+            max={materialsMax}
+            step={5}
+            onChange={handleMaterialsSlider}
+            disabled={isIncidentExpired}
+          />
           <View style={styles.scaleRow}>
             <Text style={styles.scaleMark}>0 €</Text>
-            <Text style={styles.scaleMark}>40 €</Text>
-            <Text style={styles.scaleMark}>80 €</Text>
-            <Text style={styles.scaleMark}>100 €</Text>
+            <Text style={styles.scaleMark}>{Math.round(materialsMax / 3)} €</Text>
+            <Text style={styles.scaleMark}>{Math.round((materialsMax * 2) / 3)} €</Text>
+            <Text style={styles.scaleMark}>{materialsMax} €</Text>
           </View>
         </View>
 
@@ -659,7 +776,9 @@ export default function JobEstimateScreen() {
         <View style={styles.totalRow}>
           <Text style={styles.totalLabel}>Presupuesto total estimativo:</Text>
           <View style={[styles.totalBadge, isIncidentExpired && { backgroundColor: "#94a3b8" }]}>
-            <Text style={styles.totalAmount}>{total} €</Text>
+            <Text style={styles.totalAmount}>
+              {total.toLocaleString("es-ES", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €
+            </Text>
           </View>
         </View>
 
@@ -886,6 +1005,32 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: BORDER, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4,
   },
   sliderBadgeText: { fontSize: 14, fontWeight: "700", color: DARK },
+  editableInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderWidth: 1.5,
+    borderColor: PRIMARY,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    minWidth: 80,
+    justifyContent: "flex-end",
+  },
+  editableAmountInput: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: DARK,
+    textAlign: "right",
+    padding: 0,
+    minWidth: 40,
+  },
+  euroText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: PRIMARY,
+    marginLeft: 4,
+  },
   scaleRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 2 },
   scaleMark: { fontSize: 10, color: MUTED },
 

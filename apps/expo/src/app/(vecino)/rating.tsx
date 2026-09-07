@@ -144,8 +144,8 @@ export default function RatingScreen() {
     );
   }
 
-  // Allow rating when incident is RESUELTA or CERRADA
-  if (incident && !["RESUELTA", "CERRADA"].includes((incident as any).status)) {
+  // Allow rating ONLY when incident is CERRADA
+  if (incident && (incident as any).status !== "CERRADA") {
     return (
       <SafeAreaView style={s.safe} edges={["top", "bottom"]}>
         <Stack.Screen options={{ headerShown: false }} />

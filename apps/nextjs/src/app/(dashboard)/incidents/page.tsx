@@ -74,6 +74,79 @@ function Timeline({ status }: { status: string }) {
   );
 }
 
+function formatTimelineEntry(h: any) {
+  let title = `${h.actorName ?? "Sistema"} → ${STATUS_LABEL[h.newStatus]?.label ?? h.newStatus}`;
+  let comment: string | null = h.comment ?? null;
+  let dotColor = "bg-teal-500";
+
+  if (h.action === "CREATED") {
+    title = "Incidencia comunicada";
+    comment = comment && comment !== "—" && comment !== "-" ? comment : "El vecino ha informado del problema.";
+    dotColor = "bg-teal-600";
+  } else if (h.action === "ASSIGNED") {
+    title = "Proveedor asignado";
+    comment = "Se ha asignado un proveedor a la incidencia.";
+    dotColor = "bg-sky-500";
+  } else if (h.action === "PROVIDER_ACCEPTED") {
+    title = "Intervención aceptada";
+    if (comment) {
+      if (comment.includes("Salida inmediata")) {
+        comment = "Salida inmediata.";
+      } else if (comment.startsWith("Notas: ")) {
+        comment = comment.replace(/^Notas:\s*/, "");
+      } else if (comment === "Trabajo agendado por el proveedor") {
+        comment = null;
+      }
+    }
+    dotColor = "bg-teal-500";
+  } else if (h.action === "ARRIVED") {
+    title = "Proveedor en el lugar";
+    comment = "El proveedor ha llegado y ha iniciado el trabajo.";
+    dotColor = "bg-emerald-500";
+  } else if (h.action === "COMPLETED") {
+    title = "Trabajo completado";
+    comment =
+      comment && (comment.toLowerCase().includes("pruebas") || comment.toLowerCase().includes("finalizado"))
+        ? "El proveedor ha finalizado la intervención."
+        : comment || "El proveedor ha finalizado la intervención.";
+    dotColor = "bg-emerald-600";
+  } else if (h.action === "RATED") {
+    title = "El vecino ha valorado el servicio";
+    if (comment) {
+      const match = comment.match(/Valoró con (\d+) estrellas(?::\s*["“]?(.*?)["”]?)?$/i);
+      if (match && match[1]) {
+        const starNum = parseInt(match[1], 10) || 5;
+        const starStr = "★".repeat(starNum) + "☆".repeat(Math.max(0, 5 - starNum));
+        const rest = match[2]?.trim();
+        comment = rest && rest !== "Sin comentario" ? `${starStr} / "${rest}"` : starStr;
+      }
+    }
+    dotColor = "bg-amber-500";
+  } else if (h.action === "STATUS_CHANGED" && h.newStatus === "CERRADA") {
+    title = "Incidencia cerrada";
+    comment = "El administrador ha validado el trabajo.";
+    dotColor = "bg-teal-700";
+  } else if (h.action === "NO_SHOW") {
+    title = "Visita no realizada";
+    comment = "El proveedor no inició la intervención dentro del horario previsto.";
+    dotColor = "bg-orange-500";
+  } else if (h.action === "OT_EXPIRED") {
+    title = "Orden caducada";
+    comment = "Superado el tiempo límite de respuesta (2h).";
+    dotColor = "bg-rose-500";
+  } else if (h.action === "PROVIDER_REJECTED") {
+    title = "Intervención rechazada";
+    comment = comment ?? "El proveedor ha rechazado la orden de trabajo.";
+    dotColor = "bg-red-500";
+  } else if (h.newStatus === "CERRADA") {
+    title = "Incidencia cerrada";
+    comment = comment ?? "El administrador ha validado el trabajo.";
+    dotColor = "bg-teal-700";
+  }
+
+  return { title, comment, dotColor };
+}
+
 export default function IncidentsPage() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -774,51 +847,17 @@ export default function IncidentsPage() {
                     <div className="absolute left-2 top-2 bottom-4 w-0.5 bg-slate-200" />
                   )}
                   {[...(selected.history ?? [])].reverse().map((h: any) => {
-                    const statusName = STATUS_LABEL[h.newStatus]?.label ?? h.newStatus;
-                    let actionText = `→ ${statusName}`;
-                    let dotColor = "bg-teal-500";
-
-                    if (h.action === "CREATED") {
-                      actionText = "reportó la incidencia";
-                      dotColor = "bg-blue-500";
-                    } else if (h.action === "ASSIGNED") {
-                      actionText = "asignó un proveedor";
-                      dotColor = "bg-violet-500";
-                    } else if (h.action === "PROVIDER_ACCEPTED") {
-                      actionText = "aceptó el trabajo (Agendada)";
-                      dotColor = "bg-purple-500";
-                    } else if (h.action === "ARRIVED") {
-                      actionText = "confirmó llegada en el sitio (En curso)";
-                      dotColor = "bg-cyan-500";
-                    } else if (h.action === "COMPLETED") {
-                      actionText = "finalizó el trabajo (Resuelta)";
-                      dotColor = "bg-emerald-500";
-                    } else if (h.action === "RATED") {
-                      actionText = "valoró el servicio";
-                      dotColor = "bg-amber-500";
-                    } else if (h.action === "OT_EXPIRED") {
-                      actionText = "caducó por superar tiempo de respuesta (2h)";
-                      dotColor = "bg-rose-500";
-                    } else if (h.action === "NO_SHOW") {
-                      actionText = "no se presentó a la visita (+1h tras hora programada)";
-                      dotColor = "bg-orange-500";
-                    } else if (h.action === "PROVIDER_REJECTED") {
-                      actionText = "rechazó la orden de trabajo";
-                      dotColor = "bg-red-500";
-                    }
+                    const { title, comment, dotColor } = formatTimelineEntry(h);
 
                     return (
                       <div key={h.id} className="relative flex gap-3">
                         <div className={`absolute -left-3 top-1 h-3 w-3 rounded-full border-2 border-white z-10 ${dotColor}`} />
                         <div>
                           <p className="text-sm font-semibold text-slate-800">
-                            {h.actorName}{" "}
-                            <span className="font-normal text-slate-500">
-                              {actionText}
-                            </span>
+                            {title}
                           </p>
-                          {h.comment && (
-                            <p className="mt-1 inline-block rounded-lg border border-slate-100 bg-slate-50 px-3 py-1.5 text-xs text-slate-600">{h.comment}</p>
+                          {comment && (
+                            <p className="mt-1 inline-block rounded-lg border border-slate-100 bg-slate-50 px-3 py-1.5 text-xs text-slate-600 font-medium">{comment}</p>
                           )}
                           <p className="mt-0.5 text-xs text-slate-400">
                             {new Date(h.createdAt).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}

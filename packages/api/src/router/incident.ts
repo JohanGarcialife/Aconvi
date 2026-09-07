@@ -213,7 +213,7 @@ async function processOverdueIncidents(db: any, organizationId?: string | null) 
           action: "NO_SHOW",
           previousStatus: "AGENDADA",
           newStatus: "NO_PRESENTADA",
-          comment: "El proveedor no inició la intervención tras 1 hora de la hora programada.",
+          comment: "El proveedor no inició la intervención dentro del horario previsto.",
         });
 
         // Push notification to AFs
@@ -385,9 +385,10 @@ export const incidentRouter = createTRPCRouter({
       // Log history
       await ctx.db.insert(incidentHistory).values({
         incidentId: created.id,
-        actorName: "Vecino (Reportero)",
+        actorName: "Vecino",
         action: "CREATED",
         newStatus: "RECIBIDA",
+        comment: "El vecino ha informado del problema.",
       });
 
       // Fire-and-forget: Push to AFs
@@ -594,7 +595,7 @@ export const incidentRouter = createTRPCRouter({
           actorName: "Administrador / Agente",
           action: "ASSIGNED",
           newStatus: "EN_REVISION",
-          comment: "Se asignó un proveedor",
+          comment: "Se ha asignado un proveedor a la incidencia.",
         });
       } catch (err) {
         console.error("[assignProvider] Error inserting history:", err);
@@ -942,7 +943,12 @@ export const incidentRouter = createTRPCRouter({
         action: "PROVIDER_ACCEPTED",
         previousStatus: current.status,
         newStatus: "AGENDADA",
-        comment: input.notes ? `Notas: ${input.notes}` : "Trabajo agendado por el proveedor",
+        comment:
+          input.notes === "Salida inmediata"
+            ? "Salida inmediata."
+            : input.notes
+              ? `Notas: ${input.notes}`
+              : "Intervención aceptada",
       });
 
       // Fire-and-forget push to vecino
@@ -1018,7 +1024,7 @@ export const incidentRouter = createTRPCRouter({
         action: "COMPLETED",
         previousStatus: "EN_CURSO",
         newStatus: "RESUELTA",
-        comment: input.completionNote || "Trabajo finalizado",
+        comment: input.completionNote || "El proveedor ha finalizado la intervención.",
       });
 
       // Fire-and-forget push to vecino
@@ -1119,7 +1125,7 @@ export const incidentRouter = createTRPCRouter({
         action: "ARRIVED",
         previousStatus: "AGENDADA",
         newStatus: "EN_CURSO",
-        comment: "Proveedor llegó al lugar e inicia el trabajo",
+        comment: "El proveedor ha llegado y ha iniciado el trabajo.",
       });
 
       // Fire-and-forget push to vecino
@@ -1175,7 +1181,7 @@ export const incidentRouter = createTRPCRouter({
         action: "STATUS_CHANGED",
         previousStatus: "RESUELTA",
         newStatus: "CERRADA",
-        comment: input.closingComment || "Incidencia revisada y cerrada por el administrador",
+        comment: input.closingComment || "El administrador ha validado el trabajo.",
       });
 
       // Notify vecino
@@ -1214,7 +1220,7 @@ export const incidentRouter = createTRPCRouter({
           and(
             eq(incident.id, input.id),
             eq(incident.organizationId, input.tenantId),
-            inArray(incident.status, ["RESUELTA", "CERRADA"]),
+            eq(incident.status, "CERRADA"),
             isNull(incident.rating),
           ),
         )
@@ -1223,13 +1229,18 @@ export const incidentRouter = createTRPCRouter({
       if (!updated) throw new Error("No se pudo registrar la valoración.");
 
       // Log history event (not state change)
+      const stars = "★".repeat(input.rating) + "☆".repeat(Math.max(0, 5 - input.rating));
+      const ratingComment = input.comment?.trim() && input.comment.trim() !== "Sin comentario"
+        ? `${stars} / "${input.comment.trim()}"`
+        : stars;
+
       await ctx.db.insert(incidentHistory).values({
         incidentId: updated.id,
-        actorName: "Vecino",
+        actorName: "El vecino",
         action: "RATED",
         previousStatus: updated.status,
         newStatus: "CERRADA",
-        comment: `Valoró con ${input.rating} estrellas: "${input.comment ?? "Sin comentario"}"`,
+        comment: ratingComment,
       });
 
       // Push notification to AFs

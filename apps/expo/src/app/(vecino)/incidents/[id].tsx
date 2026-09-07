@@ -45,7 +45,7 @@ const TENANT_ID = "org_aconvi_demo";
 const STATUS_MAP: Record<string, { label: string; icon: string; color: string; bg: string }> = {
   RECIBIDA:    { label: "Incidencia recibida",     icon: "✉️",  color: "#92400e", bg: "#fef3c7" },
   EN_REVISION: { label: "Profesional asignado",     icon: "👤",  color: "#1e40af", bg: "#dbeafe" },
-  AGENDADA:    { label: "Intervención confirmada",  icon: "📅",  color: "#5b21b6", bg: "#ede9fe" },
+  AGENDADA:    { label: "Intervención confirmada",  icon: "📅",  color: "#027580", bg: "#e6fffa" },
   EN_CURSO:    { label: "En intervención",           icon: "🔧",  color: "#065f46", bg: "#d1fae5" },
   RESUELTA:    { label: "Resuelta",                 icon: "🕒",  color: "#b45309", bg: "#fef3c7" },
   RECHAZADA:   { label: "No procede",               icon: "✕",   color: "#991b1b", bg: "#fee2e2" },
@@ -183,7 +183,7 @@ export default function IncidentDetailScreen() {
   const displayId = `#INC-${id.slice(0, 8).toUpperCase()}`;
   const createdDate = format(new Date(incident.createdAt), "d 'de' MMMM, HH:mm", { locale: es });
   const isResolved = incident.status === "RESUELTA" || incident.status === "CERRADA";
-  const canRate = ["RESUELTA", "CERRADA"].includes(incident.status) && !incident.rating;
+  const canRate = incident.status === "CERRADA" && !incident.rating;
   const isRejected = incident.status === "RECHAZADA";
 
   return (
@@ -297,7 +297,7 @@ export default function IncidentDetailScreen() {
               </View>
             )}
 
-            {/* ── Rating CTA ────────────────────────────────────────────────── */}
+            {/* ── Rating CTA / Status info ─────────────────────────────────── */}
             {canRate && (
               <TouchableOpacity
                 style={s.rateBtn}
@@ -306,6 +306,14 @@ export default function IncidentDetailScreen() {
               >
                 <Text style={s.rateBtnText}>✅ Valorar el servicio</Text>
               </TouchableOpacity>
+            )}
+
+            {incident.status === "RESUELTA" && !incident.rating && (
+              <View style={{ backgroundColor: "#fef3c7", borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: "#fde68a" }}>
+                <Text style={{ fontSize: 13, color: "#92400e", fontWeight: "600" }}>
+                  🕒 El proveedor ha finalizado la intervención. Podrás valorar el servicio en cuanto el administrador valide y cierre la incidencia.
+                </Text>
+              </View>
             )}
 
             {/* ── Notifications toggle ──────────────────────────────────────── */}
@@ -353,7 +361,10 @@ export default function IncidentDetailScreen() {
             {(incident as any).category && (
               <View style={s.detailCard}>
                 <Text style={s.detailLabel}>CATEGORÍA</Text>
-                <Text style={s.detailValue}>{(incident as any).category}</Text>
+                <Text style={[s.detailValue, { textTransform: "capitalize" }]}>
+                  {String((incident as any).category).charAt(0).toUpperCase() +
+                    String((incident as any).category).slice(1)}
+                </Text>
               </View>
             )}
 

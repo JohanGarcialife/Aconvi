@@ -320,7 +320,7 @@ export default function VotingScreen() {
     ? format(new Date(activeSession.closesAt), "d MMM. · HH:mm", { locale: es })
     : "18 sept. · 23:59";
 
-  // Top header with Back + Title on left, Bell + User on right
+  // Top header with Back + Title
   const renderHeader = (titleText: string) => (
     <View style={styles.headerBar}>
       <TouchableOpacity
@@ -336,75 +336,8 @@ export default function VotingScreen() {
         <Feather name="arrow-left" size={22} color={TEAL} />
         <Text style={styles.headerTitle}>{titleText}</Text>
       </TouchableOpacity>
-      <View style={styles.headerRightIcons}>
-        <TouchableOpacity
-          onPress={() => router.push("/(vecino)/communication")}
-          style={styles.headerIconBtn}
-          activeOpacity={0.7}
-        >
-          <Feather name="bell" size={20} color={DARK} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.headerIconBtn}
-          activeOpacity={0.7}
-        >
-          <Feather name="user" size={20} color={DARK} />
-        </TouchableOpacity>
-      </View>
     </View>
   );
-
-  const renderSessionSwitcher = () => {
-    if (!sessions || (sessions as any[]).length <= 1) return null;
-    return (
-      <View style={styles.sessionSwitcherBox}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.sessionSwitcherContent}
-        >
-          {(sessions as any[]).map((s: any) => {
-            const isSelected = s.id === activeSession.id;
-            const isVoted = s.hasVoted;
-            const isJuntaType = s.type === "JUNTA";
-            return (
-              <TouchableOpacity
-                key={s.id}
-                onPress={() => {
-                  setSelectedSessionId(s.id);
-                  setStep("VOTE");
-                  setJustVotedSessionId(null);
-                  setChoices({});
-                }}
-                style={[
-                  styles.sessionPill,
-                  isSelected && styles.sessionPillActive,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.sessionPillText,
-                    isSelected && styles.sessionPillTextActive,
-                  ]}
-                  numberOfLines={1}
-                >
-                  {isVoted
-                    ? "✓ "
-                    : s.status === "CLOSED"
-                      ? "🔒 "
-                      : isJuntaType
-                        ? "⚖️ "
-                        : "🗳️ "}
-                  {s.title}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
-    );
-  };
 
   // ═════════════════════════════════════════════════════════════════════════════
   // CASO ESPECIAL: USUARIO SIN DERECHO A VOTO (Y SESIÓN NO CERRADA)
@@ -414,7 +347,6 @@ export default function VotingScreen() {
       <SafeAreaView style={styles.safeArea}>
         <StatusBar barStyle="dark-content" />
         {renderHeader(isJunta ? "Junta extraordinaria" : "Votación activa")}
-        {renderSessionSwitcher()}
 
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.debtCard}>
@@ -479,7 +411,6 @@ export default function VotingScreen() {
               ? "Votos registrados"
               : "Voto registrado",
         )}
-        {renderSessionSwitcher()}
 
         <ScrollView
           contentContainerStyle={styles.scrollContent}
@@ -615,20 +546,6 @@ export default function VotingScreen() {
               ))}
             </View>
           )}
-
-          {/* Botón Volver a Inicio (Outline blanco con borde teal) */}
-          <TouchableOpacity
-            style={styles.outlineReturnBtn}
-            onPress={() => {
-              setStep("VOTE");
-              setJustVotedSessionId(null);
-              setChoices({});
-              router.replace("/(vecino)");
-            }}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.outlineReturnBtnText}>Volver a Inicio</Text>
-          </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
     );
@@ -680,7 +597,7 @@ export default function VotingScreen() {
 
           {/* Título & Subtítulo (Screen 08) */}
           <Text style={styles.modalTitle}>
-            {isJunta ? "Confirmar y enviar mis votos" : "Confirmar y enviar"}
+            {isJunta ? "Enviar mis votos" : "Enviar"}
           </Text>
           <Text style={styles.modalSubtitle}>
             {isJunta
@@ -749,7 +666,7 @@ export default function VotingScreen() {
             </Text>
           </View>
 
-          {/* Botón Confirmar y enviar */}
+          {/* Botón Enviar */}
           <TouchableOpacity
             style={styles.modalSubmitBtn}
             onPress={handleConfirmSubmit}
@@ -759,7 +676,9 @@ export default function VotingScreen() {
             {castMutation.isPending ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
-              <Text style={styles.modalSubmitBtnText}>Confirmar y enviar</Text>
+              <Text style={styles.modalSubmitBtnText}>
+                {isJunta ? "Enviar mis votos" : "Enviar"}
+              </Text>
             )}
           </TouchableOpacity>
 
@@ -785,7 +704,6 @@ export default function VotingScreen() {
       <SafeAreaView style={styles.safeArea}>
         <StatusBar barStyle="dark-content" />
         {renderHeader("Junta extraordinaria")}
-        {renderSessionSwitcher()}
 
         <ScrollView
           contentContainerStyle={styles.scrollContent}
@@ -870,7 +788,7 @@ export default function VotingScreen() {
             </View>
           )}
 
-          {/* Submit button: "Confirmar y enviar mis votos" with lock icon when disabled */}
+          {/* Submit button: "Enviar mis votos" with lock icon when disabled */}
           <TouchableOpacity
             style={[
               styles.juntaSubmitBtn,
@@ -881,7 +799,7 @@ export default function VotingScreen() {
             activeOpacity={0.85}
           >
             <Text style={styles.juntaSubmitBtnText}>
-              Confirmar y enviar mis votos
+              Enviar mis votos
             </Text>
             {!allAnswered && <Feather name="lock" size={16} color="#FFFFFF" />}
           </TouchableOpacity>
@@ -898,9 +816,8 @@ export default function VotingScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" />
-      {/* 1. Header con flecha teal, texto 'Votación activa', campana y usuario */}
+      {/* 1. Header con flecha teal y texto 'Votación activa' */}
       {renderHeader("Votación activa")}
-      {renderSessionSwitcher()}
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -1103,7 +1020,7 @@ export default function VotingScreen() {
           );
         })}
 
-        {/* 7. Botón Inferior: "Confirmar y enviar" (abre el modal de confirmación) */}
+        {/* 7. Botón Inferior: "Enviar" (abre el modal de confirmación) */}
         <TouchableOpacity
           style={[
             styles.submitBtn,
@@ -1113,7 +1030,7 @@ export default function VotingScreen() {
           disabled={!allAnswered}
           activeOpacity={0.85}
         >
-          <Text style={styles.submitBtnText}>Confirmar y enviar</Text>
+          <Text style={styles.submitBtnText}>Enviar</Text>
         </TouchableOpacity>
       </ScrollView>
 
