@@ -73,7 +73,7 @@ interface OfflineJob {
   providerId: string;
   tenantId: string;
   notes: string;
-  photoUri: string; // uri local de la foto
+  photoUri?: string; // uri local de la foto
   createdAt: number;
 }
 
@@ -118,6 +118,13 @@ export default function CompleteJobScreen() {
     enabled: !!params.incidentId,
     refetchInterval: 300000,
   });
+
+  const incidentCategory = ((incident as any)?.category ?? "").toLowerCase();
+  const isPhotoOptional =
+    incidentCategory === "ruidos" ||
+    incidentCategory === "molestias" ||
+    incidentCategory === "otro" ||
+    incidentCategory === "otros";
 
   // ─── tRPC mutation ────────────────────────────────────────────────────────
   const completeMutation = useMutation(
@@ -296,7 +303,7 @@ export default function CompleteJobScreen() {
 
   // ─── Submit ───────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
-    if (!photoUri || !photoBase64) {
+    if (!isPhotoOptional && (!photoUri || !photoBase64)) {
       Alert.alert("Foto requerida", "Debes añadir una foto del trabajo terminado antes de cerrar.");
       return;
     }
@@ -324,7 +331,7 @@ export default function CompleteJobScreen() {
         providerId,
         tenantId: DEMO_TENANT_ID,
         notes: notes || "Trabajo completado",
-        photoUri: photoBase64,
+        photoUri: photoBase64 ?? undefined,
         createdAt: Date.now(),
       };
       await addToQueue(job);
@@ -344,13 +351,15 @@ export default function CompleteJobScreen() {
         }) }],
       );
     } else {
-      // ── Online: upload photo first, then send only the URL via tRPC ──
-      // This avoids sending a large base64 payload through tRPC (which can hit
-      // Next.js 4 MB body limit and cause a JSON parse error on the client).
-      const uploadedUrl = await uploadPhotoToServer(photoBase64);
-      if (!uploadedUrl) {
-        Alert.alert("Error al subir foto", "No se pudo subir la foto. Verifica tu conexión e inténtalo de nuevo.");
-        return;
+      // ── Online: upload photo first if present, then send URL via tRPC ──
+      let uploadedUrl: string | undefined = undefined;
+      if (photoBase64) {
+        const res = await uploadPhotoToServer(photoBase64);
+        if (!res) {
+          Alert.alert("Error al subir foto", "No se pudo subir la foto. Verifica tu conexión e inténtalo de nuevo.");
+          return;
+        }
+        uploadedUrl = res;
       }
       completeMutation.mutate({
         id: incidentId,
@@ -422,7 +431,7 @@ export default function CompleteJobScreen() {
             <Text style={styles.photoPickerEmoji}>📷</Text>
             <Text style={styles.photoPickerLabel}>Añadir foto del trabajo terminado</Text>
             <Text style={{ fontSize: 11, color: MUTED, marginTop: 4 }}>
-              Obligatorio para cerrar la incidencia
+              {isPhotoOptional ? "Opcional para esta categoría" : "Obligatorio para cerrar la incidencia"}
             </Text>
           </TouchableOpacity>
         ) : (
@@ -462,7 +471,7 @@ export default function CompleteJobScreen() {
           {[
             "La avería está reparada correctamente",
             "La zona está limpia y ordenada",
-            "La foto muestra claramente el trabajo terminado",
+            ...(isPhotoOptional ? [] : ["La foto muestra claramente el trabajo terminado"]),
           ].map((item) => (
             <View key={item} style={styles.checkItem}>
               <Text style={{ color: PRIMARY, fontSize: 14, fontWeight: "700" }}>✓</Text>
@@ -473,9 +482,9 @@ export default function CompleteJobScreen() {
 
         {/* CTA */}
         <TouchableOpacity
-          style={[styles.submitButton, (!photoUri || !photoBase64 || isLoading) && { opacity: 0.5 }]}
+          style={[styles.submitButton, ((!isPhotoOptional && (!photoUri || !photoBase64)) || isLoading) && { opacity: 0.5 }]}
           onPress={handleSubmit}
-          disabled={!photoUri || !photoBase64 || isLoading}
+          disabled={(!isPhotoOptional && (!photoUri || !photoBase64)) || isLoading}
           activeOpacity={0.85}
         >
           {isLoading ? (
