@@ -494,12 +494,30 @@ export default function VecinoHome() {
 
   // ── Computed Values ──
   const allVotings = (votings as any[] | undefined) ?? [];
+  const NOW = Date.now();
+  const H48 = 48 * 60 * 60 * 1000;
+
+  // Votación con status OPEN pero plazo ya expirado → la tratamos como expirada
+  const isExpiredOpen = (v: any) =>
+    v.status === "OPEN" && v.closesAt && new Date(v.closesAt).getTime() < NOW;
+
   const openVotings = allVotings.filter(
-    (v: any) => v.status === "OPEN" && !v.isArchived,
+    (v: any) => v.status === "OPEN" && !v.isArchived && !isExpiredOpen(v),
   );
+  // Cerradas incluye CLOSED + OPEN expiradas
   const closedVotings = allVotings.filter(
-    (v: any) => v.status === "CLOSED" && !v.isArchived,
+    (v: any) => (v.status === "CLOSED" || isExpiredOpen(v)) && !v.isArchived,
   );
+
+  // Filtrar cerradas que llevan >48 horas cerradas — van al histórico, no al Home
+  const recentClosedVotings = closedVotings.filter((v: any) => {
+    const closedTime = v.closedAt
+      ? new Date(v.closedAt).getTime()
+      : v.closesAt
+        ? new Date(v.closesAt).getTime()
+        : NOW;
+    return NOW - closedTime <= H48;
+  });
 
   // Sort open votings: non-voted first, then priority desc, then closesAt asc
   const sortedOpen = [...openVotings].sort((a: any, b: any) => {
@@ -514,13 +532,13 @@ export default function VecinoHome() {
   });
 
   // Sort closed votings: closedAt desc (most recent first)
-  const sortedClosed = [...closedVotings].sort((a: any, b: any) => {
-    const timeA = a.closedAt ? new Date(a.closedAt).getTime() : new Date(a.createdAt).getTime();
-    const timeB = b.closedAt ? new Date(b.closedAt).getTime() : new Date(b.createdAt).getTime();
+  const sortedClosed = [...recentClosedVotings].sort((a: any, b: any) => {
+    const timeA = a.closedAt ? new Date(a.closedAt).getTime() : a.closesAt ? new Date(a.closesAt).getTime() : new Date(a.createdAt).getTime();
+    const timeB = b.closedAt ? new Date(b.closedAt).getTime() : b.closesAt ? new Date(b.closesAt).getTime() : new Date(b.createdAt).getTime();
     return timeB - timeA;
   });
 
-  // Client requirement: Abiertas (según urgencia) → cerradas
+  // Client requirement: Abiertas (según urgencia) → cerradas recientes (<48h)
   const displayVotings = [...sortedOpen, ...sortedClosed];
 
   const handleVotingScroll = useCallback(
@@ -557,8 +575,8 @@ export default function VecinoHome() {
     );
   }, [commonAreas]);
 
-  // Notification badge = unread notices
-  const notifCount = (notices as any[])?.length ?? 0;
+  // Notification badge: punto verde si hay avisos no leídos (sin números)
+  const hasNotif = ((notices as any[])?.length ?? 0) > 0;
 
   // Compute pending fees
   const pendingAmount =
@@ -582,12 +600,18 @@ export default function VecinoHome() {
             onPress={() => router.push("/(vecino)/communication")}
           >
             <Text style={{ fontSize: 22 }}>🔔</Text>
-            {notifCount > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>
-                  {notifCount > 9 ? "9+" : notifCount}
-                </Text>
-              </View>
+            {hasNotif && (
+              <View
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  right: 0,
+                  backgroundColor: "#027580",
+                  borderRadius: 5,
+                  width: 8,
+                  height: 8,
+                }}
+              />
             )}
           </TouchableOpacity>
           {/* Profile — opens modal */}
@@ -646,7 +670,28 @@ export default function VecinoHome() {
               {displayVotings.map((voting: any) => {
                 const isJunta = voting.type === "JUNTA";
                 const isVoted = voting.hasVoted;
-                const isClosed = voting.status === "CLOSED";
+                // Tratar como cerrada si status CLOSED o plazo expirado
+                const isClosed =
+                  voting.status === "CLOSED" ||
+                  (voting.closesAt && new Date(voting.closesAt).getTime() < NOW);
+                // Calcular resultado para mostrar en tarjeta cerrada
+                const resultText: string | null = (() => {
+                  if (!isClosed) return null;
+                  if (voting.resultSummary) return voting.resultSummary;
+                  // Calcular desde votos si existen
+                  const yesVotes: number = (voting.items ?? []).reduce(
+                    (sum: number, item: any) => sum + (item.votesFor ?? item.yesVotes ?? 0),
+                    0,
+                  );
+                  const totalVotes: number = (voting.items ?? []).reduce(
+                    (sum: number, item: any) =>
+                      sum + (item.votesFor ?? item.yesVotes ?? 0) + (item.votesAgainst ?? item.noVotes ?? 0),
+                    0,
+                  );
+                  if (totalVotes === 0) return null;
+                  const pct = Math.round((yesVotes / totalVotes) * 100);
+                  return pct >= 50 ? `Aprobado con el ${pct} %` : `Rechazado (${pct} % a favor)`;
+                })();
                 return (
                   <View
                     key={voting.id}
@@ -714,7 +759,7 @@ export default function VecinoHome() {
                         : voting.title}
                     </Text>
 
-                    {isClosed && voting.resultSummary ? (
+                    {isClosed && resultText ? (
                       <View
                         style={{
                           backgroundColor: "#f0fdfa",
@@ -733,7 +778,7 @@ export default function VecinoHome() {
                             color: PRIMARY,
                           }}
                         >
-                          {voting.resultSummary}
+                          {resultText}
                         </Text>
                       </View>
                     ) : null}
@@ -768,7 +813,9 @@ export default function VecinoHome() {
                       {isClosed
                         ? voting.closedAt
                           ? `Finalizada el ${format(new Date(voting.closedAt), "d MMM. · HH:mm", { locale: es })}`
-                          : "Votación finalizada"
+                          : voting.closesAt
+                            ? `Finalizada el ${format(new Date(voting.closesAt), "d MMM. · HH:mm", { locale: es })}`
+                            : "Votación finalizada"
                         : voting.closesAt
                           ? `Cierre: ${format(new Date(voting.closesAt), "d MMM. · HH:mm", { locale: es })}`
                           : "Sin fecha límite"}

@@ -13,11 +13,11 @@ const INACTIVE = "#94a3b8";
 function TabIcon({
   name,
   focused,
-  badge,
+  hasBadge,
 }: {
   name: string;
   focused: boolean;
-  badge?: number;
+  hasBadge?: boolean;
 }) {
   const icons: Record<string, string> = {
     Inicio: "⌂",
@@ -39,25 +39,18 @@ function TabIcon({
       >
         {icons[name] ?? "•"}
       </Text>
-      {badge !== undefined && badge > 0 && (
+      {hasBadge && (
         <View
           style={{
             position: "absolute",
-            top: -4,
-            right: -10,
+            top: -3,
+            right: -8,
             backgroundColor: PRIMARY,
-            borderRadius: 8,
-            minWidth: 16,
-            height: 16,
-            alignItems: "center",
-            justifyContent: "center",
-            paddingHorizontal: 3,
+            borderRadius: 5,
+            width: 8,
+            height: 8,
           }}
-        >
-          <Text style={{ color: "#fff", fontSize: 10, fontWeight: "700" }}>
-            {badge}
-          </Text>
-        </View>
+        />
       )}
     </View>
   );
@@ -74,13 +67,12 @@ export default function VecinoLayout() {
 
   const insets = useSafeAreaInsets();
   const bottomPad = Math.max(insets.bottom, 8);
-  const { data: incidents } = useQuery(
-    api.incident.all.queryOptions({ tenantId: "org_aconvi_demo" })
+  const { data: notices } = useQuery(
+    api.notice.all.queryOptions({ tenantId: "org_aconvi_demo" })
   );
-  
-  const activeIncidentsCount = (incidents as any[] | undefined)?.filter(
-    (i: any) => i.reporterId === userId && i.status !== "RESUELTA" && i.status !== "RECHAZADA"
-  )?.length ?? 0;
+
+  // Punto verde en Comunicados si hay avisos (cliente: no mostrar números, solo punto)
+  const hasUnreadNotices = ((notices as any[] | undefined)?.length ?? 0) > 0;
 
   return (
     <Tabs
@@ -118,7 +110,7 @@ export default function VecinoLayout() {
         options={{
           title: "Incidencias",
           tabBarIcon: ({ focused }) => (
-            <TabIcon name="Incidencias" focused={focused} badge={activeIncidentsCount} />
+            <TabIcon name="Incidencias" focused={focused} />
           ),
         }}
       />
@@ -127,7 +119,7 @@ export default function VecinoLayout() {
         options={{
           title: "Comunicados",
           tabBarIcon: ({ focused }) => (
-            <TabIcon name="Comunicados" focused={focused} />
+            <TabIcon name="Comunicados" focused={focused} hasBadge={hasUnreadNotices} />
           ),
         }}
       />

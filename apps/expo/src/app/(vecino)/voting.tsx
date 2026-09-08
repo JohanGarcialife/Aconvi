@@ -283,7 +283,10 @@ export default function VotingScreen() {
 
   const isJunta = activeSession.type === "JUNTA";
   const primaryThemeColor = TEAL;
-  const isClosed = activeSession.status === "CLOSED";
+  // Cerrada si status CLOSED o si el plazo ya expiró
+  const isClosed =
+    activeSession.status === "CLOSED" ||
+    (activeSession.closesAt && new Date(activeSession.closesAt).getTime() < Date.now());
   const canVote = activeSession.userVotingStatus?.canVote ?? true;
   const isAlreadyVoted = Boolean(
     activeSession.hasVoted ||
