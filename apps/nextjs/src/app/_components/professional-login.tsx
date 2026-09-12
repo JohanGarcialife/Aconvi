@@ -376,43 +376,6 @@ export function ProfessionalLogin() {
           Introduce tu usuario corporativo para recibir la notificación de acceso.
         </p>
 
-        {/* Demo Helper Banner */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            background: "#F0FDFA",
-            border: "1px solid #CCFBF1",
-            borderRadius: "8px",
-            padding: "8px 14px",
-            marginBottom: "20px",
-            width: "100%",
-            maxWidth: "440px",
-            boxSizing: "border-box",
-          }}
-        >
-          <span style={{ fontSize: "13px", color: "#0F766E" }}>
-            💡 Acceso rápido AF: <strong>jluis.test</strong> (PIN: 123456)
-          </span>
-          <button
-            type="button"
-            onClick={() => setUsername("jluis.test")}
-            style={{
-              background: "#027580",
-              color: "#fff",
-              border: "none",
-              borderRadius: "6px",
-              padding: "5px 10px",
-              fontSize: "12px",
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            Completar
-          </button>
-        </div>
-
         <form
           onSubmit={handleSubmit}
           style={{

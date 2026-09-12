@@ -1,6 +1,8 @@
+import { useEffect } from "react";
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Linking } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "~/utils/api";
+import { markDocsAsSeen } from "~/utils/notifications-tracker";
 
 const CATEGORY_META = {
   ACTA: { label: "Actas de Junta", icon: "📝", color: "#f8fafc" },
@@ -15,6 +17,12 @@ export default function DocumentsScreen() {
   const { data: documents, isLoading } = useQuery(
     api.document.all.queryOptions({ tenantId: "org_aconvi_demo" })
   );
+
+  useEffect(() => {
+    if (documents && (documents as any[]).length > 0) {
+      void markDocsAsSeen((documents as any[]).map((d: any) => d.id));
+    }
+  }, [documents]);
 
   const renderItem = ({ item }: { item: any }) => {
     const meta = CATEGORY_META[item.category as keyof typeof CATEGORY_META] ?? CATEGORY_META.OTRO;

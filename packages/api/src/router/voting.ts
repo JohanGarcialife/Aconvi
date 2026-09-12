@@ -19,6 +19,52 @@ import { sendPushToAllMembers } from "./notification";
 
 const DEMO_AUTHOR_ID = "00000000-0000-0000-0000-000000000000";
 
+let votingTablesEnsured = false;
+async function ensureVotingTables(db: any) {
+  if (votingTablesEnsured) return;
+  try {
+    const { sql } = await import("drizzle-orm");
+    const statements = [
+      `INSERT INTO "user" ("id", "name", "email", "role")
+       VALUES ('00000000-0000-0000-0000-000000000000', 'Administrador Demo', 'af@aconvi.es', 'AF')
+       ON CONFLICT ("id") DO NOTHING;`,
+      `INSERT INTO "user" ("id", "name", "email", "role")
+       VALUES ('user_admin', 'Administrador de Fincas', 'admin@aconvi.es', 'AF')
+       ON CONFLICT ("id") DO NOTHING;`,
+      `CREATE TABLE IF NOT EXISTS "vote_budget_proposal" (
+        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+        "session_id" uuid NOT NULL REFERENCES "vote_session"("id") ON DELETE cascade,
+        "item_id" uuid,
+        "company_name" varchar(256) NOT NULL,
+        "amount" varchar(64) NOT NULL,
+        "description" text,
+        "file_url" text,
+        "file_name" varchar(256),
+        "display_order" integer DEFAULT 0 NOT NULL,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL
+      );`,
+      `ALTER TABLE "vote_cast" ALTER COLUMN "option_id" DROP NOT NULL;`,
+      `ALTER TABLE "vote_cast" ADD COLUMN IF NOT EXISTS "choice" varchar(32) DEFAULT 'APPROVE';`,
+      `ALTER TABLE "vote_cast" ADD COLUMN IF NOT EXISTS "item_id" uuid;`,
+      `ALTER TABLE "vote_cast" ADD COLUMN IF NOT EXISTS "selected_proposal_id" uuid;`,
+      `ALTER TABLE "member" ADD COLUMN IF NOT EXISTS "voting_override" boolean DEFAULT false;`,
+      `ALTER TABLE "member" ADD COLUMN IF NOT EXISTS "voting_override_reason" text;`,
+      `ALTER TABLE "member" ADD COLUMN IF NOT EXISTS "voting_override_at" timestamp with time zone;`,
+      `ALTER TABLE "member" ADD COLUMN IF NOT EXISTS "voting_override_by" text;`,
+    ];
+    for (const stmt of statements) {
+      try {
+        await db.execute(sql.raw(stmt));
+      } catch (e: any) {
+        console.warn("[ensureVotingTables] Statement warning:", e?.message);
+      }
+    }
+    votingTablesEnsured = true;
+  } catch (err) {
+    console.error("[ensureVotingTables] Error running migration:", err);
+  }
+}
+
 export const votingRouter = createTRPCRouter({
   // ── List all sessions for a community with user-specific voting status ─────────
   all: publicProcedure
@@ -29,6 +75,7 @@ export const votingRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
+      await ensureVotingTables(ctx.db);
       const resolvedUserId =
         ctx.session?.user?.id ?? input.userId ?? DEMO_AUTHOR_ID;
 
@@ -71,7 +118,7 @@ export const votingRouter = createTRPCRouter({
       const hasOverride = Boolean(memberRecord?.votingOverride);
       const canVote = !hasDebt || hasOverride;
 
-      return sessions.map((session) => {
+      const mapped = sessions.map((session) => {
         const userCasts = session.casts.filter(
           (c) => c.userId === resolvedUserId,
         );
@@ -86,49 +133,138 @@ export const votingRouter = createTRPCRouter({
                 48 * 3600 * 1000),
         );
 
-        // Result summary string for closed cards (e.g. "Aprobado por el 82 % de las cuotas")
+        // Result summary string for closed cards (e.g. "Aprobado con el 82 %" / "Rechazado (30 % a favor)")
         let resultSummary: string | null = null;
-        if (session.status === "CLOSED") {
+        const isEffectivelyClosed =
+          session.status === "CLOSED" ||
+          Boolean(session.closesAt && new Date(session.closesAt).getTime() < Date.now());
+
+        if (isEffectivelyClosed) {
+          const isApproveChoice = (c: any) => {
+            const ch = (c.choice || "").toUpperCase();
+            if (ch === "APPROVE" || ch === "APRUEBO" || ch === "SI" || ch === "SÍ") return true;
+            if (c.optionId && session.options) {
+              const opt = session.options.find((o: any) => o.id === c.optionId);
+              if (opt && opt.label.toLowerCase().includes("aprueb")) return true;
+            }
+            return false;
+          };
+
+          const isRejectChoice = (c: any) => {
+            const ch = (c.choice || "").toUpperCase();
+            if (ch === "REJECT" || ch === "RECHAZO" || ch === "NO") return true;
+            if (c.optionId && session.options) {
+              const opt = session.options.find((o: any) => o.id === c.optionId);
+              if (opt && opt.label.toLowerCase().includes("rechaz")) return true;
+            }
+            return false;
+          };
+
+          const isAbstainChoice = (c: any) => {
+            const ch = (c.choice || "").toUpperCase();
+            if (ch === "ABSTAIN" || ch === "ABSTENGO" || ch === "BLANCO") return true;
+            if (c.optionId && session.options) {
+              const opt = session.options.find((o: any) => o.id === c.optionId);
+              if (opt && opt.label.toLowerCase().includes("absten")) return true;
+            }
+            return false;
+          };
+
           if (session.type === "SINGLE" || !session.items.length) {
-            const approveW = session.casts
-              .filter((c) => c.choice === "APPROVE")
-              .reduce((sum, c) => sum + c.coefficient, 0);
-            const rejectW = session.casts
-              .filter((c) => c.choice === "REJECT")
-              .reduce((sum, c) => sum + c.coefficient, 0);
-            const abstainW = session.casts
-              .filter((c) => c.choice === "ABSTAIN")
-              .reduce((sum, c) => sum + c.coefficient, 0);
-            const totalW = approveW + rejectW + abstainW;
+            let approveW = session.casts
+              .filter(isApproveChoice)
+              .reduce((sum, c) => sum + (c.coefficient || 1), 0);
+            let rejectW = session.casts
+              .filter(isRejectChoice)
+              .reduce((sum, c) => sum + (c.coefficient || 1), 0);
+            let abstainW = session.casts
+              .filter(isAbstainChoice)
+              .reduce((sum, c) => sum + (c.coefficient || 1), 0);
+            let totalW = approveW + rejectW + abstainW;
+
+            // Fallback to session.options counters if casts were not found or legacy
+            if (totalW === 0 && session.options && session.options.length > 0) {
+              const approveOpt = session.options.find((o) =>
+                o.label.toLowerCase().includes("aprueb"),
+              );
+              const rejectOpt = session.options.find((o) =>
+                o.label.toLowerCase().includes("rechaz"),
+              );
+              const abstainOpt = session.options.find((o) =>
+                o.label.toLowerCase().includes("absten"),
+              );
+
+              const optApp = (approveOpt?.weightedTotal && approveOpt.weightedTotal > 0)
+                ? approveOpt.weightedTotal
+                : (approveOpt?.voteCount ?? 0);
+              const optRej = (rejectOpt?.weightedTotal && rejectOpt.weightedTotal > 0)
+                ? rejectOpt.weightedTotal
+                : (rejectOpt?.voteCount ?? 0);
+              const optAbs = (abstainOpt?.weightedTotal && abstainOpt.weightedTotal > 0)
+                ? abstainOpt.weightedTotal
+                : (abstainOpt?.voteCount ?? 0);
+
+              if (optApp + optRej + optAbs > 0) {
+                approveW = optApp;
+                rejectW = optRej;
+                abstainW = optAbs;
+                totalW = optApp + optRej + optAbs;
+              }
+            }
+
             if (totalW > 0) {
               const pct = Math.round((approveW / totalW) * 100);
               resultSummary =
-                approveW > rejectW
-                  ? `Aprobado por el ${pct} % de las cuotas`
-                  : `Rechazado (${Math.round((rejectW / totalW) * 100)} % en contra)`;
+                approveW >= rejectW && pct >= 50
+                  ? `Aprobado con el ${pct} %`
+                  : `Rechazado (${pct} % a favor)`;
             } else {
-              resultSummary = "Cerrada sin votos emitidos";
+              resultSummary = "Rechazado (0 % a favor)";
             }
           } else {
+            // Junta with items: Calculate overall approval percentage
             const onlineItems = session.items.filter(
               (i) => i.onlineVotingEnabled,
             );
             const relevantItems =
               onlineItems.length > 0 ? onlineItems : session.items;
+
+            let totalApproveW = 0;
+            let totalRejectW = 0;
             let approvedCount = 0;
+
             for (const item of relevantItems) {
               const itemCasts = session.casts.filter(
                 (c) => c.itemId === item.id,
               );
               const app = itemCasts
-                .filter((c) => c.choice === "APPROVE")
-                .reduce((s, c) => s + c.coefficient, 0);
+                .filter(isApproveChoice)
+                .reduce((s, c) => s + (c.coefficient || 1), 0);
               const rej = itemCasts
-                .filter((c) => c.choice === "REJECT")
-                .reduce((s, c) => s + c.coefficient, 0);
+                .filter(isRejectChoice)
+                .reduce((s, c) => s + (c.coefficient || 1), 0);
+
+              totalApproveW += app;
+              totalRejectW += rej;
               if (app > rej) approvedCount++;
             }
-            resultSummary = `${approvedCount} de ${relevantItems.length} acuerdos aprobados`;
+
+            const totalW = totalApproveW + totalRejectW;
+            if (totalW > 0) {
+              const pct = Math.round((totalApproveW / totalW) * 100);
+              resultSummary =
+                pct >= 50
+                  ? `Aprobado con el ${pct} %`
+                  : `Rechazado (${pct} % a favor)`;
+            } else if (relevantItems.length > 0 && approvedCount > 0) {
+              const pct = Math.round((approvedCount / relevantItems.length) * 100);
+              resultSummary =
+                pct >= 50
+                  ? `Aprobado con el ${pct} %`
+                  : `Rechazado (${pct} % a favor)`;
+            } else {
+              resultSummary = "Rechazado (0 % a favor)";
+            }
           }
         }
 
@@ -154,6 +290,54 @@ export const votingRouter = createTRPCRouter({
             coefficient: userCoefficient,
           },
         };
+      });
+
+      const toDayString = (d: string | Date | null | undefined) => {
+        if (!d) return null;
+        const dt = new Date(d);
+        if (isNaN(dt.getTime())) return null;
+        return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+      };
+
+      const now = Date.now();
+
+      return mapped.sort((a, b) => {
+        const isClosedA = a.status === "CLOSED" || (a.closesAt && new Date(a.closesAt).getTime() < now);
+        const isClosedB = b.status === "CLOSED" || (b.closesAt && new Date(b.closesAt).getTime() < now);
+
+        // Abiertas siempre antes que cerradas
+        if (!isClosedA && isClosedB) return -1;
+        if (isClosedA && !isClosedB) return 1;
+
+        if (!isClosedA && !isClosedB) {
+          const timeA = a.closesAt ? new Date(a.closesAt).getTime() : Infinity;
+          const timeB = b.closesAt ? new Date(b.closesAt).getTime() : Infinity;
+          const dayA = toDayString(a.closesAt);
+          const dayB = toDayString(b.closesAt);
+
+          // 1. Si finalizan en fechas (días) distintas: manda la que finaliza antes, aunque ya esté votada
+          if (dayA && dayB && dayA !== dayB) {
+            return timeA - timeB;
+          }
+          if (dayA && !dayB) return -1;
+          if (!dayA && dayB) return 1;
+
+          // 2. Si ambas finalizan el mismo día: va primero la que NO está votada
+          if (!a.hasVoted && b.hasVoted) return -1;
+          if (a.hasVoted && !b.hasVoted) return 1;
+
+          // 3. Si ambas no están votadas (o ambas ya votadas): manda la que finaliza antes (hora)
+          if (timeA !== timeB) return timeA - timeB;
+
+          const prioDiff = (b.priority || 0) - (a.priority || 0);
+          if (prioDiff !== 0) return prioDiff;
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        }
+
+        // Si ambas cerradas: más reciente primero
+        const timeA = a.closedAt ? new Date(a.closedAt).getTime() : a.closesAt ? new Date(a.closesAt).getTime() : new Date(a.createdAt).getTime();
+        const timeB = b.closedAt ? new Date(b.closedAt).getTime() : b.closesAt ? new Date(b.closesAt).getTime() : new Date(b.createdAt).getTime();
+        return timeB - timeA;
       });
     }),
 
@@ -317,6 +501,17 @@ export const votingRouter = createTRPCRouter({
             }),
           )
           .optional(),
+        proposals: z
+          .array(
+            z.object({
+              companyName: z.string().min(1),
+              amount: z.string().min(1),
+              description: z.string().optional(),
+              fileUrl: z.string().optional(),
+              fileName: z.string().optional(),
+            }),
+          )
+          .optional(),
         items: z
           .array(
             z.object({
@@ -330,8 +525,23 @@ export const votingRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await ensureVotingTables(ctx.db);
       const sessionId = crypto.randomUUID();
       const authorId = ctx.session?.user?.id ?? DEMO_AUTHOR_ID;
+
+      // Ensure author exists in user table to prevent foreign key violation
+      try {
+        const { sql } = await import("drizzle-orm");
+        await ctx.db.execute(
+          sql`INSERT INTO "user" ("id", "name", "email", "role")
+              VALUES (${authorId}, 'Administrador de Fincas', 'af@aconvi.es', 'AF')
+              ON CONFLICT ("id") DO NOTHING;`,
+        );
+      } catch (authorErr) {
+        console.warn("[voting.create] Could not ensure author user:", authorErr);
+      }
+
+      const allProposals = input.budgetProposals ?? input.proposals ?? [];
 
       // Check how many sessions are currently open to alert if reaching >2
       const openCountResult = await ctx.db
@@ -349,6 +559,14 @@ export const votingRouter = createTRPCRouter({
           ? "Aviso: Ya hay 2 votaciones activas en primer plano. Esta votación se creará y se mostrará en el carrusel de 'Otras votaciones pendientes'."
           : null;
 
+      const derivedBudget =
+        input.budget ??
+        (allProposals.length === 1
+          ? allProposals[0]!.amount
+          : allProposals.length > 1
+            ? allProposals.map((p) => p.amount).join(" · ")
+            : null);
+
       const [created] = await ctx.db
         .insert(voteSession)
         .values({
@@ -357,7 +575,7 @@ export const votingRouter = createTRPCRouter({
           authorId,
           type: input.type,
           title: input.title,
-          budget: input.budget ?? null,
+          budget: derivedBudget,
           description: input.description ?? null,
           status: "OPEN",
           coefficientWeighted: true,
@@ -382,16 +600,17 @@ export const votingRouter = createTRPCRouter({
       }
 
       // If budget proposals provided, insert them
-      if (input.budgetProposals && input.budgetProposals.length > 0) {
+      if (allProposals.length > 0) {
         await ctx.db.insert(voteBudgetProposal).values(
-          input.budgetProposals.map((bp, idx) => ({
+          allProposals.map((bp, idx) => ({
             id: crypto.randomUUID(),
             sessionId,
+            itemId: null,
             companyName: bp.companyName,
             amount: bp.amount,
             description: bp.description ?? null,
             fileUrl: bp.fileUrl ?? null,
-            fileName: bp.fileName ?? null,
+            fileName: bp.fileName ?? (bp.fileUrl ? "Presupuesto.pdf" : null),
             displayOrder: idx,
           })),
         );
@@ -478,6 +697,7 @@ export const votingRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await ensureVotingTables(ctx.db);
       const sessionId = crypto.randomUUID();
       const authorId = ctx.session?.user?.id ?? DEMO_AUTHOR_ID;
 
@@ -681,35 +901,63 @@ Fdo. La Administración de Fincas`;
         userId: z.string().optional(),
         // For Single Decision
         choice: z.enum(["APPROVE", "REJECT", "ABSTAIN"]).optional(),
-        selectedProposalId: z.string().uuid().optional(),
+        selectedProposalId: z
+          .union([z.string(), z.null(), z.undefined()])
+          .optional()
+          .transform((val) =>
+            val && typeof val === "string" && val.trim().length > 0
+              ? val.trim()
+              : null,
+          ),
         // For Junta Multi-point
         votes: z
           .array(
             z.object({
-              itemId: z.string().uuid(),
+              itemId: z.string().min(1),
               choice: z.enum(["APPROVE", "REJECT", "ABSTAIN"]),
-              selectedProposalId: z.string().uuid().optional(),
+              selectedProposalId: z
+                .union([z.string(), z.null(), z.undefined()])
+                .optional()
+                .transform((val) =>
+                  val && typeof val === "string" && val.trim().length > 0
+                    ? val.trim()
+                    : null,
+                ),
             }),
           )
           .optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await ensureVotingTables(ctx.db);
       const resolvedUserId =
         ctx.session?.user?.id ?? input.userId ?? DEMO_AUTHOR_ID;
 
-      // 1. Validate session
+      // 1. Ensure voter exists in user table to prevent FK violation on vote_cast.user_id
+      try {
+        const { sql } = await import("drizzle-orm");
+        await ctx.db.execute(
+          sql`INSERT INTO "user" ("id", "name", "email", "role")
+              VALUES (${resolvedUserId}, 'Vecino', 'vecino@aconvi.es', 'Vecino')
+              ON CONFLICT ("id") DO NOTHING;`,
+        );
+      } catch (userErr) {
+        console.warn("[voting.cast] Could not ensure voter user:", userErr);
+      }
+
+      // 2. Validate session
       const session = await ctx.db.query.voteSession.findFirst({
         where: eq(voteSession.id, input.sessionId),
         with: {
           items: { orderBy: (item, { asc }) => [asc(item.orderIndex)] },
+          options: { orderBy: (opt, { asc }) => [asc(opt.displayOrder)] },
         },
       });
       if (!session) throw new Error("Votación no encontrada");
       if (session.status !== "OPEN")
         throw new Error("Esta votación no está abierta");
 
-      // 2. Validate user right to vote (check for debts unless override by AF)
+      // 3. Validate user right to vote (check for debts unless override by AF)
       const memberRecord = await ctx.db.query.member.findFirst({
         where: and(
           eq(member.userId, resolvedUserId),
@@ -726,14 +974,24 @@ Fdo. La Administración de Fincas`;
             inArray(fee.status, ["OVERDUE", "PENDING"]),
           ),
         });
-        if (userDebts.length > 0) {
+
+        // Only genuinely overdue debts deprive voting right under Art. 15.2 LPH
+        const hasOverdueDebt = userDebts.some((f) => {
+          if (f.status === "OVERDUE") return true;
+          if (f.status === "PENDING" && f.dueDate) {
+            return new Date(f.dueDate).getTime() < Date.now();
+          }
+          return false;
+        });
+
+        if (hasOverdueDebt) {
           throw new Error(
-            "No puedes votar en esta votación. Tienes pagos pendientes con la comunidad. Ponte al día para poder participar.",
+            "No puedes votar en esta votación. Tienes pagos vencidos con la comunidad. Ponte al día para poder participar.",
           );
         }
       }
 
-      // 3. Check if user already voted (votes are final and immutable)
+      // 4. Check if user already voted (votes are final and immutable)
       const existing = await ctx.db.query.voteCast.findFirst({
         where: and(
           eq(voteCast.sessionId, input.sessionId),
@@ -746,11 +1004,48 @@ Fdo. La Administración de Fincas`;
         );
       }
 
-      // 4. Get voter's coefficient
+      // 5. Get voter's coefficient
       const coefficient = memberRecord?.coefficient ?? 1;
       const castAt = new Date();
 
-      // 5. Handle Junta (Multi-point) — Only require votes for items where onlineVotingEnabled = true!
+      // UUID sanitization helper
+      const isValidUuid = (val?: string | null): val is string =>
+        Boolean(
+          val &&
+            typeof val === "string" &&
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+              val.trim(),
+            ),
+        );
+
+      // Resolve matching optionId from session options for backwards compatibility & constraint satisfaction
+      const findOptionForChoice = (choiceStr: string) => {
+        const c = choiceStr.toUpperCase();
+        if (c === "APPROVE") {
+          return (
+            session.options.find((o) =>
+              o.label.toLowerCase().includes("aprueb"),
+            ) ?? session.options[0]
+          );
+        }
+        if (c === "REJECT") {
+          return (
+            session.options.find((o) =>
+              o.label.toLowerCase().includes("rechaz"),
+            ) ?? session.options[1]
+          );
+        }
+        if (c === "ABSTAIN") {
+          return (
+            session.options.find((o) =>
+              o.label.toLowerCase().includes("absten"),
+            ) ?? session.options[2]
+          );
+        }
+        return session.options[0];
+      };
+
+      // 6. Handle Junta (Multi-point)
       if (session.type === "JUNTA" && session.items.length > 0) {
         const onlineItems = session.items.filter((i) => i.onlineVotingEnabled);
 
@@ -773,17 +1068,47 @@ Fdo. La Administración de Fincas`;
 
           // Insert all votes
           await ctx.db.insert(voteCast).values(
-            input.votes.map((v) => ({
-              id: crypto.randomUUID(),
-              sessionId: input.sessionId,
-              itemId: v.itemId,
-              userId: resolvedUserId,
-              choice: v.choice,
-              selectedProposalId: v.selectedProposalId ?? null,
-              coefficient,
-              castAt,
-            })),
+            input.votes.map((v) => {
+              const matchedOption = findOptionForChoice(v.choice);
+              const cleanItemProposalId = isValidUuid(v.selectedProposalId)
+                ? v.selectedProposalId.trim()
+                : null;
+
+              return {
+                id: crypto.randomUUID(),
+                sessionId: input.sessionId,
+                itemId: v.itemId,
+                userId: resolvedUserId,
+                choice: v.choice,
+                optionId: matchedOption?.id ?? null,
+                selectedProposalId: cleanItemProposalId,
+                coefficient,
+                castAt,
+              };
+            }),
           );
+
+          // Update option counters
+          for (const v of input.votes) {
+            const matchedOption = findOptionForChoice(v.choice);
+            if (matchedOption) {
+              try {
+                await ctx.db
+                  .update(voteOption)
+                  .set({
+                    voteCount: (matchedOption.voteCount ?? 0) + 1,
+                    weightedTotal:
+                      (matchedOption.weightedTotal ?? 0) + coefficient,
+                  })
+                  .where(eq(voteOption.id, matchedOption.id));
+              } catch (optErr) {
+                console.warn(
+                  "[voting.cast] Could not update option counter:",
+                  optErr,
+                );
+              }
+            }
+          }
         } else {
           throw new Error(
             "Esta junta no contiene puntos habilitados para votación online.",
@@ -792,7 +1117,7 @@ Fdo. La Administración de Fincas`;
       } else {
         // Handle Single Decision
         const singleChoice = input.choice ?? input.votes?.[0]?.choice;
-        const selectedProposalId =
+        const rawSelectedProposalId =
           input.selectedProposalId ??
           input.votes?.[0]?.selectedProposalId ??
           null;
@@ -803,23 +1128,51 @@ Fdo. La Administración de Fincas`;
           );
         }
 
+        const matchedOption = findOptionForChoice(singleChoice);
+        const cleanSelectedProposalId = isValidUuid(rawSelectedProposalId)
+          ? rawSelectedProposalId.trim()
+          : null;
+
         await ctx.db.insert(voteCast).values({
           id: crypto.randomUUID(),
           sessionId: input.sessionId,
           itemId: session.items[0]?.id ?? null,
           userId: resolvedUserId,
           choice: singleChoice,
-          selectedProposalId,
+          optionId: matchedOption?.id ?? null,
+          selectedProposalId: cleanSelectedProposalId,
           coefficient,
           castAt,
         });
+
+        if (matchedOption) {
+          try {
+            await ctx.db
+              .update(voteOption)
+              .set({
+                voteCount: (matchedOption.voteCount ?? 0) + 1,
+                weightedTotal:
+                  (matchedOption.weightedTotal ?? 0) + coefficient,
+              })
+              .where(eq(voteOption.id, matchedOption.id));
+          } catch (optErr) {
+            console.warn(
+              "[voting.cast] Could not update option counter:",
+              optErr,
+            );
+          }
+        }
       }
 
-      await emitWebSocketEvent(input.tenantId, "voting-cast", {
-        sessionId: input.sessionId,
-        userId: resolvedUserId,
-        castAt,
-      });
+      try {
+        await emitWebSocketEvent(input.tenantId, "voting-cast", {
+          sessionId: input.sessionId,
+          userId: resolvedUserId,
+          castAt,
+        });
+      } catch (wsErr) {
+        console.warn("[voting.cast] WebSocket emit failed:", wsErr);
+      }
 
       return {
         ok: true,

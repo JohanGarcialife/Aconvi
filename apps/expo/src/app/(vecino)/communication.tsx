@@ -15,6 +15,11 @@ import { api } from "~/utils/api";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import {
+  useReadStatus,
+  markNoticeAsRead,
+  markAllNoticesAsRead,
+} from "~/utils/notifications-tracker";
 
 const TENANT_ID = "org_aconvi_demo";
 
@@ -24,6 +29,7 @@ const DARK = "#0f172a";
 const MUTED = "#64748b";
 const BORDER = "#e2e8f0";
 const BG = "#f8fafc";
+const ALERT_RED = "#EF4444";
 
 // ─── Tipo de aviso ────────────────────────────────────────────────────────────
 type NoticeType = "COMUNICADO" | "AVISO" | "URGENTE" | "ALL";
@@ -130,7 +136,15 @@ function NoticeDetailModal({
 }
 
 // ─── Notice Card ──────────────────────────────────────────────────────────────
-function NoticeCard({ notice, onPress }: { notice: any; onPress: () => void }) {
+function NoticeCard({
+  notice,
+  isUnread,
+  onPress,
+}: {
+  notice: any;
+  isUnread: boolean;
+  onPress: () => void;
+}) {
   const cfg = getConfig(notice.type ?? "COMUNICADO");
   const isPinned = notice.pinned;
 
@@ -138,7 +152,7 @@ function NoticeCard({ notice, onPress }: { notice: any; onPress: () => void }) {
     <TouchableOpacity
       style={[
         styles.card,
-        { borderLeftColor: cfg.border, borderLeftWidth: 4 },
+        { borderLeftColor: isUnread ? ALERT_RED : cfg.border, borderLeftWidth: 4 },
         isPinned && styles.cardPinned,
       ]}
       activeOpacity={0.7}
@@ -155,11 +169,29 @@ function NoticeCard({ notice, onPress }: { notice: any; onPress: () => void }) {
             <Text style={styles.pinnedBadgeText}>📌 Fijado</Text>
           </View>
         )}
+        {isUnread && (
+          <View
+            style={{
+              backgroundColor: "#FEE2E2",
+              paddingHorizontal: 6,
+              paddingVertical: 2,
+              borderRadius: 6,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: ALERT_RED }} />
+            <Text style={{ fontSize: 10, fontWeight: "700", color: ALERT_RED }}>Nuevo</Text>
+          </View>
+        )}
         <Text style={styles.dateText}>{formatRelative(notice.createdAt)}</Text>
       </View>
 
       {/* Title */}
-      <Text style={styles.cardTitle} numberOfLines={2}>{notice.title}</Text>
+      <Text style={[styles.cardTitle, isUnread && { fontWeight: "800" }]} numberOfLines={2}>
+        {notice.title}
+      </Text>
 
       {/* Content preview */}
       <Text style={styles.cardPreview} numberOfLines={3}>
@@ -200,6 +232,7 @@ export default function CommunicationScreen() {
   const [filter, setFilter] = useState<NoticeType>("ALL");
   const [selectedNotice, setSelectedNotice] = useState<any>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const { readNoticeIds } = useReadStatus();
 
   const { data: notices, isLoading } = useQuery(
     api.notice.all.queryOptions({ tenantId: TENANT_ID })
@@ -217,15 +250,27 @@ export default function CommunicationScreen() {
 
   // Sort: pinned first, then by date
   const sorted = [...noticesArray].sort((a: any, b: any) => {
-        if (a.pinned && !b.pinned) return -1;
-        if (!a.pinned && b.pinned) return 1;
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      });
+    if (a.pinned && !b.pinned) return -1;
+    if (!a.pinned && b.pinned) return 1;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
 
   const filtered =
     filter === "ALL"
       ? sorted
       : sorted.filter((n: any) => (n.type ?? "COMUNICADO") === filter);
+
+  const unreadCount = noticesArray.filter((n: any) => !readNoticeIds.includes(n.id)).length;
+
+  const handleOpenNotice = (notice: any) => {
+    void markNoticeAsRead(notice.id);
+    setSelectedNotice(notice);
+  };
+
+  const handleMarkAllRead = () => {
+    const allIds = noticesArray.map((n: any) => n.id);
+    void markAllNoticesAsRead(allIds);
+  };
 
   const counts = {
     ALL: noticesArray.length ?? 0,
@@ -242,10 +287,23 @@ export default function CommunicationScreen() {
           <Text style={styles.headerTitle}>Tablón Digital</Text>
           <Text style={styles.headerSubtitle}>Comunicados y avisos de tu comunidad</Text>
         </View>
-        {counts.URGENTE > 0 && (
-          <View style={styles.urgentBadge}>
-            <Text style={styles.urgentBadgeText}>🚨 {counts.URGENTE}</Text>
-          </View>
+        {unreadCount > 0 && (
+          <TouchableOpacity
+            style={{
+              backgroundColor: "#FEE2E2",
+              paddingHorizontal: 10,
+              paddingVertical: 5,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: "#FECACA",
+            }}
+            onPress={handleMarkAllRead}
+            activeOpacity={0.7}
+          >
+            <Text style={{ fontSize: 11, fontWeight: "700", color: ALERT_RED }}>
+              Marcar todos leídos
+            </Text>
+          </TouchableOpacity>
         )}
       </View>
 
@@ -287,7 +345,11 @@ export default function CommunicationScreen() {
           data={filtered}
           keyExtractor={(item: any) => item.id}
           renderItem={({ item }) => (
-            <NoticeCard notice={item} onPress={() => setSelectedNotice(item)} />
+            <NoticeCard
+              notice={item}
+              isUnread={!readNoticeIds.includes(item.id)}
+              onPress={() => handleOpenNotice(item)}
+            />
           )}
           contentContainerStyle={[
             styles.listContent,

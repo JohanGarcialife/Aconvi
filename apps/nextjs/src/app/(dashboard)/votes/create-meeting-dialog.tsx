@@ -208,9 +208,9 @@ export function CreateMeetingDialog({ onSuccess }: { onSuccess: () => void }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-[#027580] font-bold text-white shadow-sm hover:bg-[#015A63]">
-          <Calendar className="mr-2 h-4 w-4" />
-          Crear Junta
+        <Button className="flex items-center gap-1.5 rounded-xl bg-[#008075] px-4 py-2 text-sm font-bold text-white shadow-xs hover:bg-[#006e64]">
+          <Plus className="h-4 w-4" />
+          Nueva junta
         </Button>
       </DialogTrigger>
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-3xl">

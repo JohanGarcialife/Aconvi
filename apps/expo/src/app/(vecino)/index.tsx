@@ -24,6 +24,8 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
 import { api, queryClient } from "~/utils/api";
+import { useReadStatus } from "~/utils/notifications-tracker";
+import { useVotedSessions } from "~/utils/voting-tracker";
 
 const TENANT_ID = "org_aconvi_demo";
 
@@ -33,6 +35,7 @@ const MUTED = "#6B7280";
 const BORDER = "#E5E7EB";
 const BG = "#F9FAFB";
 const CARD_BG = "#FFFFFF";
+const ALERT_RED = "#EF4444";
 
 // ─── Section Header Title Component ──────────────────────────────────────────
 function SectionTitle({
@@ -385,6 +388,8 @@ export default function VecinoHome() {
     "00000000-0000-0000-0000-000000000000",
   );
 
+  const { isSessionVoted } = useVotedSessions();
+
   const cardWidth = screenWidth - 32;
   const cardGap = 12;
 
@@ -519,15 +524,48 @@ export default function VecinoHome() {
     return NOW - closedTime <= H48;
   });
 
-  // Sort open votings: non-voted first, then priority desc, then closesAt asc
+  // ── Helper fecha (YYYY-MM-DD) para comparar días de cierre ──
+  const toDayString = (d: string | Date | null | undefined) => {
+    if (!d) return null;
+    const dt = new Date(d);
+    if (isNaN(dt.getTime())) return null;
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+  };
+
+  // ── Client requirement Punto 3: Orden de votaciones del vecino ──
+  // • Si una votación finaliza antes, va primero, aunque ya esté votada.
+  // • Si ambas finalizan el mismo día, va primero la que NO está votada.
+  // • Si ambas no están votadas, manda la que finaliza antes.
   const sortedOpen = [...openVotings].sort((a: any, b: any) => {
-    if (!a.hasVoted && b.hasVoted) return -1;
-    if (a.hasVoted && !b.hasVoted) return 1;
+    const timeA = a.closesAt ? new Date(a.closesAt).getTime() : Infinity;
+    const timeB = b.closesAt ? new Date(b.closesAt).getTime() : Infinity;
+
+    const dayA = toDayString(a.closesAt);
+    const dayB = toDayString(b.closesAt);
+
+    // 1. Si finalizan en fechas (días) distintas: manda la que finaliza antes, aunque ya esté votada
+    if (dayA && dayB && dayA !== dayB) {
+      return timeA - timeB;
+    }
+
+    // Si solo una tiene fecha de cierre definida, esa va primero
+    if (dayA && !dayB) return -1;
+    if (!dayA && dayB) return 1;
+
+    // 2. Si ambas finalizan el mismo día: va primero la que NO está votada
+    const hasVotedA = Boolean(a.hasVoted || isSessionVoted(a.id));
+    const hasVotedB = Boolean(b.hasVoted || isSessionVoted(b.id));
+    if (!hasVotedA && hasVotedB) return -1;
+    if (hasVotedA && !hasVotedB) return 1;
+
+    // 3. Si ambas no están votadas (o ambas ya votadas): manda la que finaliza antes (hora)
+    if (timeA !== timeB) {
+      return timeA - timeB;
+    }
+
+    // Desempate por prioridad y fecha de creación
     const prioDiff = (b.priority || 0) - (a.priority || 0);
     if (prioDiff !== 0) return prioDiff;
-    if (a.closesAt && b.closesAt) {
-      return new Date(a.closesAt).getTime() - new Date(b.closesAt).getTime();
-    }
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 
@@ -575,8 +613,18 @@ export default function VecinoHome() {
     );
   }, [commonAreas]);
 
-  // Notification badge: punto verde si hay avisos no leídos (sin números)
-  const hasNotif = ((notices as any[])?.length ?? 0) > 0;
+  const { readNoticeIds, lastSeenFeesTs } = useReadStatus();
+
+  // Notification badge: punto rojo si hay avisos no leídos o cuotas pendientes
+  const hasUnreadNotices = ((notices as any[] | undefined) ?? []).some(
+    (n: any) => !readNoticeIds.includes(n.id),
+  );
+  const hasPendingFeesAlert = ((fees as any[] | undefined) ?? []).some(
+    (f: any) =>
+      (f.status === "PENDING" || f.status === "OVERDUE") &&
+      (!lastSeenFeesTs || new Date(f.createdAt).getTime() > lastSeenFeesTs),
+  );
+  const hasNotif = hasUnreadNotices || hasPendingFeesAlert;
 
   // Compute pending fees
   const pendingAmount =
@@ -606,7 +654,7 @@ export default function VecinoHome() {
                   position: "absolute",
                   top: 0,
                   right: 0,
-                  backgroundColor: "#027580",
+                  backgroundColor: ALERT_RED,
                   borderRadius: 5,
                   width: 8,
                   height: 8,
@@ -669,29 +717,92 @@ export default function VecinoHome() {
             >
               {displayVotings.map((voting: any) => {
                 const isJunta = voting.type === "JUNTA";
-                const isVoted = voting.hasVoted;
+                const isVoted = Boolean(
+                  voting.hasVoted || isSessionVoted(voting.id),
+                );
                 // Tratar como cerrada si status CLOSED o plazo expirado
                 const isClosed =
                   voting.status === "CLOSED" ||
                   (voting.closesAt && new Date(voting.closesAt).getTime() < NOW);
+
                 // Calcular resultado para mostrar en tarjeta cerrada
                 const resultText: string | null = (() => {
                   if (!isClosed) return null;
-                  if (voting.resultSummary) return voting.resultSummary;
-                  // Calcular desde votos si existen
-                  const yesVotes: number = (voting.items ?? []).reduce(
-                    (sum: number, item: any) => sum + (item.votesFor ?? item.yesVotes ?? 0),
-                    0,
-                  );
-                  const totalVotes: number = (voting.items ?? []).reduce(
-                    (sum: number, item: any) =>
-                      sum + (item.votesFor ?? item.yesVotes ?? 0) + (item.votesAgainst ?? item.noVotes ?? 0),
-                    0,
-                  );
-                  if (totalVotes === 0) return null;
-                  const pct = Math.round((yesVotes / totalVotes) * 100);
-                  return pct >= 50 ? `Aprobado con el ${pct} %` : `Rechazado (${pct} % a favor)`;
+                  if (voting.resultSummary && typeof voting.resultSummary === "string") {
+                    if (
+                      voting.resultSummary.includes("Aprobado con") ||
+                      voting.resultSummary.includes("Rechazado (")
+                    ) {
+                      return voting.resultSummary;
+                    }
+                  }
+
+                  // Calcular a partir de casts u options
+                  let approveW = 0;
+                  let rejectW = 0;
+                  let totalW = 0;
+
+                  const isApprove = (c: any) => {
+                    const ch = (c.choice || "").toUpperCase();
+                    if (ch === "APPROVE" || ch === "APRUEBO" || ch === "SI" || ch === "SÍ") return true;
+                    if (c.optionId && voting.options) {
+                      const opt = voting.options.find((o: any) => o.id === c.optionId);
+                      if (opt && opt.label?.toLowerCase().includes("aprueb")) return true;
+                    }
+                    return false;
+                  };
+
+                  const isReject = (c: any) => {
+                    const ch = (c.choice || "").toUpperCase();
+                    if (ch === "REJECT" || ch === "RECHAZO" || ch === "NO") return true;
+                    if (c.optionId && voting.options) {
+                      const opt = voting.options.find((o: any) => o.id === c.optionId);
+                      if (opt && opt.label?.toLowerCase().includes("rechaz")) return true;
+                    }
+                    return false;
+                  };
+
+                  if (Array.isArray(voting.casts) && voting.casts.length > 0) {
+                    approveW = voting.casts
+                      .filter(isApprove)
+                      .reduce((sum: number, c: any) => sum + (c.coefficient || 1), 0);
+                    rejectW = voting.casts
+                      .filter(isReject)
+                      .reduce((sum: number, c: any) => sum + (c.coefficient || 1), 0);
+                    const abstainW = voting.casts
+                      .filter((c: any) => (c.choice || "").toUpperCase() === "ABSTAIN")
+                      .reduce((sum: number, c: any) => sum + (c.coefficient || 1), 0);
+                    totalW = approveW + rejectW + abstainW;
+                  } else if (Array.isArray(voting.options) && voting.options.length > 0) {
+                    const approveOpt = voting.options.find((o: any) => o.label?.toLowerCase().includes("aprueb"));
+                    const rejectOpt = voting.options.find((o: any) => o.label?.toLowerCase().includes("rechaz"));
+                    const abstainOpt = voting.options.find((o: any) => o.label?.toLowerCase().includes("absten"));
+
+                    approveW = (approveOpt?.weightedTotal && approveOpt.weightedTotal > 0)
+                      ? approveOpt.weightedTotal
+                      : (approveOpt?.voteCount ?? 0);
+                    rejectW = (rejectOpt?.weightedTotal && rejectOpt.weightedTotal > 0)
+                      ? rejectOpt.weightedTotal
+                      : (rejectOpt?.voteCount ?? 0);
+                    const abstainW = (abstainOpt?.weightedTotal && abstainOpt.weightedTotal > 0)
+                      ? abstainOpt.weightedTotal
+                      : (abstainOpt?.voteCount ?? 0);
+                    totalW = approveW + rejectW + abstainW;
+                  }
+
+                  if (totalW > 0) {
+                    const pct = Math.round((approveW / totalW) * 100);
+                    return approveW >= rejectW && pct >= 50
+                      ? `Aprobado con el ${pct} %`
+                      : `Rechazado (${pct} % a favor)`;
+                  }
+
+                  return "Rechazado (0 % a favor)";
                 })();
+
+                const isApprovedResult = Boolean(
+                  resultText && resultText.toLowerCase().includes("aprobado"),
+                );
                 return (
                   <View
                     key={voting.id}
@@ -762,22 +873,24 @@ export default function VecinoHome() {
                     {isClosed && resultText ? (
                       <View
                         style={{
-                          backgroundColor: "#f0fdfa",
+                          backgroundColor: isApprovedResult ? "#f0fdf4" : "#fef2f2",
                           borderWidth: 1,
-                          borderColor: "#ccfbf1",
+                          borderColor: isApprovedResult ? "#bbf7d0" : "#fecaca",
                           borderRadius: 8,
                           paddingHorizontal: 10,
                           paddingVertical: 6,
                           marginBottom: 8,
+                          alignSelf: "flex-start",
                         }}
                       >
                         <Text
                           style={{
                             fontSize: 12,
                             fontWeight: "700",
-                            color: PRIMARY,
+                            color: isApprovedResult ? "#15803d" : "#dc2626",
                           }}
                         >
+                          {isApprovedResult ? "✓ " : "✕ "}
                           {resultText}
                         </Text>
                       </View>

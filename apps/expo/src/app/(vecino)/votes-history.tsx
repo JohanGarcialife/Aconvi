@@ -17,6 +17,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
 import { api } from "~/utils/api";
+import { useVotedSessions } from "~/utils/voting-tracker";
 
 const TENANT_ID = "org_aconvi_demo";
 
@@ -30,6 +31,7 @@ const RED = "#DC2626";
 
 export default function VotesHistoryScreen() {
   const router = useRouter();
+  const { isSessionVoted } = useVotedSessions();
   const [userId, setUserId] = useState<string>(
     "00000000-0000-0000-0000-000000000000",
   );
@@ -73,7 +75,7 @@ export default function VotesHistoryScreen() {
 
   // Active sessions where user has cast a vote
   const activeVotedSessions = sessionList.filter(
-    (s: any) => s.status === "OPEN" && s.hasVoted,
+    (s: any) => s.status === "OPEN" && (s.hasVoted || isSessionVoted(s.id)),
   );
 
   // Closed sessions (or archived)
@@ -411,28 +413,54 @@ export default function VotesHistoryScreen() {
               const closedDate = s.closedAt
                 ? format(new Date(s.closedAt), "d MMM. yyyy", { locale: es })
                 : "2023";
-              return (
-                <TouchableOpacity
-                  key={s.id}
-                  style={styles.pastCard}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/(vecino)/voting",
-                      params: { sessionId: s.id },
-                    } as any)
-                  }
-                  activeOpacity={0.7}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.pastCardTitle}>{s.title}</Text>
-                    <Text style={styles.pastCardSubtitle}>
-                      Celebrada el {closedDate}
-                    </Text>
-                  </View>
-                  <Feather name="chevron-right" size={20} color="#94A3B8" />
-                </TouchableOpacity>
-              );
-            })
+                const summary = s.resultSummary;
+                const isApproved = summary ? summary.toLowerCase().includes("aprob") : true;
+                return (
+                  <TouchableOpacity
+                    key={s.id}
+                    style={styles.pastCard}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/(vecino)/voting",
+                        params: { sessionId: s.id },
+                      } as any)
+                    }
+                    activeOpacity={0.7}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.pastCardTitle}>{s.title}</Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
+                        <Text style={styles.pastCardSubtitle}>
+                          {s.closedAt ? `Finalizada el ${closedDate}` : `Celebrada el ${closedDate}`}
+                        </Text>
+                        {summary ? (
+                          <View
+                            style={{
+                              backgroundColor: isApproved ? "#f0fdf4" : "#fef2f2",
+                              paddingHorizontal: 6,
+                              paddingVertical: 2,
+                              borderRadius: 4,
+                              borderWidth: 1,
+                              borderColor: isApproved ? "#bbf7d0" : "#fecaca",
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 10,
+                                fontWeight: "700",
+                                color: isApproved ? "#15803d" : "#dc2626",
+                              }}
+                            >
+                              {isApproved ? "✓ " : "✕ "}{summary}
+                            </Text>
+                          </View>
+                        ) : null}
+                      </View>
+                    </View>
+                    <Feather name="chevron-right" size={20} color="#94A3B8" />
+                  </TouchableOpacity>
+                );
+              })
           : pastDemoSessions.map((demo) => (
               <TouchableOpacity
                 key={demo.id}

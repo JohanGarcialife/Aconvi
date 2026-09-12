@@ -6,9 +6,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as SecureStore from "expo-secure-store";
 import { api } from "~/utils/api";
 import { authClient } from "~/utils/auth";
+import { useReadStatus } from "~/utils/notifications-tracker";
 
 const PRIMARY = "#4aa19b";
 const INACTIVE = "#94a3b8";
+const ALERT_RED = "#EF4444";
 
 function TabIcon({
   name,
@@ -45,7 +47,7 @@ function TabIcon({
             position: "absolute",
             top: -3,
             right: -8,
-            backgroundColor: PRIMARY,
+            backgroundColor: ALERT_RED,
             borderRadius: 5,
             width: 8,
             height: 8,
@@ -67,12 +69,40 @@ export default function VecinoLayout() {
 
   const insets = useSafeAreaInsets();
   const bottomPad = Math.max(insets.bottom, 8);
-  const { data: notices } = useQuery(
-    api.notice.all.queryOptions({ tenantId: "org_aconvi_demo" })
+  const { readNoticeIds, seenDocIds, lastSeenFeesTs } = useReadStatus();
+
+  const { data: notices } = useQuery({
+    ...api.notice.all.queryOptions({ tenantId: "org_aconvi_demo" }),
+    refetchInterval: 8000,
+  });
+  const { data: documents } = useQuery({
+    ...api.document.all.queryOptions({ tenantId: "org_aconvi_demo" }),
+    refetchInterval: 15000,
+  });
+  const { data: fees } = useQuery({
+    ...api.fee.myFees.queryOptions({
+      tenantId: "org_aconvi_demo",
+      userId: userId ?? "user_admin",
+    }),
+    refetchInterval: 15000,
+  });
+
+  const noticesList = (notices as any[] | undefined) ?? [];
+  const hasUnreadNotices = noticesList.some(
+    (n: any) => !readNoticeIds.includes(n.id),
   );
 
-  // Punto verde en Comunicados si hay avisos (cliente: no mostrar números, solo punto)
-  const hasUnreadNotices = ((notices as any[] | undefined)?.length ?? 0) > 0;
+  const docsList = (documents as any[] | undefined) ?? [];
+  const hasUnreadDocs = docsList.some(
+    (d: any) => !seenDocIds.includes(d.id),
+  );
+
+  const feesList = (fees as any[] | undefined) ?? [];
+  const hasPendingFees = feesList.some(
+    (f: any) =>
+      (f.status === "PENDING" || f.status === "OVERDUE") &&
+      (!lastSeenFeesTs || new Date(f.createdAt).getTime() > lastSeenFeesTs),
+  );
 
   return (
     <Tabs
@@ -138,7 +168,7 @@ export default function VecinoLayout() {
         options={{
           title: "Documentos",
           tabBarIcon: ({ focused }) => (
-            <TabIcon name="Documentos" focused={focused} />
+            <TabIcon name="Documentos" focused={focused} hasBadge={hasUnreadDocs} />
           ),
         }}
       />
@@ -158,7 +188,7 @@ export default function VecinoLayout() {
         options={{
           title: "Mis cuotas",
           tabBarIcon: ({ focused }) => (
-            <TabIcon name="Mis cuotas" focused={focused} />
+            <TabIcon name="Mis cuotas" focused={focused} hasBadge={hasPendingFees} />
           ),
         }}
       />

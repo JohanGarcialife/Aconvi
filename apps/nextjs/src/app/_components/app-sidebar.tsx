@@ -85,10 +85,10 @@ export function AppSidebar() {
                     <SidebarMenuButton
                       asChild
                       isActive={isActive}
-                      className={`h-10 rounded-xl px-3 text-sm font-medium transition-all ${
+                      className={`h-10 rounded-md px-3 text-sm font-medium transition-all ${
                         isActive
-                          ? "bg-primary! text-white! hover:bg-primary/90! hover:text-white!"
-                          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                          ? "bg-[#EAF5F2]! text-[#008075]! font-semibold hover:bg-[#E2F0ED]! hover:text-[#008075]!"
+                          : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                       }`}
                     >
                       <Link
@@ -96,15 +96,15 @@ export function AppSidebar() {
                         className="flex justify-between items-center w-full"
                       >
                         <div className="flex items-center gap-3">
-                          <item.icon className="h-4 w-4 shrink-0" />
+                          <item.icon className={`h-4 w-4 shrink-0 ${isActive ? "text-[#008075]" : "text-slate-500"}`} />
                           <span>{item.title}</span>
                         </div>
                         {item.title === "Incidencias" && totalCount > 0 ? (
                           <span
                             className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
                               isActive
-                                ? "bg-white/25 text-white"
-                                : "bg-primary/15 text-primary"
+                                ? "bg-[#008075]/15 text-[#008075]"
+                                : "bg-slate-100 text-slate-600"
                             }`}
                           >
                             {totalCount}
@@ -113,8 +113,8 @@ export function AppSidebar() {
                           <span
                             className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
                               isActive
-                                ? "bg-white/25 text-white"
-                                : "bg-primary/15 text-primary"
+                                ? "bg-[#008075]/15 text-[#008075]"
+                                : "bg-slate-100 text-slate-600"
                             }`}
                           >
                             {item.badge}

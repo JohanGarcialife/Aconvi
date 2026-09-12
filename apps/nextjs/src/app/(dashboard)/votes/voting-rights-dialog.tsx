@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Search, ShieldAlert, ShieldCheck } from "lucide-react";
+import { Search, ShieldAlert, ShieldCheck, Users } from "lucide-react";
 
 import { Badge } from "@acme/ui/badge";
 import { Button } from "@acme/ui/button";
@@ -80,11 +80,10 @@ export function VotingRightsDialog() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button
-          variant="outline"
-          className="border-slate-300 font-bold hover:bg-slate-50"
+          className="flex items-center gap-1.5 rounded-xl bg-[#008075] px-4 py-2 text-sm font-bold text-white shadow-xs hover:bg-[#006e64]"
         >
-          <ShieldCheck className="mr-2 h-4 w-4 text-emerald-600" />
-          Derechos de Voto
+          <Users className="h-4 w-4" />
+          Habilitar voto
         </Button>
       </DialogTrigger>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">

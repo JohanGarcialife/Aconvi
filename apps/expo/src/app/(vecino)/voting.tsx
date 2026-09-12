@@ -20,6 +20,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
 import { api, queryClient } from "~/utils/api";
+import { useVotedSessions, markSessionAsVoted } from "~/utils/voting-tracker";
 
 const TENANT_ID = "org_aconvi_demo";
 
@@ -56,6 +57,8 @@ export default function VotingScreen() {
   const [justVotedSessionId, setJustVotedSessionId] = useState<string | null>(
     null,
   );
+
+  const { isSessionVoted } = useVotedSessions();
 
   // Modal de confirmación (Bottom sheet)
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
@@ -94,31 +97,70 @@ export default function VotingScreen() {
     refetchInterval: 3000,
   });
 
-  const sessionList = (sessions as any[]) ?? [];
+  const toDayString = (d: string | Date | null | undefined) => {
+    if (!d) return null;
+    const dt = new Date(d);
+    if (isNaN(dt.getTime())) return null;
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+  };
+
+  const isVotedSession = (session: any) =>
+    Boolean(session && (session.hasVoted || isSessionVoted(session.id)));
+
+  const rawList = (sessions as any[]) ?? [];
+  const sessionList = [...rawList].sort((a: any, b: any) => {
+    const isClosedA = a.status === "CLOSED" || (a.closesAt && new Date(a.closesAt).getTime() < Date.now());
+    const isClosedB = b.status === "CLOSED" || (b.closesAt && new Date(b.closesAt).getTime() < Date.now());
+    if (!isClosedA && isClosedB) return -1;
+    if (isClosedA && !isClosedB) return 1;
+
+    const timeA = a.closesAt ? new Date(a.closesAt).getTime() : Infinity;
+    const timeB = b.closesAt ? new Date(b.closesAt).getTime() : Infinity;
+
+    const dayA = toDayString(a.closesAt);
+    const dayB = toDayString(b.closesAt);
+
+    if (dayA && dayB && dayA !== dayB) {
+      return timeA - timeB;
+    }
+    if (dayA && !dayB) return -1;
+    if (!dayA && dayB) return 1;
+
+    const hasVotedA = isVotedSession(a);
+    const hasVotedB = isVotedSession(b);
+    if (!hasVotedA && hasVotedB) return -1;
+    if (hasVotedA && !hasVotedB) return 1;
+
+    if (timeA !== timeB) return timeA - timeB;
+
+    const prioDiff = (b.priority || 0) - (a.priority || 0);
+    if (prioDiff !== 0) return prioDiff;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+
   const pendingOpen = sessionList.find(
-    (s) => s.status === "OPEN" && !s.hasVoted,
+    (s) => s.status === "OPEN" && !isVotedSession(s),
   );
 
   const activeSession = selectedSessionId
-    ? (sessionList.find((s) => s.id === selectedSessionId) ??
-      pendingOpen ??
-      sessionList[0])
-    : (pendingOpen ?? sessionList[0]);
+    ? (sessionList.find((s) => s.id === selectedSessionId) ?? sessionList[0])
+    : sessionList[0];
 
   useFocusEffect(
     useCallback(() => {
       void refetch();
       if (
-        !activeSession?.hasVoted &&
-        justVotedSessionId !== activeSession?.id
+        activeSession &&
+        !isVotedSession(activeSession) &&
+        justVotedSessionId !== activeSession.id
       ) {
         setStep("VOTE");
       }
     }, [
       refetch,
-      activeSession?.hasVoted,
+      activeSession,
+      isSessionVoted,
       justVotedSessionId,
-      activeSession?.id,
     ]),
   );
 
@@ -131,13 +173,13 @@ export default function VotingScreen() {
   useEffect(() => {
     if (
       activeSession &&
-      !activeSession.hasVoted &&
+      !isVotedSession(activeSession) &&
       justVotedSessionId !== activeSession.id
     ) {
       setStep("VOTE");
       setChoices({});
     }
-  }, [activeSession?.id]);
+  }, [activeSession?.id, isSessionVoted, justVotedSessionId]);
 
   useEffect(() => {
     if (
@@ -151,7 +193,7 @@ export default function VotingScreen() {
       if (
         !currentSelected ||
         currentSelected.status === "CLOSED" ||
-        currentSelected.hasVoted
+        isVotedSession(currentSelected)
       ) {
         setSelectedSessionId(pendingOpen.id);
         setStep("VOTE");
@@ -165,11 +207,36 @@ export default function VotingScreen() {
     ...api.voting.cast.mutationOptions(),
     onSuccess: () => {
       setConfirmModalVisible(false);
-      setJustVotedSessionId(activeSession?.id ?? null);
+      const votedId = activeSession?.id;
+      if (votedId) {
+        void markSessionAsVoted(votedId);
+      }
+      setJustVotedSessionId(votedId ?? null);
       setStep("SUCCESS");
-      void queryClient.invalidateQueries(
-        api.voting.all.queryFilter({ tenantId: TENANT_ID }),
+
+      // Optimistic synchronous update of query cache so navigating to Home immediately reflects vote
+      queryClient.setQueriesData(
+        { queryKey: api.voting.all.queryKey() },
+        (oldData: any) => {
+          if (!Array.isArray(oldData)) return oldData;
+          return oldData.map((s: any) =>
+            s.id === votedId
+              ? {
+                  ...s,
+                  hasVoted: true,
+                  userCasts: [
+                    ...(s.userCasts || []),
+                    { sessionId: s.id, userId: USER_ID },
+                  ],
+                }
+              : s,
+          );
+        },
       );
+
+      void queryClient.invalidateQueries({
+        queryKey: api.voting.all.queryKey(),
+      });
       void refetch();
     },
     onError: (err: any) => {
@@ -290,6 +357,7 @@ export default function VotingScreen() {
   const canVote = activeSession.userVotingStatus?.canVote ?? true;
   const isAlreadyVoted = Boolean(
     activeSession.hasVoted ||
+      isSessionVoted(activeSession.id) ||
       (justVotedSessionId === activeSession.id && step === "SUCCESS"),
   );
 

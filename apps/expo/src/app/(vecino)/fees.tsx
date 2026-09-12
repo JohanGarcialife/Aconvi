@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "~/utils/api";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { markFeesAsSeen } from "~/utils/notifications-tracker";
 
 const PRIMARY = "#4aa19b";
 const DARK = "#0f172a";
@@ -19,6 +20,10 @@ export default function FeesScreen() {
   const { data: fees, isLoading } = useQuery(
     api.fee.myFees.queryOptions({ tenantId: TENANT_ID, userId: DEMO_AUTHOR_ID })
   );
+
+  useEffect(() => {
+    void markFeesAsSeen();
+  }, []);
 
   const { mutate: payFee, isPending: isPaying } = useMutation({
     ...api.fee.pay.mutationOptions(),
