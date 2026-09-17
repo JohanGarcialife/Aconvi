@@ -381,6 +381,10 @@ export const voteSession = pgTable("vote_session", {
     mode: "date",
     withTimezone: true,
   }),
+  // Auto-generación de OT tras votación aprobada
+  autoGenerateOt: boolean("auto_generate_ot").default(false),
+  otProviderId: uuid("ot_provider_id"),
+  otGeneratedIncidentId: uuid("ot_generated_incident_id"),
 });
 
 export const voteSessionRelations = relations(voteSession, ({ one, many }) => ({

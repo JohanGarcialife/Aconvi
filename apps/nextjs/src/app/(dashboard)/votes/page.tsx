@@ -315,6 +315,16 @@ function VotesListView({
   onFinalizeActa: (id: string) => void;
 }) {
   const now = Date.now();
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  const toggleExpand = (key: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   const openSessions = sessions.filter(
     (s: any) =>
@@ -335,8 +345,13 @@ function VotesListView({
       (s.scheduledAt && new Date(s.scheduledAt).getTime() > now),
   );
 
-  const recentClosedSessions = sessions.filter(
+  const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+  const allClosedSessions = sessions.filter(
     (s: any) => s.status === "CLOSED",
+  );
+  const recentClosedSessions = allClosedSessions.filter(
+    (s: any) =>
+      new Date(s.closedAt || s.closesAt || s.createdAt).getTime() >= sevenDaysAgo,
   );
 
   return (
@@ -422,7 +437,7 @@ function VotesListView({
               </div>
             ) : (
               <div className="space-y-2.5">
-                {openSessions.map((session: any) => {
+                {(expanded.has("open") ? openSessions : openSessions.slice(0, 3)).map((session: any) => {
                   const isJunta = session.type === "JUNTA";
                   const totalVoters = 50;
                   const votesCount = session.casts?.length ?? 0;
@@ -509,6 +524,15 @@ function VotesListView({
                     </div>
                   );
                 })}
+                {openSessions.length > 3 && !expanded.has("open") && (
+                  <button
+                    type="button"
+                    onClick={() => toggleExpand("open")}
+                    className="w-full py-2 text-center text-xs font-bold text-[#008075] hover:bg-[#EAF5F2] rounded-md transition-colors"
+                  >
+                    Ver todas ({openSessions.length})
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -532,7 +556,7 @@ function VotesListView({
               </div>
             ) : (
               <div className="space-y-2.5">
-                {pendingClosureSessions.map((session: any) => (
+                {(expanded.has("pending") ? pendingClosureSessions : pendingClosureSessions.slice(0, 3)).map((session: any) => (
                   <div
                     key={session.id}
                     className="bg-white rounded-lg border border-slate-200/80 p-4 shadow-2xs hover:border-slate-300 transition-all flex flex-col md:flex-row md:items-center justify-between gap-3"
@@ -570,6 +594,15 @@ function VotesListView({
                     </div>
                   </div>
                 ))}
+                {pendingClosureSessions.length > 3 && !expanded.has("pending") && (
+                  <button
+                    type="button"
+                    onClick={() => toggleExpand("pending")}
+                    className="w-full py-2 text-center text-xs font-bold text-[#008075] hover:bg-[#EAF5F2] rounded-md transition-colors"
+                  >
+                    Ver todas ({pendingClosureSessions.length})
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -593,7 +626,7 @@ function VotesListView({
               </div>
             ) : (
               <div className="space-y-2.5">
-                {scheduledSessions.map((session: any) => (
+                {(expanded.has("scheduled") ? scheduledSessions : scheduledSessions.slice(0, 3)).map((session: any) => (
                   <div
                     key={session.id}
                     className="bg-white rounded-lg border border-slate-200/80 p-4 shadow-2xs hover:border-slate-300 transition-all flex flex-col md:flex-row md:items-center justify-between gap-3"
@@ -631,6 +664,15 @@ function VotesListView({
                     </div>
                   </div>
                 ))}
+                {scheduledSessions.length > 3 && !expanded.has("scheduled") && (
+                  <button
+                    type="button"
+                    onClick={() => toggleExpand("scheduled")}
+                    className="w-full py-2 text-center text-xs font-bold text-[#008075] hover:bg-[#EAF5F2] rounded-md transition-colors"
+                  >
+                    Ver todas ({scheduledSessions.length})
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -643,17 +685,17 @@ function VotesListView({
                 <h2 className="text-sm font-bold text-slate-900">Cerradas recientemente</h2>
               </div>
               <span className="text-xs font-medium text-slate-400">
-                {recentClosedSessions.length} este mes
+                {recentClosedSessions.length} en los últimos 7 días
               </span>
             </div>
 
             {recentClosedSessions.length === 0 ? (
               <div className="p-4 text-center text-xs text-slate-400 bg-white rounded-lg border border-dashed border-slate-200">
-                No hay votaciones cerradas este mes.
+                No hay votaciones cerradas en los últimos 7 días.
               </div>
             ) : (
               <div className="space-y-2.5">
-                {recentClosedSessions.map((session: any) => {
+                {(expanded.has("closed") ? recentClosedSessions : recentClosedSessions.slice(0, 3)).map((session: any) => {
                   const summary = session.resultSummary || "Aprobada · 78% participación";
                   const isApproved = !summary.toLowerCase().includes("rechazad");
                   return (
@@ -705,6 +747,71 @@ function VotesListView({
                     </div>
                   );
                 })}
+                {recentClosedSessions.length > 3 && !expanded.has("closed") && (
+                  <button
+                    type="button"
+                    onClick={() => toggleExpand("closed")}
+                    className="w-full py-2 text-center text-xs font-bold text-[#008075] hover:bg-[#EAF5F2] rounded-md transition-colors"
+                  >
+                    Ver todas ({recentClosedSessions.length})
+                  </button>
+                )}
+              </div>
+            )}
+            {allClosedSessions.length > recentClosedSessions.length && (
+              <button
+                type="button"
+                onClick={() => toggleExpand("history")}
+                className="w-full mt-2 py-2 text-center text-xs font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-md transition-colors border border-dashed border-slate-200"
+              >
+                {expanded.has("history")
+                  ? "Ocultar historial"
+                  : `Ver historial completo (${allClosedSessions.length} cerradas)`}
+              </button>
+            )}
+            {expanded.has("history") && (
+              <div className="space-y-2.5 mt-2">
+                {allClosedSessions
+                  .filter((s: any) => new Date(s.closedAt || s.closesAt || s.createdAt).getTime() < sevenDaysAgo)
+                  .map((session: any) => {
+                    const summary = session.resultSummary || "Cerrada";
+                    const isApproved = !summary.toLowerCase().includes("rechazad");
+                    return (
+                      <div
+                        key={session.id}
+                        className="bg-white rounded-lg border border-slate-200/80 p-4 shadow-2xs hover:border-slate-300 transition-all flex flex-col md:flex-row md:items-center justify-between gap-3 opacity-80"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-md bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
+                            <CheckCircle2 className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <h3 className="text-sm font-bold text-slate-900">{session.title}</h3>
+                            <div className="text-[10px] text-slate-400 mt-0.5">
+                              Cerrada el {format(new Date(session.closedAt || session.closesAt || session.createdAt), "d 'de' MMMM yyyy", { locale: es })}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2.5">
+                          <span
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-semibold ${
+                              isApproved ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
+                            }`}
+                          >
+                            {summary}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => onOpenDetail(session)}
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-md bg-slate-100 text-slate-800 text-xs font-bold hover:bg-slate-200 transition-colors"
+                          >
+                            Ver acta
+                            <ChevronRight className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
               </div>
             )}
           </div>
@@ -722,7 +829,7 @@ function VotingRightsView({ onBack }: { onBack: () => void }) {
   const [internalNote, setInternalNote] = useState("");
 
   const { data: neighbors, refetch } = useQuery(
-    trpc.community.neighbors.queryOptions({ tenantId: TENANT_ID }),
+    trpc.voting.debtors.queryOptions({ tenantId: TENANT_ID }),
   );
 
   const overrideMutation = useMutation(
@@ -766,19 +873,6 @@ function VotingRightsView({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="space-y-5">
-      {/* Top Banner Card */}
-      <div className="flex items-start gap-3.5 p-4 bg-white rounded-lg border border-slate-200/80 shadow-2xs">
-        <div className="w-10 h-10 rounded-md bg-[#EAF5F2] flex items-center justify-center text-[#008075] shrink-0">
-          <Users className="w-5 h-5" />
-        </div>
-        <div>
-          <h2 className="text-sm font-bold text-slate-900">Habilitar voto</h2>
-          <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
-            Propietarios con recibos pendientes. Puedes habilitar su voto de forma
-            permanente cuando la ley lo permita, indicando el motivo.
-          </p>
-        </div>
-      </div>
 
       {/* Debtors List Card */}
       <div className="space-y-2.5">
@@ -822,7 +916,8 @@ function VotingRightsView({ onBack }: { onBack: () => void }) {
                           {item.name}
                         </div>
                         <div className="text-xs text-slate-500 mt-0.5">
-                          Cuota / Deuda: <span className="font-semibold text-slate-700">{item.coefficient ? `${item.coefficient}%` : "Pendiente"}</span>
+                          Deuda pendiente: <span className="font-semibold text-rose-600">{item.totalDebt ? `${item.totalDebt.toFixed(2)} €` : "Pendiente"}</span>
+                          {item.coefficient ? <span className="text-slate-400 ml-1.5">· Coef. {item.coefficient}%</span> : null}
                         </div>
                       </div>
                     </div>
@@ -994,6 +1089,13 @@ function CreateSingleVoteView({
   const [propAmount, setPropAmount] = useState("");
   const [propFile, setPropFile] = useState<string | null>(null);
 
+  // Auto-OT generation
+  const [autoGenerateOt, setAutoGenerateOt] = useState(false);
+  const [otProviderId, setOtProviderId] = useState("");
+  const { data: providers } = useQuery(
+    trpc.provider.listByOrg.queryOptions({ tenantId: TENANT_ID }),
+  );
+
   const createMutation = useMutation(
     trpc.voting.create.mutationOptions({
       onSuccess: () => {
@@ -1046,11 +1148,19 @@ function CreateSingleVoteView({
       });
     }
 
+    let safeClosesAt: string | undefined = undefined;
+    if (closesAt) {
+      const d = new Date(closesAt);
+      if (!isNaN(d.getTime())) {
+        safeClosesAt = d.toISOString();
+      }
+    }
+
     createMutation.mutate({
       tenantId: TENANT_ID,
       title: title.trim(),
       description: description.trim() || undefined,
-      closesAt: closesAt ? new Date(closesAt).toISOString() : undefined,
+      closesAt: safeClosesAt,
       type: "SINGLE",
       budgetProposals: finalProposals.map((p) => ({
         companyName: p.companyName.trim(),
@@ -1059,6 +1169,8 @@ function CreateSingleVoteView({
         fileUrl: p.fileUrl?.trim() || undefined,
         fileName: p.fileName?.trim() || undefined,
       })),
+      autoGenerateOt,
+      otProviderId: otProviderId || undefined,
     });
   };
 
@@ -1323,6 +1435,40 @@ function CreateSingleVoteView({
         </div>
       </div>
 
+      {/* Auto-OT Generation */}
+      <div className="bg-white rounded-lg border border-slate-200/80 p-4 shadow-2xs space-y-3">
+        <label className="flex items-center gap-2.5 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={autoGenerateOt}
+            onChange={(e) => setAutoGenerateOt(e.target.checked)}
+            className="w-4 h-4 rounded border-slate-300 text-[#008075] focus:ring-[#008075]"
+          />
+          <span className="text-xs font-bold text-slate-800">
+            Generar orden de trabajo si se aprueba
+          </span>
+        </label>
+        {autoGenerateOt && (
+          <div className="pl-6.5 space-y-1.5">
+            <label className="text-[11px] font-medium text-slate-500">
+              Proveedor asignado (opcional)
+            </label>
+            <select
+              value={otProviderId}
+              onChange={(e) => setOtProviderId(e.target.value)}
+              className="w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#008075]"
+            >
+              <option value="">Sin asignar</option>
+              {(providers as any[] ?? []).map((p: any) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} {p.speciality ? `(${p.speciality})` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
       {/* Bottom Bar */}
       <div className="flex items-center justify-end gap-2.5 pt-1">
         <button
@@ -1378,6 +1524,13 @@ function CreateMeetingView({
   const [newPropCompany, setNewPropCompany] = useState("");
   const [newPropAmount, setNewPropAmount] = useState("");
   const [isAddingProposal, setIsAddingProposal] = useState(false);
+
+  // Auto-OT generation
+  const [autoGenerateOt, setAutoGenerateOt] = useState(false);
+  const [otProviderId, setOtProviderId] = useState("");
+  const { data: providers } = useQuery(
+    trpc.provider.listByOrg.queryOptions({ tenantId: TENANT_ID }),
+  );
 
   const createMeetingMutation = useMutation(
     trpc.voting.createMeeting.mutationOptions({
@@ -1443,10 +1596,20 @@ function CreateMeetingView({
       return;
     }
 
-    const fullMeetingDate = new Date(`${meetingDate}T${meetingTime || "18:00"}:00`).toISOString();
-    const fullSecondCall = secondCallDate
-      ? new Date(`${secondCallDate}T${secondCallTime || "18:30"}:00`).toISOString()
-      : undefined;
+    const parsedMeetingDate = new Date(`${meetingDate}T${meetingTime || "18:00"}:00`);
+    if (isNaN(parsedMeetingDate.getTime())) {
+      alert("Por favor introduce una fecha y hora válidas para la junta.");
+      return;
+    }
+    const fullMeetingDate = parsedMeetingDate.toISOString();
+
+    let fullSecondCall: string | undefined = undefined;
+    if (secondCallDate) {
+      const parsed2nd = new Date(`${secondCallDate}T${secondCallTime || "18:30"}:00`);
+      if (!isNaN(parsed2nd.getTime())) {
+        fullSecondCall = parsed2nd.toISOString();
+      }
+    }
 
     createMeetingMutation.mutate({
       tenantId: TENANT_ID,
@@ -1464,6 +1627,8 @@ function CreateMeetingView({
             amount: p.amount,
           })),
         })),
+      autoGenerateOt,
+      otProviderId: otProviderId || undefined,
     });
   };
 
@@ -1807,6 +1972,40 @@ function CreateMeetingView({
         </div>
       </div>
 
+      {/* Auto-OT Generation */}
+      <div className="bg-white rounded-lg border border-slate-200/80 p-4 shadow-2xs space-y-3">
+        <label className="flex items-center gap-2.5 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={autoGenerateOt}
+            onChange={(e) => setAutoGenerateOt(e.target.checked)}
+            className="w-4 h-4 rounded border-slate-300 text-[#008075] focus:ring-[#008075]"
+          />
+          <span className="text-xs font-bold text-slate-800">
+            Generar orden de trabajo si se aprueba
+          </span>
+        </label>
+        {autoGenerateOt && (
+          <div className="pl-6.5 space-y-1.5">
+            <label className="text-[11px] font-medium text-slate-500">
+              Proveedor asignado (opcional)
+            </label>
+            <select
+              value={otProviderId}
+              onChange={(e) => setOtProviderId(e.target.value)}
+              className="w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#008075]"
+            >
+              <option value="">Sin asignar</option>
+              {(providers as any[] ?? []).map((p: any) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} {p.speciality ? `(${p.speciality})` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
       {/* Bottom Bar */}
       <div className="flex items-center justify-end gap-2.5 pt-1">
         <button
@@ -1896,27 +2095,27 @@ export default function VotesPage() {
             {activeView === "meeting"
               ? "Crea una junta, añade su orden del día y decide qué puntos requieren votación."
               : activeView === "rights"
-              ? "Propietarios con recibos pendientes. Puedes habilitar su voto de forma permanente cuando la ley lo permita, indicando el motivo."
+              ? (<>Propietarios con recibos pendientes.<br />Puedes habilitar su voto de forma permanente cuando la ley lo permita, indicando el motivo.</>)
               : activeView === "single"
-              ? "Crea una votación sobre un tema concreto de la comunidad. Los propietarios podrán elegir entre las opciones que definas."
+              ? (<>Crea una votación sobre un tema concreto de la comunidad.<br />Los propietarios podrán elegir entre las opciones que definas.</>)
               : "Gestiona las votaciones de tu comunidad de forma sencilla y eficiente."}
           </p>
         </div>
 
         {/* Action Switcher Buttons */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Button 1: Habilitar voto */}
+          {/* Button 1: + Nueva junta (CTA principal) */}
           <button
             type="button"
-            onClick={() => setActiveView(activeView === "rights" ? "list" : "rights")}
+            onClick={() => setActiveView(activeView === "meeting" ? "list" : "meeting")}
             className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-xs font-bold shadow-2xs transition-all ${
-              activeView === "rights" || activeView === "list"
-                ? "bg-[#008075] text-white hover:bg-[#006e64]"
-                : "border border-slate-200 bg-white text-slate-800 hover:bg-slate-50"
+              activeView === "meeting"
+                ? "bg-[#006e64] text-white"
+                : "bg-[#008075] text-white hover:bg-[#006e64]"
             }`}
           >
-            <Users className="h-3.5 w-3.5" />
-            Habilitar voto
+            <Plus className="h-3.5 w-3.5" />
+            Nueva junta
           </button>
 
           {/* Button 2: Votación sin junta */}
@@ -1933,18 +2132,18 @@ export default function VotesPage() {
             Votación sin junta
           </button>
 
-          {/* Button 3: + Nueva junta */}
+          {/* Button 3: Habilitar voto */}
           <button
             type="button"
-            onClick={() => setActiveView(activeView === "meeting" ? "list" : "meeting")}
+            onClick={() => setActiveView(activeView === "rights" ? "list" : "rights")}
             className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-xs font-bold shadow-2xs transition-all ${
-              activeView === "meeting"
+              activeView === "rights"
                 ? "bg-[#008075] text-white hover:bg-[#006e64]"
                 : "border border-slate-200 bg-white text-slate-800 hover:bg-slate-50"
             }`}
           >
-            <Plus className="h-3.5 w-3.5" />
-            Nueva junta
+            <Users className="h-3.5 w-3.5" />
+            Habilitar voto
           </button>
         </div>
       </div>

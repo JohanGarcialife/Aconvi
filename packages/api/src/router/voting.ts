@@ -3,8 +3,11 @@ import { z } from "zod";
 
 import {
   fee,
+  incident,
   member,
   notice,
+  provider,
+  user,
   voteBudgetProposal,
   voteCast,
   voteItem,
@@ -51,6 +54,9 @@ async function ensureVotingTables(db: any) {
       `ALTER TABLE "member" ADD COLUMN IF NOT EXISTS "voting_override_reason" text;`,
       `ALTER TABLE "member" ADD COLUMN IF NOT EXISTS "voting_override_at" timestamp with time zone;`,
       `ALTER TABLE "member" ADD COLUMN IF NOT EXISTS "voting_override_by" text;`,
+      `ALTER TABLE "vote_session" ADD COLUMN IF NOT EXISTS "auto_generate_ot" boolean DEFAULT false;`,
+      `ALTER TABLE "vote_session" ADD COLUMN IF NOT EXISTS "ot_provider_id" uuid;`,
+      `ALTER TABLE "vote_session" ADD COLUMN IF NOT EXISTS "ot_generated_incident_id" uuid;`,
     ];
     for (const stmt of statements) {
       try {
@@ -522,6 +528,8 @@ export const votingRouter = createTRPCRouter({
             }),
           )
           .optional(),
+        autoGenerateOt: z.boolean().optional().default(false),
+        otProviderId: z.string().uuid().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -581,10 +589,12 @@ export const votingRouter = createTRPCRouter({
           coefficientWeighted: true,
           priority: input.priority ?? 0,
           closesAt: input.closesAt ? new Date(input.closesAt) : null,
+          autoGenerateOt: input.autoGenerateOt ?? false,
+          otProviderId: input.otProviderId ?? null,
         })
         .returning();
 
-      // If Junta with items, insert vote_items
+      // Insert vote_item for session
       if (input.type === "JUNTA" && input.items && input.items.length > 0) {
         await ctx.db.insert(voteItem).values(
           input.items.map((item, idx) => ({
@@ -597,6 +607,16 @@ export const votingRouter = createTRPCRouter({
             onlineVotingEnabled: item.onlineVotingEnabled ?? true,
           })),
         );
+      } else if (input.type === "SINGLE") {
+        await ctx.db.insert(voteItem).values({
+          id: crypto.randomUUID(),
+          sessionId,
+          orderIndex: 1,
+          title: input.title,
+          budget: derivedBudget,
+          description: input.description ?? null,
+          onlineVotingEnabled: true,
+        });
       }
 
       // If budget proposals provided, insert them
@@ -693,13 +713,28 @@ export const votingRouter = createTRPCRouter({
                 .optional(),
             }),
           )
-          .min(1),
+          .optional()
+          .default([]),
+        autoGenerateOt: z.boolean().optional().default(false),
+        otProviderId: z.string().uuid().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       await ensureVotingTables(ctx.db);
       const sessionId = crypto.randomUUID();
       const authorId = ctx.session?.user?.id ?? DEMO_AUTHOR_ID;
+
+      // Ensure author exists in user table to prevent foreign key violation
+      try {
+        const { sql } = await import("drizzle-orm");
+        await ctx.db.execute(
+          sql`INSERT INTO "user" ("id", "name", "email", "role")
+              VALUES (${authorId}, 'Administrador de Fincas', 'af@aconvi.es', 'AF')
+              ON CONFLICT ("id") DO NOTHING;`,
+        );
+      } catch (authorErr) {
+        console.warn("[voting.createMeeting] Could not ensure author user:", authorErr);
+      }
 
       // Check open sessions count
       const openCountResult = await ctx.db
@@ -742,12 +777,27 @@ export const votingRouter = createTRPCRouter({
           meetingLocation: input.meetingLocation,
           secondCallDate: secondCallD,
           convocationGeneratedAt: now,
+          autoGenerateOt: input.autoGenerateOt ?? false,
+          otProviderId: input.otProviderId ?? null,
         })
         .returning();
 
       // 2. Insert items & their proposals
-      for (let idx = 0; idx < input.items.length; idx++) {
-        const itemInput = input.items[idx]!;
+      const resolvedItems =
+        input.items && input.items.length > 0
+          ? input.items
+          : [
+              {
+                title: "Puntos del orden del día general",
+                budget: undefined,
+                description: undefined,
+                onlineVotingEnabled: true,
+                proposals: [],
+              },
+            ];
+
+      for (let idx = 0; idx < resolvedItems.length; idx++) {
+        const itemInput = resolvedItems[idx]!;
         const itemId = crypto.randomUUID();
 
         await ctx.db.insert(voteItem).values({
@@ -823,7 +873,7 @@ export const votingRouter = createTRPCRouter({
           })
         : null;
 
-      const agendaPoints = input.items
+      const agendaPoints = resolvedItems
         .map((it, idx) => {
           const modeTag = it.onlineVotingEnabled
             ? "🗳️ [Voto telemático habilitado en la App]"
@@ -855,15 +905,19 @@ Se recuerda a los propietarios que, conforme a la normativa vigente, aquellos qu
 
 Fdo. La Administración de Fincas`;
 
-      await ctx.db.insert(notice).values({
-        id: crypto.randomUUID(),
-        organizationId: input.tenantId,
-        authorId,
-        title: `📋 Convocatoria: ${input.title}`,
-        content: noticeBody,
-        type: "COMUNICADO",
-        pinned: true,
-      });
+      try {
+        await ctx.db.insert(notice).values({
+          id: crypto.randomUUID(),
+          organizationId: input.tenantId,
+          authorId,
+          title: `📋 Convocatoria: ${input.title}`,
+          content: noticeBody,
+          type: "COMUNICADO",
+          pinned: true,
+        });
+      } catch (noticeErr) {
+        console.warn("[voting.createMeeting] Notice insert warning:", noticeErr);
+      }
 
       // 4. Real-time Events & Notifications
       try {
@@ -1316,7 +1370,95 @@ Fdo. La Administración de Fincas`;
         console.warn("[voting.close] Push broadcast failed:", pushErr);
       }
 
-      return { ok: true, minuteContent: lines.join("\n") };
+      // Auto-generate OT (incident) if enabled and vote was approved
+      let generatedIncidentId: string | null = null;
+      if (session.autoGenerateOt) {
+        try {
+          const allCasts = session.casts;
+          const approveWeight = allCasts
+            .filter((c) => c.choice === "APPROVE")
+            .reduce((s, c) => s + c.coefficient, 0);
+          const rejectWeight = allCasts
+            .filter((c) => c.choice === "REJECT")
+            .reduce((s, c) => s + c.coefficient, 0);
+
+          if (approveWeight > rejectWeight) {
+            const incidentId = crypto.randomUUID();
+            const authorId = ctx.session?.user?.id ?? DEMO_AUTHOR_ID;
+
+            await ctx.db.insert(incident).values({
+              id: incidentId,
+              title: `OT: ${session.title}`,
+              description: `Orden de trabajo generada automáticamente tras la aprobación por mayoría de la votación "${session.title}".`,
+              category: "obra",
+              status: "RECIBIDA",
+              priority: "MEDIA",
+              organizationId: input.tenantId,
+              reporterId: authorId,
+              providerId: session.otProviderId ?? null,
+            });
+
+            await ctx.db
+              .update(voteSession)
+              .set({ otGeneratedIncidentId: incidentId })
+              .where(eq(voteSession.id, input.sessionId));
+
+            generatedIncidentId = incidentId;
+            console.log(`[voting.close] Auto-generated OT incident: ${incidentId}`);
+          }
+        } catch (otErr) {
+          console.warn("[voting.close] Auto-OT generation failed:", otErr);
+        }
+      }
+
+      return { ok: true, minuteContent: lines.join("\n"), generatedIncidentId };
+    }),
+
+  // ── Debtors with voting rights info (for AF "Habilitar voto" view) ─────────
+  debtors: publicProcedure
+    .input(z.object({ tenantId: z.string().min(1) }))
+    .query(async ({ ctx, input }) => {
+      const pendingFees = await ctx.db.query.fee.findMany({
+        where: and(
+          eq(fee.organizationId, input.tenantId),
+          inArray(fee.status, ["PENDING", "OVERDUE"]),
+        ),
+      });
+
+      if (pendingFees.length === 0) return [];
+
+      const debtorUserIds = [...new Set(pendingFees.map((f) => f.userId))];
+
+      const debtorMembers = await ctx.db.query.member.findMany({
+        where: and(
+          eq(member.organizationId, input.tenantId),
+          inArray(member.userId, debtorUserIds),
+        ),
+        with: {
+          user: {
+            columns: {
+              id: true,
+              name: true,
+              email: true,
+              phoneNumber: true,
+            },
+          },
+        },
+      });
+
+      return debtorMembers.map((m) => {
+        const userFees = pendingFees.filter((f) => f.userId === m.userId);
+        const totalDebt = userFees.reduce((sum, f) => sum + f.amount, 0);
+        return {
+          ...m.user,
+          memberId: m.id,
+          coefficient: m.coefficient,
+          votingOverride: m.votingOverride,
+          votingOverrideReason: m.votingOverrideReason,
+          totalDebt,
+          pendingFeeCount: userFees.length,
+        };
+      });
     }),
 
   // ── Override Voting Right (AF only) ──────────────────────────────────────────
