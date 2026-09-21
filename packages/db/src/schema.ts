@@ -418,6 +418,9 @@ export const voteItem = pgTable("vote_item", {
   budget: varchar({ length: 64 }), // e.g. "1.200 €"
   description: text(),
   onlineVotingEnabled: boolean("online_voting_enabled").default(true).notNull(), // Toggle AF: ¿Votar este punto antes de la junta?
+  autoGenerateOt: boolean("auto_generate_ot").default(false),
+  otProviderId: uuid("ot_provider_id"),
+  otGeneratedIncidentId: uuid("ot_generated_incident_id"),
   createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
     .defaultNow()
     .notNull(),

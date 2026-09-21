@@ -57,6 +57,9 @@ async function ensureVotingTables(db: any) {
       `ALTER TABLE "vote_session" ADD COLUMN IF NOT EXISTS "auto_generate_ot" boolean DEFAULT false;`,
       `ALTER TABLE "vote_session" ADD COLUMN IF NOT EXISTS "ot_provider_id" uuid;`,
       `ALTER TABLE "vote_session" ADD COLUMN IF NOT EXISTS "ot_generated_incident_id" uuid;`,
+      `ALTER TABLE "vote_item" ADD COLUMN IF NOT EXISTS "auto_generate_ot" boolean DEFAULT false;`,
+      `ALTER TABLE "vote_item" ADD COLUMN IF NOT EXISTS "ot_provider_id" uuid;`,
+      `ALTER TABLE "vote_item" ADD COLUMN IF NOT EXISTS "ot_generated_incident_id" uuid;`,
     ];
     for (const stmt of statements) {
       try {
@@ -143,7 +146,8 @@ export const votingRouter = createTRPCRouter({
         let resultSummary: string | null = null;
         const isEffectivelyClosed =
           session.status === "CLOSED" ||
-          Boolean(session.closesAt && new Date(session.closesAt).getTime() < Date.now());
+          Boolean(session.closesAt && new Date(session.closesAt).getTime() < Date.now()) ||
+          Boolean(session.type === "JUNTA" && session.meetingDate && new Date(session.meetingDate).getTime() < Date.now());
 
         if (isEffectivelyClosed) {
           const isApproveChoice = (c: any) => {
@@ -616,6 +620,8 @@ export const votingRouter = createTRPCRouter({
           budget: derivedBudget,
           description: input.description ?? null,
           onlineVotingEnabled: true,
+          autoGenerateOt: input.autoGenerateOt ?? false,
+          otProviderId: input.otProviderId ?? null,
         });
       }
 
@@ -711,6 +717,8 @@ export const votingRouter = createTRPCRouter({
                   }),
                 )
                 .optional(),
+              autoGenerateOt: z.boolean().optional().default(false),
+              otProviderId: z.string().uuid().optional(),
             }),
           )
           .optional()
@@ -757,7 +765,7 @@ export const votingRouter = createTRPCRouter({
       const secondCallD = input.secondCallDate
         ? new Date(input.secondCallDate)
         : null;
-      const closesD = input.closesAt ? new Date(input.closesAt) : null;
+      const closesD = input.closesAt ? new Date(input.closesAt) : meetingD;
 
       // 1. Insert Vote Session
       const [createdSession] = await ctx.db
@@ -792,6 +800,8 @@ export const votingRouter = createTRPCRouter({
                 budget: undefined,
                 description: undefined,
                 onlineVotingEnabled: true,
+                autoGenerateOt: false,
+                otProviderId: undefined,
                 proposals: [],
               },
             ];
@@ -808,6 +818,8 @@ export const votingRouter = createTRPCRouter({
           budget: itemInput.budget ?? null,
           description: itemInput.description ?? null,
           onlineVotingEnabled: itemInput.onlineVotingEnabled ?? true,
+          autoGenerateOt: itemInput.autoGenerateOt ?? false,
+          otProviderId: itemInput.otProviderId ?? null,
         });
 
         if (itemInput.proposals && itemInput.proposals.length > 0) {
@@ -1010,6 +1022,10 @@ Fdo. La Administración de Fincas`;
       if (!session) throw new Error("Votación no encontrada");
       if (session.status !== "OPEN")
         throw new Error("Esta votación no está abierta");
+      const effectiveClosesAt =
+        session.closesAt ?? (session.type === "JUNTA" ? session.meetingDate : null);
+      if (effectiveClosesAt && new Date(effectiveClosesAt).getTime() < Date.now())
+        throw new Error("El plazo para votar en esta convocatoria ha finalizado");
 
       // 3. Validate user right to vote (check for debts unless override by AF)
       const memberRecord = await ctx.db.query.member.findFirst({
@@ -1370,8 +1386,69 @@ Fdo. La Administración de Fincas`;
         console.warn("[voting.close] Push broadcast failed:", pushErr);
       }
 
-      // Auto-generate OT (incident) if enabled and vote was approved
-      let generatedIncidentId: string | null = null;
+      // Auto-generate OT (incident) for items (or session level if SINGLE)
+      const generatedIncidentIds: string[] = [];
+      const authorId = ctx.session?.user?.id ?? DEMO_AUTHOR_ID;
+
+      // Ensure author exists in user table for incident reporter foreign key
+      try {
+        const { sql } = await import("drizzle-orm");
+        await ctx.db.execute(
+          sql`INSERT INTO "user" ("id", "name", "email", "role")
+              VALUES (${authorId}, 'Administrador de Fincas', 'af@aconvi.es', 'AF')
+              ON CONFLICT ("id") DO NOTHING;`,
+        );
+      } catch (authorErr) {
+        console.warn("[voting.close] Could not ensure author user:", authorErr);
+      }
+
+      if (session.type === "JUNTA" && session.items && session.items.length > 0) {
+        for (const item of session.items) {
+          if (item.autoGenerateOt) {
+            try {
+              const itemCasts = session.casts.filter((c) => c.itemId === item.id);
+              const approveWeight = itemCasts
+                .filter((c) => c.choice === "APPROVE")
+                .reduce((s, c) => s + c.coefficient, 0);
+              const rejectWeight = itemCasts
+                .filter((c) => c.choice === "REJECT")
+                .reduce((s, c) => s + c.coefficient, 0);
+
+              if (approveWeight > rejectWeight) {
+                const incidentId = crypto.randomUUID();
+                await ctx.db.insert(incident).values({
+                  id: incidentId,
+                  title: `OT: ${item.title}`,
+                  description: `Orden de trabajo generada automáticamente tras la aprobación del punto "${item.title}" en la junta "${session.title}".`,
+                  category: "obra",
+                  status: "RECIBIDA",
+                  priority: "MEDIA",
+                  organizationId: input.tenantId,
+                  reporterId: authorId,
+                  providerId: item.otProviderId ?? null,
+                });
+
+                await ctx.db
+                  .update(voteItem)
+                  .set({ otGeneratedIncidentId: incidentId })
+                  .where(eq(voteItem.id, item.id));
+
+                generatedIncidentIds.push(incidentId);
+                console.log(
+                  `[voting.close] Auto-generated OT incident for item ${item.id}: ${incidentId}`,
+                );
+              }
+            } catch (otErr) {
+              console.warn(
+                `[voting.close] Auto-OT generation failed for item ${item.id}:`,
+                otErr,
+              );
+            }
+          }
+        }
+      }
+
+      // Also check session-level auto-OT (for SINGLE votes or session-wide)
       if (session.autoGenerateOt) {
         try {
           const allCasts = session.casts;
@@ -1384,8 +1461,6 @@ Fdo. La Administración de Fincas`;
 
           if (approveWeight > rejectWeight) {
             const incidentId = crypto.randomUUID();
-            const authorId = ctx.session?.user?.id ?? DEMO_AUTHOR_ID;
-
             await ctx.db.insert(incident).values({
               id: incidentId,
               title: `OT: ${session.title}`,
@@ -1403,15 +1478,20 @@ Fdo. La Administración de Fincas`;
               .set({ otGeneratedIncidentId: incidentId })
               .where(eq(voteSession.id, input.sessionId));
 
-            generatedIncidentId = incidentId;
-            console.log(`[voting.close] Auto-generated OT incident: ${incidentId}`);
+            generatedIncidentIds.push(incidentId);
+            console.log(`[voting.close] Auto-generated OT incident for session: ${incidentId}`);
           }
         } catch (otErr) {
-          console.warn("[voting.close] Auto-OT generation failed:", otErr);
+          console.warn("[voting.close] Auto-OT generation failed for session:", otErr);
         }
       }
 
-      return { ok: true, minuteContent: lines.join("\n"), generatedIncidentId };
+      return {
+        ok: true,
+        minuteContent: lines.join("\n"),
+        generatedIncidentId: generatedIncidentIds[0] ?? null,
+        generatedIncidentIds,
+      };
     }),
 
   // ── Debtors with voting rights info (for AF "Habilitar voto" view) ─────────

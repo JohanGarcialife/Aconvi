@@ -1516,6 +1516,8 @@ function CreateMeetingView({
     Array<{
       title: string;
       onlineVotingEnabled: boolean;
+      autoGenerateOt: boolean;
+      otProviderId?: string;
       proposals: Array<{ companyName: string; amount: string; fileUrl?: string }>;
     }>
   >([]);
@@ -1525,9 +1527,6 @@ function CreateMeetingView({
   const [newPropAmount, setNewPropAmount] = useState("");
   const [isAddingProposal, setIsAddingProposal] = useState(false);
 
-  // Auto-OT generation
-  const [autoGenerateOt, setAutoGenerateOt] = useState(false);
-  const [otProviderId, setOtProviderId] = useState("");
   const { data: providers } = useQuery(
     trpc.provider.listByOrg.queryOptions({ tenantId: TENANT_ID }),
   );
@@ -1551,6 +1550,8 @@ function CreateMeetingView({
       {
         title: "",
         onlineVotingEnabled: true,
+        autoGenerateOt: false,
+        otProviderId: "",
         proposals: [],
       },
     ]);
@@ -1622,13 +1623,13 @@ function CreateMeetingView({
         .map((it) => ({
           title: it.title.trim(),
           onlineVotingEnabled: it.onlineVotingEnabled,
+          autoGenerateOt: it.autoGenerateOt ?? false,
+          otProviderId: it.otProviderId || undefined,
           proposals: it.proposals.map((p) => ({
             companyName: p.companyName,
             amount: p.amount,
           })),
         })),
-      autoGenerateOt,
-      otProviderId: otProviderId || undefined,
     });
   };
 
@@ -1855,6 +1856,48 @@ function CreateMeetingView({
                         </div>
                       </div>
 
+                      {/* Generar orden de trabajo si se aprueba */}
+                      <div className="pt-2.5 border-t border-slate-100 space-y-2">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={it.autoGenerateOt ?? false}
+                            onChange={(e) => {
+                              const next = [...items];
+                              next[idx]!.autoGenerateOt = e.target.checked;
+                              setItems(next);
+                            }}
+                            className="w-3.5 h-3.5 rounded border-slate-300 text-[#008075] focus:ring-[#008075]"
+                          />
+                          <span className="text-xs font-semibold text-slate-700">
+                            Generar orden de trabajo si se aprueba
+                          </span>
+                        </label>
+                        {it.autoGenerateOt && (
+                          <div className="pl-5.5 space-y-1">
+                            <label className="text-[11px] font-medium text-slate-500">
+                              Proveedor asignado (opcional)
+                            </label>
+                            <select
+                              value={it.otProviderId ?? ""}
+                              onChange={(e) => {
+                                const next = [...items];
+                                next[idx]!.otProviderId = e.target.value;
+                                setItems(next);
+                              }}
+                              className="w-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#008075]"
+                            >
+                              <option value="">Sin asignar</option>
+                              {(providers as any[] ?? []).map((p: any) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.name} {p.speciality ? `(${p.speciality})` : ""}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                      </div>
+
                       {/* Presupuestos */}
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
@@ -1972,40 +2015,6 @@ function CreateMeetingView({
         </div>
       </div>
 
-      {/* Auto-OT Generation */}
-      <div className="bg-white rounded-lg border border-slate-200/80 p-4 shadow-2xs space-y-3">
-        <label className="flex items-center gap-2.5 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={autoGenerateOt}
-            onChange={(e) => setAutoGenerateOt(e.target.checked)}
-            className="w-4 h-4 rounded border-slate-300 text-[#008075] focus:ring-[#008075]"
-          />
-          <span className="text-xs font-bold text-slate-800">
-            Generar orden de trabajo si se aprueba
-          </span>
-        </label>
-        {autoGenerateOt && (
-          <div className="pl-6.5 space-y-1.5">
-            <label className="text-[11px] font-medium text-slate-500">
-              Proveedor asignado (opcional)
-            </label>
-            <select
-              value={otProviderId}
-              onChange={(e) => setOtProviderId(e.target.value)}
-              className="w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#008075]"
-            >
-              <option value="">Sin asignar</option>
-              {(providers as any[] ?? []).map((p: any) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} {p.speciality ? `(${p.speciality})` : ""}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-      </div>
-
       {/* Bottom Bar */}
       <div className="flex items-center justify-end gap-2.5 pt-1">
         <button
@@ -2111,7 +2120,9 @@ export default function VotesPage() {
             className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-xs font-bold shadow-2xs transition-all ${
               activeView === "meeting"
                 ? "bg-[#006e64] text-white"
-                : "bg-[#008075] text-white hover:bg-[#006e64]"
+                : activeView === "list"
+                  ? "bg-[#008075] text-white hover:bg-[#006e64]"
+                  : "border border-slate-200 bg-white text-slate-800 hover:bg-slate-50"
             }`}
           >
             <Plus className="h-3.5 w-3.5" />

@@ -504,7 +504,11 @@ export default function VecinoHome() {
 
   // Votación con status OPEN pero plazo ya expirado → la tratamos como expirada
   const isExpiredOpen = (v: any) =>
-    v.status === "OPEN" && v.closesAt && new Date(v.closesAt).getTime() < NOW;
+    v.status === "OPEN" &&
+    Boolean(
+      (v.closesAt && new Date(v.closesAt).getTime() < NOW) ||
+        (v.type === "JUNTA" && v.meetingDate && new Date(v.meetingDate).getTime() < NOW),
+    );
 
   const openVotings = allVotings.filter(
     (v: any) => v.status === "OPEN" && !v.isArchived && !isExpiredOpen(v),
@@ -723,7 +727,8 @@ export default function VecinoHome() {
                 // Tratar como cerrada si status CLOSED o plazo expirado
                 const isClosed =
                   voting.status === "CLOSED" ||
-                  (voting.closesAt && new Date(voting.closesAt).getTime() < NOW);
+                  Boolean(voting.closesAt && new Date(voting.closesAt).getTime() < NOW) ||
+                  Boolean(voting.type === "JUNTA" && voting.meetingDate && new Date(voting.meetingDate).getTime() < NOW);
 
                 // Calcular resultado para mostrar en tarjeta cerrada
                 const resultText: string | null = (() => {

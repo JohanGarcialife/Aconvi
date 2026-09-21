@@ -74,7 +74,6 @@ export default function VotingScreen() {
   useEffect(() => {
     if (params.sessionId) {
       setSelectedSessionId(params.sessionId);
-      setStep("VOTE");
       setJustVotedSessionId(null);
       setChoices({});
     }
@@ -104,13 +103,21 @@ export default function VotingScreen() {
     return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
   };
 
+  const isSessionEffectivelyClosed = (s: any) =>
+    Boolean(
+      !s ||
+        s.status === "CLOSED" ||
+        (s.closesAt && new Date(s.closesAt).getTime() < Date.now()) ||
+        (s.type === "JUNTA" && s.meetingDate && new Date(s.meetingDate).getTime() < Date.now()),
+    );
+
   const isVotedSession = (session: any) =>
     Boolean(session && (session.hasVoted || isSessionVoted(session.id)));
 
   const rawList = (sessions as any[]) ?? [];
   const sessionList = [...rawList].sort((a: any, b: any) => {
-    const isClosedA = a.status === "CLOSED" || (a.closesAt && new Date(a.closesAt).getTime() < Date.now());
-    const isClosedB = b.status === "CLOSED" || (b.closesAt && new Date(b.closesAt).getTime() < Date.now());
+    const isClosedA = isSessionEffectivelyClosed(a);
+    const isClosedB = isSessionEffectivelyClosed(b);
     if (!isClosedA && isClosedB) return -1;
     if (isClosedA && !isClosedB) return 1;
 
@@ -139,7 +146,7 @@ export default function VotingScreen() {
   });
 
   const pendingOpen = sessionList.find(
-    (s) => s.status === "OPEN" && !isVotedSession(s),
+    (s) => !isSessionEffectivelyClosed(s) && !isVotedSession(s),
   );
 
   const activeSession = selectedSessionId
@@ -257,6 +264,14 @@ export default function VotingScreen() {
   const handleOpenConfirmModal = () => {
     if (!activeSession) return;
 
+    if (isSessionEffectivelyClosed(activeSession)) {
+      Alert.alert(
+        "Votación cerrada",
+        "El plazo para votar en esta convocatoria ha finalizado.",
+      );
+      return;
+    }
+
     if (activeSession.type === "JUNTA" && activeSession.items?.length > 0) {
       const onlineItems = activeSession.items.filter(
         (i: any) => i.onlineVotingEnabled !== false,
@@ -286,6 +301,15 @@ export default function VotingScreen() {
 
   const handleConfirmSubmit = () => {
     if (!activeSession) return;
+
+    if (isSessionEffectivelyClosed(activeSession)) {
+      setConfirmModalVisible(false);
+      Alert.alert(
+        "Votación cerrada",
+        "El plazo para votar en esta convocatoria ha finalizado.",
+      );
+      return;
+    }
 
     if (activeSession.type === "JUNTA" && activeSession.items?.length > 0) {
       const onlineItems = activeSession.items.filter(
@@ -351,9 +375,7 @@ export default function VotingScreen() {
   const isJunta = activeSession.type === "JUNTA";
   const primaryThemeColor = TEAL;
   // Cerrada si status CLOSED o si el plazo ya expiró
-  const isClosed =
-    activeSession.status === "CLOSED" ||
-    (activeSession.closesAt && new Date(activeSession.closesAt).getTime() < Date.now());
+  const isClosed = isSessionEffectivelyClosed(activeSession);
   const canVote = activeSession.userVotingStatus?.canVote ?? true;
   const isAlreadyVoted = Boolean(
     activeSession.hasVoted ||
