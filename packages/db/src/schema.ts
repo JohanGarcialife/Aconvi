@@ -442,6 +442,7 @@ export const voteBudgetProposal = pgTable("vote_budget_proposal", {
     .notNull()
     .references(() => voteSession.id, { onDelete: "cascade" }),
   itemId: uuid("item_id"), // Referencia opcional a un punto concreto de una Junta
+  providerId: uuid("provider_id"), // Referencia opcional al proveedor de la empresa
   companyName: varchar("company_name", { length: 256 }).notNull(),
   amount: varchar("amount", { length: 64 }).notNull(),
   description: text("description"),
@@ -463,6 +464,10 @@ export const voteBudgetProposalRelations = relations(
     item: one(voteItem, {
       fields: [voteBudgetProposal.itemId],
       references: [voteItem.id],
+    }),
+    provider: one(provider, {
+      fields: [voteBudgetProposal.providerId],
+      references: [provider.id],
     }),
     casts: many(voteCast),
   }),

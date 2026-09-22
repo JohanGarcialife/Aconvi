@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
-import { Feather } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -294,6 +294,20 @@ export default function VotingScreen() {
         );
         return;
       }
+      const singleProposals = (activeSession.budgetProposals || []).filter(
+        (bp: any) => !bp.itemId || bp.itemId === activeSession.id,
+      );
+      if (
+        singleProposals.length > 1 &&
+        choices["__single__"] === "APPROVE" &&
+        !selectedProposals["__single__"]
+      ) {
+        Alert.alert(
+          "Selección de presupuesto requerida",
+          "Por favor selecciona una de las opciones antes de confirmar tu voto a favor.",
+        );
+        return;
+      }
     }
 
     setConfirmModalVisible(true);
@@ -328,12 +342,19 @@ export default function VotingScreen() {
         votes: votesPayload,
       });
     } else {
+      const singleProposals = (activeSession.budgetProposals || []).filter(
+        (bp: any) => !bp.itemId || bp.itemId === activeSession.id,
+      );
+      const chosenProposalId =
+        selectedProposals["__single__"] ||
+        (singleProposals.length === 1 ? singleProposals[0]?.id : undefined);
+
       castMutation.mutate({
         sessionId: activeSession.id,
         tenantId: TENANT_ID,
         userId: USER_ID,
         choice: choices["__single__"] as ChoiceType,
-        selectedProposalId: selectedProposals["__single__"] || undefined,
+        selectedProposalId: chosenProposalId || undefined,
       });
     }
   };
@@ -706,12 +727,24 @@ export default function VotingScreen() {
             >
               {onlineItems.map((item: any, idx: number) => {
                 const currentChoice = choices[item.id];
-                const choiceLabel =
-                  currentChoice === "APPROVE"
+                const choiceLabel = !isJunta
+                  ? currentChoice === "APPROVE"
+                    ? "A favor"
+                    : currentChoice === "REJECT"
+                      ? "En contra"
+                      : "Me abstengo"
+                  : currentChoice === "APPROVE"
                     ? "Apruebo"
                     : currentChoice === "REJECT"
                       ? "Rechazo"
                       : "Me abstengo";
+
+                const chosenProp =
+                  !isJunta && selectedProposals[item.id]
+                    ? (activeSession.budgetProposals || []).find(
+                        (p: any) => p.id === selectedProposals[item.id],
+                      )
+                    : null;
 
                 return (
                   <View
@@ -734,8 +767,41 @@ export default function VotingScreen() {
                       <Text style={styles.modalItemBudget}>{item.budget}</Text>
                     ) : null}
 
+                    {chosenProp && (
+                      <View
+                        style={{
+                          backgroundColor: "#F8FAFC",
+                          padding: 10,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: "#E2E8F0",
+                          marginVertical: 6,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            color: "#64748B",
+                            fontWeight: "600",
+                          }}
+                        >
+                          Presupuesto seleccionado:
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            color: "#0F172A",
+                            fontWeight: "700",
+                            marginTop: 2,
+                          }}
+                        >
+                          {chosenProp.companyName} — {chosenProp.amount}
+                        </Text>
+                      </View>
+                    )}
+
                     {!isJunta && (
-                      <Text style={styles.modalAnswerLabel}>Tu respuesta</Text>
+                      <Text style={styles.modalAnswerLabel}>Tu voto</Text>
                     )}
                     <View style={styles.modalChoiceRow}>
                       <View style={styles.modalChoiceCheck}>
@@ -904,131 +970,140 @@ export default function VotingScreen() {
   }
 
   // ═════════════════════════════════════════════════════════════════════════════
-  // PANTALLA PRINCIPAL DE VOTACIÓN INDIVIDUAL (MATCH EXACTO media_1788543451554.png)
+  // PANTALLA PRINCIPAL DE VOTACIÓN INDIVIDUAL (BIFURCADA SEGÚN NÚMERO DE PROPUESTAS)
   // ═════════════════════════════════════════════════════════════════════════════
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" />
-      {/* 1. Header con flecha teal y texto 'Votación activa' */}
-      {renderHeader("Votación activa")}
+  const singleProposals = (activeSession.budgetProposals || []).filter(
+    (bp: any) =>
+      !bp.itemId ||
+      bp.itemId === activeSession.id ||
+      bp.itemId === itemsList[0]?.id,
+  );
+  const isMultiProposal = singleProposals.length >= 2;
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* 2. Badge Pill de Cierre: "Cierre: 18 sept. · 23:59" */}
-        <View style={styles.datePill}>
-          <Text style={styles.datePillText}>Cierre: {formattedClose}</Text>
-        </View>
+  const formatCloseDateLabel = (dateStr?: string | null) => {
+    if (!dateStr) return "Cierra próximamente";
+    try {
+      const d = new Date(dateStr);
+      const months = [
+        "enero",
+        "febr.",
+        "marzo",
+        "abr.",
+        "mayo",
+        "jun.",
+        "jul.",
+        "agosto",
+        "sept.",
+        "oct.",
+        "nov.",
+        "dic.",
+      ];
+      const day = d.getDate();
+      const monthStr = months[d.getMonth()] || format(d, "MMM.", { locale: es });
+      const hours = String(d.getHours()).padStart(2, "0");
+      const minutes = String(d.getMinutes()).padStart(2, "0");
+      return `Cierra el ${day} ${monthStr} a las ${hours}:${minutes}`;
+    } catch {
+      return "Cierra próximamente";
+    }
+  };
 
-        {/* 3. Items o Sesión única */}
-        {itemsList.map((item: any, idx: number) => {
-          const currentChoice = choices[item.id];
-          const isPresentialOnly = item.onlineVotingEnabled === false;
-          const itemProposals = (activeSession.budgetProposals || []).filter(
-            (bp: any) => !bp.itemId || bp.itemId === item.id,
-          );
+  if (isMultiProposal) {
+    // ─────────────────────────────────────────────────────────────────────────
+    // ESCENARIO 1: MÚLTIPLES PROPUESTAS (2+ OPCIONES / PRESUPUESTOS)
+    // Coincidencia exacta con mockup media_1790086439892.jpg
+    // ─────────────────────────────────────────────────────────────────────────
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar barStyle="dark-content" />
 
-          return (
-            <View key={item.id} style={styles.itemWrapper}>
-              {/* Título & Presupuesto (ej: "Reparación del ascensor" / "5.500 €") */}
-              <Text style={styles.mainTitle}>{item.title}</Text>
-              {item.budget ? (
-                <Text style={styles.mainBudget}>{item.budget}</Text>
-              ) : null}
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Botón Volver (Flecha atrás simple) */}
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backBtnOnly}
+            activeOpacity={0.7}
+          >
+            <Feather name="arrow-left" size={24} color={DARK} />
+          </TouchableOpacity>
 
-              {/* 4. Tarjeta Propuesta */}
-              <View style={styles.propuestaCard}>
-                <Text style={styles.propuestaTitle}>Propuesta</Text>
-                <Text style={styles.propuestaDesc}>
-                  {item.description ||
-                    activeSession.description ||
-                    "Sustituir el motor del ascensor por uno más eficiente según el presupuesto adjunto."}
-                </Text>
+          {/* Título de la votación */}
+          <Text style={styles.multiTitle}>{activeSession.title}</Text>
+          <Text style={styles.multiSubtitle}>
+            Selecciona el presupuesto que prefieres
+          </Text>
 
-                {/* Si hay múltiples propuestas comparativas de empresas */}
-                {itemProposals.length > 1 ? (
-                  <View style={styles.multiProposalsBox}>
-                    <Text style={styles.multiProposalsTitle}>
-                      Propuestas recibidas:
+          {/* Fila de metadatos: N presupuestos & Cierre */}
+          <View style={styles.multiMetaRow}>
+            <View style={styles.multiMetaItem}>
+              <Feather name="file-text" size={15} color="#64748B" />
+              <Text style={styles.multiMetaText}>
+                {singleProposals.length} presupuestos
+              </Text>
+            </View>
+            <View style={styles.multiMetaItem}>
+              <Feather name="clock" size={15} color="#64748B" />
+              <Text style={styles.multiMetaText}>
+                {formatCloseDateLabel(activeSession.closesAt)}
+              </Text>
+            </View>
+          </View>
+
+          {/* Lista de tarjetas con Radio Button */}
+          {singleProposals.map((prop: any) => {
+            const isSelected = selectedProposals["__single__"] === prop.id;
+            return (
+              <TouchableOpacity
+                key={prop.id}
+                activeOpacity={0.85}
+                style={[
+                  styles.multiPropCard,
+                  isSelected && styles.multiPropCardSelected,
+                ]}
+                onPress={() => {
+                  setSelectedProposals((prev) => ({
+                    ...prev,
+                    ["__single__"]: prop.id,
+                  }));
+                  // Al seleccionar opción, activa automáticamente "A favor"
+                  setChoices((prev) => ({
+                    ...prev,
+                    ["__single__"]: "APPROVE",
+                  }));
+                }}
+              >
+                <View
+                  style={[
+                    styles.multiRadioCircle,
+                    isSelected && styles.multiRadioCircleSelected,
+                  ]}
+                >
+                  {isSelected && <View style={styles.multiRadioInnerDot} />}
+                </View>
+
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <View style={styles.multiCardTopRow}>
+                    <Text style={styles.multiCardCompany}>
+                      {prop.companyName}
                     </Text>
-                    {itemProposals.map((prop: any) => {
-                      const isPropSelected =
-                        selectedProposals[item.id] === prop.id;
-                      return (
-                        <View
-                          key={prop.id}
-                          style={[
-                            styles.proposalItemCard,
-                            isPropSelected && styles.proposalItemCardSelected,
-                          ]}
-                        >
-                          <View style={styles.proposalItemHeader}>
-                            <Text style={styles.proposalCompany}>
-                              {prop.companyName}
-                            </Text>
-                            <Text style={styles.proposalAmount}>
-                              {prop.amount}
-                            </Text>
-                          </View>
-                          {prop.description ? (
-                            <Text style={styles.proposalItemDescText}>
-                              {prop.description}
-                            </Text>
-                          ) : null}
-                          <View style={styles.proposalItemFooter}>
-                            <TouchableOpacity
-                              style={styles.pdfLinkRow}
-                              onPress={() =>
-                                prop.fileUrl && Linking.openURL(prop.fileUrl)
-                              }
-                            >
-                              <Feather
-                                name="file-text"
-                                size={15}
-                                color={TEAL}
-                              />
-                              <Text style={styles.pdfLinkText}>
-                                Ver {prop.fileName || "presupuesto.pdf"}
-                              </Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={[
-                                styles.selectPropBtn,
-                                isPropSelected && styles.selectPropBtnActive,
-                              ]}
-                              onPress={() =>
-                                setSelectedProposals((prev) => ({
-                                  ...prev,
-                                  [item.id]: prop.id,
-                                }))
-                              }
-                            >
-                              <Text
-                                style={[
-                                  styles.selectPropBtnText,
-                                  isPropSelected &&
-                                    styles.selectPropBtnTextActive,
-                                ]}
-                              >
-                                {isPropSelected
-                                  ? "✓ Seleccionada"
-                                  : "Elegir propuesta"}
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      );
-                    })}
+                    <Text style={styles.multiCardAmount}>{prop.amount}</Text>
                   </View>
-                ) : (
-                  /* Enlace único a Ver presupuesto.pdf con icono de archivo */
+
+                  <View style={styles.multiCardSecondRow}>
+                    <Text style={styles.multiCardDesc} numberOfLines={1}>
+                      {prop.description || "Presupuesto detallado"}
+                    </Text>
+                    <Text style={styles.multiCardVat}>IVA incluido</Text>
+                  </View>
+
                   <TouchableOpacity
-                    style={styles.pdfLinkRow}
+                    style={styles.multiCardPdfRow}
                     onPress={() => {
-                      const pdfUrl = itemProposals[0]?.fileUrl;
-                      if (pdfUrl) {
-                        void Linking.openURL(pdfUrl);
+                      if (prop.fileUrl) {
+                        void Linking.openURL(prop.fileUrl);
                       } else {
                         Alert.alert(
                           "Presupuesto",
@@ -1038,93 +1113,354 @@ export default function VotingScreen() {
                     }}
                     activeOpacity={0.7}
                   >
-                    <Feather name="file-text" size={16} color={TEAL} />
-                    <Text style={styles.pdfLinkText}>
-                      Ver {itemProposals[0]?.fileName || "presupuesto.pdf"}
+                    <Text style={styles.multiCardPdfText}>
+                      Ver presupuesto
                     </Text>
+                    <Feather name="chevron-right" size={16} color="#008075" />
                   </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+
+          {/* Sección: ¿Cómo quieres votar? */}
+          <View style={styles.multiVoteSection}>
+            <Text style={styles.multiVoteHeading}>¿Cómo quieres votar?</Text>
+            <Text style={styles.multiVoteSubheading}>
+              Tu voto se registrará para el presupuesto seleccionado
+            </Text>
+
+            <View style={styles.multiVoteButtonsRow}>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                style={[
+                  styles.multiVoteStanceBtn,
+                  choices["__single__"] === "APPROVE" &&
+                    styles.multiVoteStanceBtnSelected,
+                ]}
+                onPress={() => handleSelectChoice("__single__", "APPROVE")}
+              >
+                <Feather
+                  name="thumbs-up"
+                  size={18}
+                  color={
+                    choices["__single__"] === "APPROVE" ? "#008075" : "#0F172A"
+                  }
+                />
+                <Text
+                  style={[
+                    styles.multiVoteStanceText,
+                    choices["__single__"] === "APPROVE" &&
+                      styles.multiVoteStanceTextSelected,
+                  ]}
+                >
+                  A favor
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.85}
+                style={[
+                  styles.multiVoteStanceBtn,
+                  choices["__single__"] === "REJECT" &&
+                    styles.multiVoteStanceBtnSelected,
+                ]}
+                onPress={() => handleSelectChoice("__single__", "REJECT")}
+              >
+                <Feather
+                  name="thumbs-down"
+                  size={18}
+                  color={
+                    choices["__single__"] === "REJECT" ? "#008075" : "#0F172A"
+                  }
+                />
+                <Text
+                  style={[
+                    styles.multiVoteStanceText,
+                    choices["__single__"] === "REJECT" &&
+                      styles.multiVoteStanceTextSelected,
+                  ]}
+                >
+                  En contra
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.85}
+                style={[
+                  styles.multiVoteStanceBtn,
+                  choices["__single__"] === "ABSTAIN" &&
+                    styles.multiVoteStanceBtnSelected,
+                ]}
+                onPress={() => handleSelectChoice("__single__", "ABSTAIN")}
+              >
+                <Ionicons
+                  name="hand-left-outline"
+                  size={18}
+                  color={
+                    choices["__single__"] === "ABSTAIN" ? "#008075" : "#0F172A"
+                  }
+                />
+                <Text
+                  style={[
+                    styles.multiVoteStanceText,
+                    choices["__single__"] === "ABSTAIN" &&
+                      styles.multiVoteStanceTextSelected,
+                  ]}
+                >
+                  Me abstengo
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={[
+                styles.mainConfirmVoteBtn,
+                {
+                  backgroundColor: choices["__single__"]
+                    ? "#008075"
+                    : "#CBD5E1",
+                },
+              ]}
+              onPress={handleOpenConfirmModal}
+              disabled={!choices["__single__"]}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.mainConfirmVoteBtnText}>Confirmar voto</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+
+        {renderConfirmModal()}
+      </SafeAreaView>
+    );
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // ESCENARIO 2: UNA SOLA OPCIÓN / DECISIÓN DIRECTA (0 ó 1 PROPUESTA)
+  // Coincidencia exacta con mockup media_1790086439903.png
+  // ───────────────────────────────────────────────────────────────────────────
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" />
+
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Botón Volver (Flecha atrás simple) */}
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backBtnOnly}
+          activeOpacity={0.7}
+        >
+          <Feather name="arrow-left" size={24} color={DARK} />
+        </TouchableOpacity>
+
+        {/* Título y subtítulo */}
+        <Text style={styles.singleTitle}>{activeSession.title}</Text>
+        <Text style={styles.singleSubtitle}>
+          {activeSession.description || "Presupuesto anual de la comunidad"}
+        </Text>
+
+        {/* Gran Tarjeta Central de Importe y Documento */}
+        <View style={styles.singleBigCard}>
+          <View style={styles.singleEuroIconCircle}>
+            <View style={styles.singleEuroDocWrap}>
+              <Feather name="file-text" size={22} color="#008075" />
+              <Text style={styles.singleDocEuroSign}>€</Text>
+            </View>
+          </View>
+
+          <Text style={styles.singleAmountDisplay}>
+            {singleProposals[0]?.amount || activeSession.budget || "1.000 €"}
+          </Text>
+          <Text style={styles.singleAmountSub}>Importe total</Text>
+
+          <View style={styles.singleCardDivider} />
+
+          <TouchableOpacity
+            style={styles.singleFileRow}
+            onPress={() => {
+              const url = singleProposals[0]?.fileUrl;
+              if (url) {
+                void Linking.openURL(url);
+              } else {
+                Alert.alert(
+                  "Documento",
+                  "Documento detallado de la votación en formato PDF.",
+                );
+              }
+            }}
+            activeOpacity={0.7}
+          >
+            <View style={styles.singlePdfBadge}>
+              <Feather name="file-text" size={20} color="#008075" />
+            </View>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={styles.singleFileTitle}>
+                Ver documento completo
+              </Text>
+              <Text style={styles.singleFileSubtitle}>
+                Documento detallado
+              </Text>
+            </View>
+            <Feather name="chevron-right" size={20} color="#94A3B8" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Pastilla de fecha de cierre */}
+        <View style={styles.singleDatePillContainer}>
+          <Feather
+            name="calendar"
+            size={16}
+            color="#008075"
+            style={{ marginRight: 8 }}
+          />
+          <Text style={styles.singleDatePillText}>
+            {formatCloseDateLabel(activeSession.closesAt)}
+          </Text>
+        </View>
+
+        {/* Sección: ¿Cuál es tu voto? */}
+        <View style={styles.singleVoteSection}>
+          <Text style={styles.singleVoteHeading}>¿Cuál es tu voto?</Text>
+          <Text style={styles.singleVoteSubheading}>
+            Tu voto quedará registrado de forma segura.
+          </Text>
+
+          <View style={styles.singleVoteCardsRow}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              style={[
+                styles.singleChoiceCard,
+                choices["__single__"] === "APPROVE" &&
+                  styles.singleChoiceCardSelected,
+              ]}
+              onPress={() => handleSelectChoice("__single__", "APPROVE")}
+            >
+              <Feather
+                name="thumbs-up"
+                size={24}
+                color={
+                  choices["__single__"] === "APPROVE" ? "#008075" : "#0F172A"
+                }
+              />
+              <Text
+                style={[
+                  styles.singleChoiceCardText,
+                  choices["__single__"] === "APPROVE" &&
+                    styles.singleChoiceCardTextSelected,
+                ]}
+              >
+                A favor
+              </Text>
+              <View
+                style={[
+                  styles.singleChoiceRadio,
+                  choices["__single__"] === "APPROVE" &&
+                    styles.singleChoiceRadioSelected,
+                ]}
+              >
+                {choices["__single__"] === "APPROVE" && (
+                  <View style={styles.singleChoiceRadioDot} />
                 )}
               </View>
+            </TouchableOpacity>
 
-              {/* Si es sólo presencial */}
-              {isPresentialOnly ? (
-                <View style={styles.presentialNoticeBox}>
-                  <Text style={{ fontSize: 24, marginRight: 10 }}>👥</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.presentialNoticeTitle}>
-                      Votación presencial en Junta
-                    </Text>
-                    <Text style={styles.presentialNoticeText}>
-                      Este punto se debatirá y votará presencialmente durante la
-                      reunión de la Junta.
-                    </Text>
-                  </View>
-                </View>
-              ) : (
-                <>
-                  {/* 5. Pregunta destacada: "¿Apruebas la reparación del ascensor?" */}
-                  <Text style={styles.questionPrompt}>
-                    {formatQuestion(item.title)}
-                  </Text>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              style={[
+                styles.singleChoiceCard,
+                choices["__single__"] === "REJECT" &&
+                  styles.singleChoiceCardSelected,
+              ]}
+              onPress={() => handleSelectChoice("__single__", "REJECT")}
+            >
+              <Feather
+                name="thumbs-down"
+                size={24}
+                color={
+                  choices["__single__"] === "REJECT" ? "#008075" : "#0F172A"
+                }
+              />
+              <Text
+                style={[
+                  styles.singleChoiceCardText,
+                  choices["__single__"] === "REJECT" &&
+                    styles.singleChoiceCardTextSelected,
+                ]}
+              >
+                En contra
+              </Text>
+              <View
+                style={[
+                  styles.singleChoiceRadio,
+                  choices["__single__"] === "REJECT" &&
+                    styles.singleChoiceRadioSelected,
+                ]}
+              >
+                {choices["__single__"] === "REJECT" && (
+                  <View style={styles.singleChoiceRadioDot} />
+                )}
+              </View>
+            </TouchableOpacity>
 
-                  {/* 6. Tres Opciones Verticales: Apruebo, Rechazo, Me abstengo */}
-                  <View style={styles.optionsList}>
-                    {VOTE_OPTIONS.map((opt) => {
-                      const isSelected = currentChoice === opt.key;
-                      return (
-                        <TouchableOpacity
-                          key={opt.key}
-                          style={[
-                            styles.verticalOptionCard,
-                            isSelected && styles.verticalOptionCardSelected,
-                          ]}
-                          onPress={() => handleSelectChoice(item.id, opt.key)}
-                          activeOpacity={0.8}
-                        >
-                          <View
-                            style={[
-                              styles.optionCircleIcon,
-                              isSelected
-                                ? styles.optionCircleIconSelected
-                                : styles.optionCircleIconUnselected,
-                            ]}
-                          >
-                            {isSelected ? (
-                              <Feather name="check" size={14} color="#FFFFFF" />
-                            ) : (
-                              <Feather name="minus" size={12} color="#475569" />
-                            )}
-                          </View>
-                          <Text
-                            style={[
-                              styles.verticalOptionText,
-                              isSelected && styles.verticalOptionTextSelected,
-                            ]}
-                          >
-                            {opt.label}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </>
-              )}
-            </View>
-          );
-        })}
+            <TouchableOpacity
+              activeOpacity={0.85}
+              style={[
+                styles.singleChoiceCard,
+                choices["__single__"] === "ABSTAIN" &&
+                  styles.singleChoiceCardSelected,
+              ]}
+              onPress={() => handleSelectChoice("__single__", "ABSTAIN")}
+            >
+              <Ionicons
+                name="hand-left-outline"
+                size={24}
+                color={
+                  choices["__single__"] === "ABSTAIN" ? "#008075" : "#0F172A"
+                }
+              />
+              <Text
+                style={[
+                  styles.singleChoiceCardText,
+                  choices["__single__"] === "ABSTAIN" &&
+                    styles.singleChoiceCardTextSelected,
+                ]}
+              >
+                Me abstengo
+              </Text>
+              <View
+                style={[
+                  styles.singleChoiceRadio,
+                  choices["__single__"] === "ABSTAIN" &&
+                    styles.singleChoiceRadioSelected,
+                ]}
+              >
+                {choices["__single__"] === "ABSTAIN" && (
+                  <View style={styles.singleChoiceRadioDot} />
+                )}
+              </View>
+            </TouchableOpacity>
+          </View>
 
-        {/* 7. Botón Inferior: "Enviar" (abre el modal de confirmación) */}
-        <TouchableOpacity
-          style={[
-            styles.submitBtn,
-            { backgroundColor: allAnswered ? TEAL : "#CBD5E1" },
-          ]}
-          onPress={handleOpenConfirmModal}
-          disabled={!allAnswered}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.submitBtnText}>Enviar</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.mainConfirmVoteBtn,
+              {
+                backgroundColor: choices["__single__"]
+                  ? "#008075"
+                  : "#CBD5E1",
+              },
+            ]}
+            onPress={handleOpenConfirmModal}
+            disabled={!choices["__single__"]}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.mainConfirmVoteBtnText}>Confirmar voto</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
 
       {renderConfirmModal()}
@@ -1984,5 +2320,343 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
     color: TEAL,
+  },
+
+  // ─── Screen 1: Multi-Proposal Styles (Exact Mockup 1) ──────────────────────
+  backBtnOnly: {
+    paddingVertical: 8,
+    paddingHorizontal: 0,
+    marginBottom: 12,
+    alignSelf: "flex-start",
+  },
+  multiTitle: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: DARK,
+    marginBottom: 4,
+  },
+  multiSubtitle: {
+    fontSize: 14,
+    color: "#64748B",
+    marginBottom: 14,
+  },
+  multiMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    marginBottom: 18,
+  },
+  multiMetaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  multiMetaText: {
+    fontSize: 13,
+    color: "#64748B",
+    fontWeight: "500",
+  },
+  multiPropCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: BORDER,
+    padding: 16,
+    marginBottom: 12,
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  multiPropCardSelected: {
+    borderColor: "#008075",
+    backgroundColor: "#F0FDF9",
+  },
+  multiRadioCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: "#CBD5E1",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 2,
+  },
+  multiRadioCircleSelected: {
+    borderColor: "#008075",
+  },
+  multiRadioInnerDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: "#008075",
+  },
+  multiCardTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  multiCardCompany: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: DARK,
+  },
+  multiCardAmount: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: DARK,
+  },
+  multiCardSecondRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 4,
+  },
+  multiCardDesc: {
+    fontSize: 12,
+    color: "#64748B",
+    flex: 1,
+    marginRight: 8,
+  },
+  multiCardVat: {
+    fontSize: 11,
+    color: "#94A3B8",
+    fontWeight: "500",
+  },
+  multiCardPdfRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 10,
+    gap: 2,
+  },
+  multiCardPdfText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#008075",
+  },
+  multiVoteSection: {
+    marginTop: 12,
+  },
+  multiVoteHeading: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: DARK,
+  },
+  multiVoteSubheading: {
+    fontSize: 13,
+    color: "#64748B",
+    marginTop: 3,
+    marginBottom: 14,
+  },
+  multiVoteButtonsRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 18,
+  },
+  multiVoteStanceBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: BORDER,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
+  },
+  multiVoteStanceBtnSelected: {
+    borderColor: "#008075",
+    backgroundColor: "#E6F7F5",
+  },
+  multiVoteStanceText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#0F172A",
+  },
+  multiVoteStanceTextSelected: {
+    color: "#008075",
+    fontWeight: "700",
+  },
+  mainConfirmVoteBtn: {
+    borderRadius: 12,
+    paddingVertical: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 28,
+  },
+  mainConfirmVoteBtnText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+
+  // ─── Screen 2: Single-Option Styles (Exact Mockup 2) ───────────────────────
+  singleTitle: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: DARK,
+    marginBottom: 4,
+  },
+  singleSubtitle: {
+    fontSize: 14,
+    color: "#64748B",
+    marginBottom: 20,
+  },
+  singleBigCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+    padding: 24,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
+    marginBottom: 14,
+  },
+  singleEuroIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#E6F7F5",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
+  },
+  singleEuroDocWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  singleDocEuroSign: {
+    position: "absolute",
+    fontSize: 10,
+    fontWeight: "900",
+    color: "#008075",
+    top: 5,
+  },
+  singleAmountDisplay: {
+    fontSize: 38,
+    fontWeight: "800",
+    color: "#008075",
+    letterSpacing: -0.5,
+  },
+  singleAmountSub: {
+    fontSize: 12,
+    color: "#94A3B8",
+    fontWeight: "500",
+    marginTop: 2,
+    marginBottom: 18,
+  },
+  singleCardDivider: {
+    width: "100%",
+    height: 1,
+    backgroundColor: "#F1F5F9",
+    marginBottom: 14,
+  },
+  singleFileRow: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  singlePdfBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: "#F0FDF9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  singleFileTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: DARK,
+  },
+  singleFileSubtitle: {
+    fontSize: 12,
+    color: "#94A3B8",
+    marginTop: 1,
+  },
+  singleDatePillContainer: {
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 20,
+  },
+  singleDatePillText: {
+    fontSize: 13,
+    color: "#475569",
+    fontWeight: "500",
+  },
+  singleVoteSection: {
+    marginTop: 4,
+  },
+  singleVoteHeading: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: DARK,
+  },
+  singleVoteSubheading: {
+    fontSize: 12,
+    color: "#64748B",
+    marginTop: 3,
+    marginBottom: 14,
+  },
+  singleVoteCardsRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 18,
+  },
+  singleChoiceCard: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: BORDER,
+    paddingVertical: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  singleChoiceCardSelected: {
+    borderColor: "#008075",
+    backgroundColor: "#E6F7F5",
+  },
+  singleChoiceCardText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#475569",
+  },
+  singleChoiceCardTextSelected: {
+    color: "#0F172A",
+    fontWeight: "700",
+  },
+  singleChoiceRadio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: "#CBD5E1",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 4,
+  },
+  singleChoiceRadioSelected: {
+    borderColor: "#008075",
+    borderWidth: 2,
+  },
+  singleChoiceRadioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#008075",
   },
 });

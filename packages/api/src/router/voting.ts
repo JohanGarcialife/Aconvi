@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -46,6 +46,7 @@ async function ensureVotingTables(db: any) {
         "display_order" integer DEFAULT 0 NOT NULL,
         "created_at" timestamp with time zone DEFAULT now() NOT NULL
       );`,
+      `ALTER TABLE "vote_budget_proposal" ADD COLUMN IF NOT EXISTS "provider_id" uuid;`,
       `ALTER TABLE "vote_cast" ALTER COLUMN "option_id" DROP NOT NULL;`,
       `ALTER TABLE "vote_cast" ADD COLUMN IF NOT EXISTS "choice" varchar(32) DEFAULT 'APPROVE';`,
       `ALTER TABLE "vote_cast" ADD COLUMN IF NOT EXISTS "item_id" uuid;`,
@@ -505,6 +506,7 @@ export const votingRouter = createTRPCRouter({
             z.object({
               companyName: z.string().min(1),
               amount: z.string().min(1),
+              providerId: z.string().uuid().optional().nullable(),
               description: z.string().optional(),
               fileUrl: z.string().optional(),
               fileName: z.string().optional(),
@@ -516,6 +518,7 @@ export const votingRouter = createTRPCRouter({
             z.object({
               companyName: z.string().min(1),
               amount: z.string().min(1),
+              providerId: z.string().uuid().optional().nullable(),
               description: z.string().optional(),
               fileUrl: z.string().optional(),
               fileName: z.string().optional(),
@@ -632,6 +635,7 @@ export const votingRouter = createTRPCRouter({
             id: crypto.randomUUID(),
             sessionId,
             itemId: null,
+            providerId: (bp as any).providerId ?? null,
             companyName: bp.companyName,
             amount: bp.amount,
             description: bp.description ?? null,
@@ -1269,6 +1273,7 @@ Fdo. La Administración de Fincas`;
           items: { orderBy: (i, { asc }) => [asc(i.orderIndex)] },
           casts: { with: { user: { columns: { id: true, name: true } } } },
           author: { columns: { name: true } },
+          budgetProposals: { orderBy: (bp, { asc }) => [asc(bp.displayOrder)] },
         },
       });
       if (!session) throw new Error("Votación no encontrada");
@@ -1349,6 +1354,19 @@ Fdo. La Administración de Fincas`;
           `  • Me abstengo: ${session.casts.filter((c) => c.choice === "ABSTAIN").length} votos (${((abs / tot) * 100).toFixed(1)}% coef.)`,
         );
         lines.push(`  → Resultado: ${app > rej ? "APROBADO" : "RECHAZADO"}`);
+
+        if (session.budgetProposals && session.budgetProposals.length > 1) {
+          lines.push(`\n  DESGLOSE POR PROPUESTA:`);
+          for (const bp of session.budgetProposals) {
+            const bpCasts = session.casts.filter(
+              (c) => c.choice === "APPROVE" && c.selectedProposalId === bp.id,
+            );
+            const bpWeight = bpCasts.reduce((s, c) => s + c.coefficient, 0);
+            lines.push(
+              `  • ${bp.companyName} (${bp.amount}): ${bpCasts.length} votos (${((bpWeight / tot) * 100).toFixed(1)}% coef.)`,
+            );
+          }
+        }
       }
 
       lines.push(
@@ -1460,17 +1478,74 @@ Fdo. La Administración de Fincas`;
             .reduce((s, c) => s + c.coefficient, 0);
 
           if (approveWeight > rejectWeight) {
+            let assignedProviderId: string | null = session.otProviderId ?? null;
+            let winningCompanyName: string | null = null;
+            let winningAmount: string | null = null;
+
+            if (session.budgetProposals && session.budgetProposals.length > 0) {
+              const proposalVotes: Record<string, number> = {};
+              for (const c of allCasts) {
+                if (c.choice === "APPROVE" && c.selectedProposalId) {
+                  proposalVotes[c.selectedProposalId] =
+                    (proposalVotes[c.selectedProposalId] || 0) +
+                    (c.coefficient || 1);
+                }
+              }
+
+              let topProposalId: string | null = null;
+              let topWeight = -1;
+              for (const [pId, weight] of Object.entries(proposalVotes)) {
+                if (weight > topWeight) {
+                  topWeight = weight;
+                  topProposalId = pId;
+                }
+              }
+
+              // Fallback to first proposal if only 1 exists and no direct proposal votes recorded
+              if (!topProposalId && session.budgetProposals.length === 1) {
+                topProposalId = session.budgetProposals[0]?.id ?? null;
+              }
+
+              if (topProposalId) {
+                const winningProp = session.budgetProposals.find(
+                  (p) => p.id === topProposalId,
+                );
+                if (winningProp) {
+                  winningCompanyName = winningProp.companyName;
+                  winningAmount = winningProp.amount;
+                  if ((winningProp as any).providerId) {
+                    assignedProviderId = (winningProp as any).providerId;
+                  } else {
+                    const matchedProvider =
+                      await ctx.db.query.provider.findFirst({
+                        where: and(
+                          eq(provider.organizationId, input.tenantId),
+                          ilike(provider.name, winningProp.companyName.trim()),
+                        ),
+                      });
+                    if (matchedProvider) {
+                      assignedProviderId = matchedProvider.id;
+                    }
+                  }
+                }
+              }
+            }
+
             const incidentId = crypto.randomUUID();
             await ctx.db.insert(incident).values({
               id: incidentId,
-              title: `OT: ${session.title}`,
-              description: `Orden de trabajo generada automáticamente tras la aprobación por mayoría de la votación "${session.title}".`,
+              title: `OT: ${session.title}${winningCompanyName ? ` (${winningCompanyName})` : ""}`,
+              description: `Orden de trabajo generada automáticamente tras la aprobación por mayoría de la votación "${session.title}".${
+                winningCompanyName
+                  ? ` Empresa seleccionada: ${winningCompanyName}${winningAmount ? ` por ${winningAmount}` : ""}.`
+                  : ""
+              }`,
               category: "obra",
               status: "RECIBIDA",
               priority: "MEDIA",
               organizationId: input.tenantId,
               reporterId: authorId,
-              providerId: session.otProviderId ?? null,
+              providerId: assignedProviderId,
             });
 
             await ctx.db
@@ -1479,7 +1554,9 @@ Fdo. La Administración de Fincas`;
               .where(eq(voteSession.id, input.sessionId));
 
             generatedIncidentIds.push(incidentId);
-            console.log(`[voting.close] Auto-generated OT incident for session: ${incidentId}`);
+            console.log(
+              `[voting.close] Auto-generated OT incident for session: ${incidentId} (assigned to provider: ${assignedProviderId})`,
+            );
           }
         } catch (otErr) {
           console.warn("[voting.close] Auto-OT generation failed for session:", otErr);

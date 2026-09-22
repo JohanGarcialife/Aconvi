@@ -1077,6 +1077,7 @@ function CreateSingleVoteView({
     Array<{
       companyName: string;
       amount: string;
+      providerId?: string;
       description?: string;
       fileUrl?: string;
       fileName?: string;
@@ -1087,6 +1088,8 @@ function CreateSingleVoteView({
   const [isAddingProposal, setIsAddingProposal] = useState(false);
   const [propCompany, setPropCompany] = useState("");
   const [propAmount, setPropAmount] = useState("");
+  const [propProviderId, setPropProviderId] = useState<string | null>(null);
+  const [showProviderDropdown, setShowProviderDropdown] = useState(false);
   const [propFile, setPropFile] = useState<string | null>(null);
 
   // Auto-OT generation
@@ -1113,19 +1116,25 @@ function CreateSingleVoteView({
       alert("Introduce la empresa/opción y el importe.");
       return;
     }
+    const matched = (providers as any[] ?? []).find(
+      (p: any) => p.name.toLowerCase().trim() === propCompany.toLowerCase().trim(),
+    );
     setProposals([
       ...proposals,
       {
         companyName: propCompany.trim(),
         amount: propAmount.trim(),
+        providerId: propProviderId || matched?.id || undefined,
         fileName: propFile || undefined,
         fileUrl: propFile ? "https://example.com/" + encodeURIComponent(propFile) : undefined,
       },
     ]);
     setPropCompany("");
     setPropAmount("");
+    setPropProviderId(null);
     setPropFile(null);
     setIsAddingProposal(false);
+    setShowProviderDropdown(false);
   };
 
   const handleRemoveProposal = (index: number) => {
@@ -1140,9 +1149,13 @@ function CreateSingleVoteView({
 
     const finalProposals = [...proposals];
     if (isAddingProposal && propCompany.trim() && propAmount.trim()) {
+      const matched = (providers as any[] ?? []).find(
+        (p: any) => p.name.toLowerCase().trim() === propCompany.toLowerCase().trim(),
+      );
       finalProposals.push({
         companyName: propCompany.trim(),
         amount: propAmount.trim(),
+        providerId: propProviderId || matched?.id || undefined,
         fileName: propFile || undefined,
         fileUrl: propFile ? "https://example.com/" + encodeURIComponent(propFile) : undefined,
       });
@@ -1165,6 +1178,7 @@ function CreateSingleVoteView({
       budgetProposals: finalProposals.map((p) => ({
         companyName: p.companyName.trim(),
         amount: p.amount.trim(),
+        providerId: p.providerId || undefined,
         description: p.description?.trim() || undefined,
         fileUrl: p.fileUrl?.trim() || undefined,
         fileName: p.fileName?.trim() || undefined,
@@ -1271,16 +1285,62 @@ function CreateSingleVoteView({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                <div className="space-y-1">
+                <div className="space-y-1 relative">
                   <Label className="text-[11px] font-semibold text-slate-700">
                     Empresa / Opción *
                   </Label>
                   <Input
                     placeholder="Ej. Ascensores Madrid S.L."
                     value={propCompany}
-                    onChange={(e) => setPropCompany(e.target.value)}
+                    onChange={(e) => {
+                      setPropCompany(e.target.value);
+                      setShowProviderDropdown(true);
+                      const exact = (providers as any[] ?? []).find(
+                        (p: any) =>
+                          p.name.toLowerCase().trim() ===
+                          e.target.value.toLowerCase().trim(),
+                      );
+                      setPropProviderId(exact ? exact.id : null);
+                    }}
+                    onFocus={() => setShowProviderDropdown(true)}
                     className="text-xs h-8.5 bg-white rounded-md"
                   />
+                  {showProviderDropdown && propCompany.trim().length > 0 && (
+                    (() => {
+                      const filtered = (providers as any[] ?? []).filter((p: any) =>
+                        p.name
+                          .toLowerCase()
+                          .includes(propCompany.toLowerCase().trim()),
+                      );
+                      if (filtered.length === 0) return null;
+                      return (
+                        <div className="absolute top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg z-30 py-1">
+                          {filtered.map((p: any) => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                setPropCompany(p.name);
+                                setPropProviderId(p.id);
+                                setShowProviderDropdown(false);
+                              }}
+                              className="w-full text-left px-3 py-1.5 text-xs hover:bg-[#EAF5F2] flex items-center justify-between transition-colors"
+                            >
+                              <span className="font-semibold text-slate-800">
+                                {p.name}
+                              </span>
+                              {p.speciality && (
+                                <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                                  {p.speciality}
+                                </span>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })()
+                  )}
                 </div>
                 <div className="space-y-1">
                   <Label className="text-[11px] font-semibold text-slate-700">
