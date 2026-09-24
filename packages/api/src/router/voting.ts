@@ -92,7 +92,12 @@ export const votingRouter = createTRPCRouter({
       const sessions = await ctx.db.query.voteSession.findMany({
         where: eq(voteSession.organizationId, input.tenantId),
         with: {
-          items: { orderBy: (item, { asc }) => [asc(item.orderIndex)] },
+          items: {
+            orderBy: (item, { asc }) => [asc(item.orderIndex)],
+            with: {
+              budgetProposals: { orderBy: (bp, { asc }) => [asc(bp.displayOrder)] },
+            },
+          },
           options: { orderBy: (opt, { asc }) => [asc(opt.displayOrder)] },
           budgetProposals: { orderBy: (bp, { asc }) => [asc(bp.displayOrder)] },
           casts: true,
@@ -359,7 +364,12 @@ export const votingRouter = createTRPCRouter({
       const session = await ctx.db.query.voteSession.findFirst({
         where: eq(voteSession.id, input.sessionId),
         with: {
-          items: { orderBy: (item, { asc }) => [asc(item.orderIndex)] },
+          items: {
+            orderBy: (item, { asc }) => [asc(item.orderIndex)],
+            with: {
+              budgetProposals: { orderBy: (bp, { asc }) => [asc(bp.displayOrder)] },
+            },
+          },
           options: { orderBy: (opt, { asc }) => [asc(opt.displayOrder)] },
           budgetProposals: { orderBy: (bp, { asc }) => [asc(bp.displayOrder)] },
           casts: {
@@ -1270,7 +1280,12 @@ Fdo. La Administración de Fincas`;
           eq(voteSession.organizationId, input.tenantId),
         ),
         with: {
-          items: { orderBy: (i, { asc }) => [asc(i.orderIndex)] },
+          items: {
+            orderBy: (i, { asc }) => [asc(i.orderIndex)],
+            with: {
+              budgetProposals: { orderBy: (bp, { asc }) => [asc(bp.displayOrder)] },
+            },
+          },
           casts: { with: { user: { columns: { id: true, name: true } } } },
           author: { columns: { name: true } },
           budgetProposals: { orderBy: (bp, { asc }) => [asc(bp.displayOrder)] },

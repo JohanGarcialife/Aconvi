@@ -739,12 +739,17 @@ export default function VotingScreen() {
                       ? "Rechazo"
                       : "Me abstengo";
 
-                const chosenProp =
-                  !isJunta && selectedProposals[item.id]
-                    ? (activeSession.budgetProposals || []).find(
+                // For single vote: look in session-level budgetProposals
+                // For junta items with proposals: look in item.budgetProposals
+                const chosenProp = selectedProposals[item.id]
+                  ? isJunta
+                    ? (item.budgetProposals || []).find(
                         (p: any) => p.id === selectedProposals[item.id],
                       )
-                    : null;
+                    : (activeSession.budgetProposals || []).find(
+                        (p: any) => p.id === selectedProposals[item.id],
+                      )
+                  : null;
 
                 return (
                   <View
@@ -885,16 +890,95 @@ export default function VotingScreen() {
           {/* List of online points */}
           {onlineItems.map((item: any, idx: number) => {
             const currentChoice = choices[item.id];
+            const itemProposals: any[] = item.budgetProposals || [];
+            const hasProposals = itemProposals.length > 0;
+            const selectedPropId = selectedProposals[item.id];
+
             return (
               <View key={item.id} style={styles.juntaItemCard}>
-                <Text style={styles.juntaItemTitle}>
-                  {`${idx + 1}. ${item.title}`}
-                </Text>
+                {/* Header row: number badge + title + type label */}
+                <View style={styles.juntaItemHeaderRow}>
+                  <View style={styles.juntaItemNumBadge}>
+                    <Text style={styles.juntaItemNumText}>{idx + 1}</Text>
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <Text style={styles.juntaItemTitle}>{item.title}</Text>
+                    <Text style={styles.juntaItemTypeLabel}>
+                      {hasProposals ? "Votación con opciones" : "Votación simple"}
+                    </Text>
+                  </View>
+                </View>
+
                 {item.budget ? (
                   <Text style={styles.juntaItemBudget}>{item.budget}</Text>
                 ) : null}
 
-                {/* 3 Horizontal buttons: Apruebo, Rechazo, Me abstengo */}
+                {/* Proposals radio cards for multi-option items */}
+                {hasProposals && (
+                  <View style={styles.juntaProposalsContainer}>
+                    {itemProposals.map((bp: any) => {
+                      const isSelected = selectedPropId === bp.id;
+                      return (
+                        <TouchableOpacity
+                          key={bp.id}
+                          style={[
+                            styles.juntaProposalCard,
+                            isSelected && styles.juntaProposalCardSelected,
+                          ]}
+                          onPress={() => {
+                            setSelectedProposals((prev: any) => ({
+                              ...prev,
+                              [item.id]: bp.id,
+                            }));
+                            // Auto-select APPROVE when a proposal is chosen
+                            handleSelectChoice(item.id, "APPROVE");
+                          }}
+                          activeOpacity={0.75}
+                        >
+                          <View
+                            style={[
+                              styles.juntaProposalRadioOuter,
+                              isSelected && styles.juntaProposalRadioOuterSelected,
+                            ]}
+                          >
+                            {isSelected && (
+                              <View style={styles.juntaProposalRadioInner} />
+                            )}
+                          </View>
+                          <View style={{ flex: 1, marginLeft: 10 }}>
+                            <Text style={styles.juntaProposalCompany}>
+                              {bp.companyName}
+                            </Text>
+                            {bp.description ? (
+                              <Text style={styles.juntaProposalDesc}>
+                                {bp.description}
+                              </Text>
+                            ) : null}
+                          </View>
+                          <Text style={styles.juntaProposalAmount}>
+                            {bp.amount}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                    {/* Ver detalles y documentos link */}
+                    <TouchableOpacity
+                      onPress={() =>
+                        Alert.alert(
+                          "Documentos",
+                          "Los documentos detallados de cada propuesta están disponibles en el panel de la comunidad.",
+                        )
+                      }
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.juntaProposalDocsLink}>
+                        Ver detalles y documentos
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* 3 Horizontal buttons: A favor / En contra / Me abstengo */}
                 <View style={styles.juntaOptionsRow}>
                   {VOTE_OPTIONS.map((opt) => {
                     const isSelected = currentChoice === opt.key;
@@ -905,7 +989,16 @@ export default function VotingScreen() {
                           styles.juntaOptionBtn,
                           isSelected && styles.juntaOptionBtnSelected,
                         ]}
-                        onPress={() => handleSelectChoice(item.id, opt.key)}
+                        onPress={() => {
+                          handleSelectChoice(item.id, opt.key);
+                          // If switching away from APPROVE on multi-option item, clear proposal
+                          if (hasProposals && opt.key !== "APPROVE") {
+                            setSelectedProposals((prev: any) => ({
+                              ...prev,
+                              [item.id]: undefined,
+                            }));
+                          }
+                        }}
                         activeOpacity={0.8}
                       >
                         {isSelected && (
@@ -1264,50 +1357,58 @@ export default function VotingScreen() {
         </Text>
 
         {/* Gran Tarjeta Central de Importe y Documento */}
-        <View style={styles.singleBigCard}>
-          <View style={styles.singleEuroIconCircle}>
-            <View style={styles.singleEuroDocWrap}>
-              <Feather name="file-text" size={22} color="#008075" />
-              <Text style={styles.singleDocEuroSign}>€</Text>
-            </View>
-          </View>
+        {(() => {
+          const singleAmount = singleProposals[0]?.amount || activeSession.budget;
+          const hasAmount = !!singleAmount;
+          return (
+            <View style={styles.singleBigCard}>
+              {hasAmount && (
+                <>
+                  <View style={styles.singleEuroIconCircle}>
+                    <View style={styles.singleEuroDocWrap}>
+                      <Feather name="file-text" size={22} color="#008075" />
+                      <Text style={styles.singleDocEuroSign}>€</Text>
+                    </View>
+                  </View>
 
-          <Text style={styles.singleAmountDisplay}>
-            {singleProposals[0]?.amount || activeSession.budget || "1.000 €"}
-          </Text>
-          <Text style={styles.singleAmountSub}>Importe total</Text>
+                  <Text style={styles.singleAmountDisplay}>{singleAmount}</Text>
+                  <Text style={styles.singleAmountSub}>Importe total</Text>
 
-          <View style={styles.singleCardDivider} />
+                  <View style={styles.singleCardDivider} />
+                </>
+              )}
 
-          <TouchableOpacity
-            style={styles.singleFileRow}
-            onPress={() => {
-              const url = singleProposals[0]?.fileUrl;
-              if (url) {
-                void Linking.openURL(url);
-              } else {
-                Alert.alert(
-                  "Documento",
-                  "Documento detallado de la votación en formato PDF.",
-                );
-              }
-            }}
-            activeOpacity={0.7}
-          >
-            <View style={styles.singlePdfBadge}>
-              <Feather name="file-text" size={20} color="#008075" />
+              <TouchableOpacity
+                style={styles.singleFileRow}
+                onPress={() => {
+                  const url = singleProposals[0]?.fileUrl;
+                  if (url) {
+                    void Linking.openURL(url);
+                  } else {
+                    Alert.alert(
+                      "Documento",
+                      "Documento detallado de la votación en formato PDF.",
+                    );
+                  }
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.singlePdfBadge}>
+                  <Feather name="file-text" size={20} color="#008075" />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.singleFileTitle}>
+                    Ver documento completo
+                  </Text>
+                  <Text style={styles.singleFileSubtitle}>
+                    Documento detallado
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={20} color="#94A3B8" />
+              </TouchableOpacity>
             </View>
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={styles.singleFileTitle}>
-                Ver documento completo
-              </Text>
-              <Text style={styles.singleFileSubtitle}>
-                Documento detallado
-              </Text>
-            </View>
-            <Feather name="chevron-right" size={20} color="#94A3B8" />
-          </TouchableOpacity>
-        </View>
+          );
+        })()}
 
         {/* Pastilla de fecha de cierre */}
         <View style={styles.singleDatePillContainer}>
@@ -1816,6 +1917,94 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: DARK,
     marginBottom: 12,
+  },
+  juntaItemHeaderRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 8,
+  },
+  juntaItemNumBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: TEAL,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+    marginTop: 1,
+  },
+  juntaItemNumText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+  juntaItemTypeLabel: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#94A3B8",
+    marginTop: 2,
+  },
+  juntaProposalsContainer: {
+    marginBottom: 12,
+    gap: 8,
+  },
+  juntaProposalCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: BORDER,
+    backgroundColor: "#FAFAFA",
+  },
+  juntaProposalCardSelected: {
+    borderColor: TEAL,
+    borderWidth: 1.5,
+    backgroundColor: TEAL_LIGHT,
+  },
+  juntaProposalRadioOuter: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: "#CBD5E1",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  juntaProposalRadioOuterSelected: {
+    borderColor: TEAL,
+  },
+  juntaProposalRadioInner: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: TEAL,
+  },
+  juntaProposalCompany: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: DARK,
+  },
+  juntaProposalDesc: {
+    fontSize: 11,
+    color: "#64748B",
+    marginTop: 2,
+  },
+  juntaProposalAmount: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: TEAL,
+    marginLeft: 8,
+    flexShrink: 0,
+  },
+  juntaProposalDocsLink: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: TEAL,
+    textAlign: "center",
+    paddingVertical: 6,
   },
   juntaOptionsRow: {
     flexDirection: "row",

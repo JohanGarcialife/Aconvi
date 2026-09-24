@@ -1070,6 +1070,7 @@ function CreateSingleVoteView({
   const trpc = useTRPC();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [budget, setBudget] = useState("");
   const [closesAt, setClosesAt] = useState("");
 
   // Clean empty proposals list - user adds their own
@@ -1183,6 +1184,7 @@ function CreateSingleVoteView({
         fileUrl: p.fileUrl?.trim() || undefined,
         fileName: p.fileName?.trim() || undefined,
       })),
+      budget: budget.trim() || undefined,
       autoGenerateOt,
       otProviderId: otProviderId || undefined,
     });
@@ -1240,6 +1242,22 @@ function CreateSingleVoteView({
               rows={2}
               className="text-xs resize-none rounded-md"
             />
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="single-budget" className="text-xs font-semibold text-slate-700">
+              Importe (opcional)
+            </Label>
+            <Input
+              id="single-budget"
+              placeholder="Ej: 2.500 €"
+              value={budget}
+              onChange={(e) => setBudget(e.target.value)}
+              className="text-xs h-9 rounded-md"
+            />
+            <p className="text-[10px] text-slate-400">
+              Si se introduce, se mostrará en la tarjeta de votación del vecino.
+            </p>
           </div>
         </div>
       </div>
