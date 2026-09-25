@@ -615,6 +615,24 @@ export default function VotingScreen() {
                         ? "Me abstengo"
                         : "Voto registrado";
 
+                const selectedPropId =
+                  selectedProposals[item.id] ||
+                  selectedProposals["__single__"] ||
+                  castForThisItem?.selectedProposalId;
+
+                const chosenProp = selectedPropId
+                  ? isJunta
+                    ? (item.budgetProposals || []).find(
+                        (p: any) => p.id === selectedPropId,
+                      ) ||
+                      (activeSession.budgetProposals || []).find(
+                        (p: any) => p.id === selectedPropId,
+                      )
+                    : (activeSession.budgetProposals || []).find(
+                        (p: any) => p.id === selectedPropId,
+                      )
+                  : null;
+
                 return (
                   <View
                     key={item.id}
@@ -635,6 +653,39 @@ export default function VotingScreen() {
                     {item.budget ? (
                       <Text style={styles.votedItemBudget}>{formatEuro(item.budget)}</Text>
                     ) : null}
+
+                    {chosenProp && (
+                      <View
+                        style={{
+                          backgroundColor: "#F8FAFC",
+                          padding: 10,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: "#E2E8F0",
+                          marginVertical: 8,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            color: "#64748B",
+                            fontWeight: "600",
+                          }}
+                        >
+                          Presupuesto seleccionado:
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            color: "#0F172A",
+                            fontWeight: "700",
+                            marginTop: 2,
+                          }}
+                        >
+                          {chosenProp.companyName} — {formatEuro(chosenProp.amount)}
+                        </Text>
+                      </View>
+                    )}
 
                     {!isJunta && (
                       <Text style={styles.votedResponseLabel}>
