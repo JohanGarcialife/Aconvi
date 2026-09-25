@@ -37,6 +37,27 @@ const BG = "#F9FAFB";
 const CARD_BG = "#FFFFFF";
 const ALERT_RED = "#EF4444";
 
+function formatEuro(val?: string | number | null): string {
+  if (val === undefined || val === null) return "";
+  const str = String(val).trim();
+  if (!str) return "";
+
+  const clean = str.replace(/[€\s]/g, "");
+  if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(clean)) {
+    return `${clean} €`;
+  }
+  const match = clean.match(/^(\d+)(?:[.,](\d+))?$/);
+  if (match && match[1]) {
+    const intPart = match[1].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    const decPart = match[2];
+    return decPart ? `${intPart},${decPart} €` : `${intPart} €`;
+  }
+  if (!str.includes("€")) {
+    return `${str} €`;
+  }
+  return str;
+}
+
 // ─── Section Header Title Component ──────────────────────────────────────────
 function SectionTitle({
   title,
@@ -919,7 +940,7 @@ export default function VecinoHome() {
                         respondidas
                       </Text>
                     ) : !isClosed && voting.budget ? (
-                      <Text style={styles.votingAmount}>{voting.budget}</Text>
+                      <Text style={styles.votingAmount}>{formatEuro(voting.budget)}</Text>
                     ) : null}
 
                     <Text

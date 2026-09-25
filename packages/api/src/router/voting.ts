@@ -75,6 +75,27 @@ async function ensureVotingTables(db: any) {
   }
 }
 
+function formatEuro(val?: string | number | null): string {
+  if (val === undefined || val === null) return "";
+  const str = String(val).trim();
+  if (!str) return "";
+
+  const clean = str.replace(/[€\s]/g, "");
+  if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(clean)) {
+    return `${clean} €`;
+  }
+  const match = clean.match(/^(\d+)(?:[.,](\d+))?$/);
+  if (match && match[1]) {
+    const intPart = match[1].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    const decPart = match[2];
+    return decPart ? `${intPart},${decPart} €` : `${intPart} €`;
+  }
+  if (!str.includes("€")) {
+    return `${str} €`;
+  }
+  return str;
+}
+
 export const votingRouter = createTRPCRouter({
   // ── List all sessions for a community with user-specific voting status ─────────
   all: publicProcedure
@@ -584,13 +605,14 @@ export const votingRouter = createTRPCRouter({
           ? "Aviso: Ya hay 2 votaciones activas en primer plano. Esta votación se creará y se mostrará en el carrusel de 'Otras votaciones pendientes'."
           : null;
 
-      const derivedBudget =
+      const rawBudget =
         input.budget ??
         (allProposals.length === 1
           ? allProposals[0]!.amount
           : allProposals.length > 1
             ? allProposals.map((p) => p.amount).join(" · ")
             : null);
+      const derivedBudget = rawBudget ? formatEuro(rawBudget) : null;
 
       const [created] = await ctx.db
         .insert(voteSession)
@@ -647,7 +669,7 @@ export const votingRouter = createTRPCRouter({
             itemId: null,
             providerId: (bp as any).providerId ?? null,
             companyName: bp.companyName,
-            amount: bp.amount,
+            amount: formatEuro(bp.amount),
             description: bp.description ?? null,
             fileUrl: bp.fileUrl ?? null,
             fileName: bp.fileName ?? (bp.fileUrl ? "Presupuesto.pdf" : null),
@@ -829,7 +851,7 @@ export const votingRouter = createTRPCRouter({
           sessionId,
           orderIndex: idx + 1,
           title: itemInput.title,
-          budget: itemInput.budget ?? null,
+          budget: itemInput.budget ? formatEuro(itemInput.budget) : null,
           description: itemInput.description ?? null,
           onlineVotingEnabled: itemInput.onlineVotingEnabled ?? true,
           autoGenerateOt: itemInput.autoGenerateOt ?? false,
@@ -843,7 +865,7 @@ export const votingRouter = createTRPCRouter({
               sessionId,
               itemId,
               companyName: bp.companyName,
-              amount: bp.amount,
+              amount: formatEuro(bp.amount),
               description: bp.description ?? null,
               fileUrl: bp.fileUrl ?? null,
               fileName: bp.fileName ?? null,

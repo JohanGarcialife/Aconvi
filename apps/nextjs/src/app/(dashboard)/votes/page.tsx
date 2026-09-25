@@ -57,6 +57,27 @@ const TENANT_ID = "org_aconvi_demo";
 
 type ActiveView = "list" | "rights" | "single" | "meeting";
 
+function formatEuro(val?: string | number | null): string {
+  if (val === undefined || val === null) return "";
+  const str = String(val).trim();
+  if (!str) return "";
+
+  const clean = str.replace(/[€\s]/g, "");
+  if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(clean)) {
+    return `${clean} €`;
+  }
+  const match = clean.match(/^(\d+)(?:[.,](\d+))?$/);
+  if (match && match[1]) {
+    const intPart = match[1].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    const decPart = match[2];
+    return decPart ? `${intPart},${decPart} €` : `${intPart} €`;
+  }
+  if (!str.includes("€")) {
+    return `${str} €`;
+  }
+  return str;
+}
+
 // ─── Results Bar ──────────────────────────────────────────────────────────────
 function ResultBar({
   label,
@@ -1124,7 +1145,7 @@ function CreateSingleVoteView({
       ...proposals,
       {
         companyName: propCompany.trim(),
-        amount: propAmount.trim(),
+        amount: formatEuro(propAmount.trim()),
         providerId: propProviderId || matched?.id || undefined,
         fileName: propFile || undefined,
         fileUrl: propFile ? "https://example.com/" + encodeURIComponent(propFile) : undefined,
@@ -1155,7 +1176,7 @@ function CreateSingleVoteView({
       );
       finalProposals.push({
         companyName: propCompany.trim(),
-        amount: propAmount.trim(),
+        amount: formatEuro(propAmount.trim()),
         providerId: propProviderId || matched?.id || undefined,
         fileName: propFile || undefined,
         fileUrl: propFile ? "https://example.com/" + encodeURIComponent(propFile) : undefined,
@@ -1178,13 +1199,13 @@ function CreateSingleVoteView({
       type: "SINGLE",
       budgetProposals: finalProposals.map((p) => ({
         companyName: p.companyName.trim(),
-        amount: p.amount.trim(),
+        amount: formatEuro(p.amount.trim()),
         providerId: p.providerId || undefined,
         description: p.description?.trim() || undefined,
         fileUrl: p.fileUrl?.trim() || undefined,
         fileName: p.fileName?.trim() || undefined,
       })),
-      budget: budget.trim() || undefined,
+      budget: budget.trim() ? formatEuro(budget.trim()) : undefined,
       autoGenerateOt,
       otProviderId: otProviderId || undefined,
     });
@@ -1660,7 +1681,7 @@ function CreateMeetingView({
     if (next[activeItemIndex]) {
       next[activeItemIndex]!.proposals.push({
         companyName: newPropCompany.trim(),
-        amount: newPropAmount.trim(),
+        amount: formatEuro(newPropAmount.trim()),
       });
       setItems(next);
       setNewPropCompany("");

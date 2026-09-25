@@ -38,6 +38,27 @@ const GRAY_BTN = "#475569";
 
 type ChoiceType = "APPROVE" | "REJECT" | "ABSTAIN";
 
+function formatEuro(val?: string | number | null): string {
+  if (val === undefined || val === null) return "";
+  const str = String(val).trim();
+  if (!str) return "";
+
+  const clean = str.replace(/[€\s]/g, "");
+  if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(clean)) {
+    return `${clean} €`;
+  }
+  const match = clean.match(/^(\d+)(?:[.,](\d+))?$/);
+  if (match && match[1]) {
+    const intPart = match[1].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    const decPart = match[2];
+    return decPart ? `${intPart},${decPart} €` : `${intPart} €`;
+  }
+  if (!str.includes("€")) {
+    return `${str} €`;
+  }
+  return str;
+}
+
 export default function VotingScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ sessionId?: string }>();
@@ -612,7 +633,7 @@ export default function VotingScreen() {
                       {item.title}
                     </Text>
                     {item.budget ? (
-                      <Text style={styles.votedItemBudget}>{item.budget}</Text>
+                      <Text style={styles.votedItemBudget}>{formatEuro(item.budget)}</Text>
                     ) : null}
 
                     {!isJunta && (
@@ -654,7 +675,7 @@ export default function VotingScreen() {
                     {item.title}
                   </Text>
                   {item.budget ? (
-                    <Text style={styles.votedItemBudget}>{item.budget}</Text>
+                    <Text style={styles.votedItemBudget}>{formatEuro(item.budget)}</Text>
                   ) : null}
                 </View>
               ))}
@@ -769,7 +790,7 @@ export default function VotingScreen() {
                       {item.title}
                     </Text>
                     {item.budget ? (
-                      <Text style={styles.modalItemBudget}>{item.budget}</Text>
+                      <Text style={styles.modalItemBudget}>{formatEuro(item.budget)}</Text>
                     ) : null}
 
                     {chosenProp && (
@@ -800,7 +821,7 @@ export default function VotingScreen() {
                             marginTop: 2,
                           }}
                         >
-                          {chosenProp.companyName} — {chosenProp.amount}
+                          {chosenProp.companyName} — {formatEuro(chosenProp.amount)}
                         </Text>
                       </View>
                     )}
@@ -910,7 +931,7 @@ export default function VotingScreen() {
                 </View>
 
                 {item.budget ? (
-                  <Text style={styles.juntaItemBudget}>{item.budget}</Text>
+                  <Text style={styles.juntaItemBudget}>{formatEuro(item.budget)}</Text>
                 ) : null}
 
                 {/* Proposals radio cards for multi-option items */}
@@ -956,7 +977,7 @@ export default function VotingScreen() {
                             ) : null}
                           </View>
                           <Text style={styles.juntaProposalAmount}>
-                            {bp.amount}
+                            {formatEuro(bp.amount)}
                           </Text>
                         </TouchableOpacity>
                       );
@@ -1182,7 +1203,7 @@ export default function VotingScreen() {
                     <Text style={styles.multiCardCompany}>
                       {prop.companyName}
                     </Text>
-                    <Text style={styles.multiCardAmount}>{prop.amount}</Text>
+                    <Text style={styles.multiCardAmount}>{formatEuro(prop.amount)}</Text>
                   </View>
 
                   <View style={styles.multiCardSecondRow}>
@@ -1366,12 +1387,14 @@ export default function VotingScreen() {
                 <>
                   <View style={styles.singleEuroIconCircle}>
                     <View style={styles.singleEuroDocWrap}>
-                      <Feather name="file-text" size={22} color="#008075" />
+                      <Feather name="file" size={26} color="#008075" />
                       <Text style={styles.singleDocEuroSign}>€</Text>
                     </View>
                   </View>
 
-                  <Text style={styles.singleAmountDisplay}>{singleAmount}</Text>
+                  <Text style={styles.singleAmountDisplay}>
+                    {formatEuro(singleAmount)}
+                  </Text>
                   <Text style={styles.singleAmountSub}>Importe total</Text>
 
                   <View style={styles.singleCardDivider} />
@@ -2714,16 +2737,19 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   singleEuroDocWrap: {
+    width: 32,
+    height: 32,
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
   },
   singleDocEuroSign: {
     position: "absolute",
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: "900",
     color: "#008075",
-    top: 5,
+    textAlign: "center",
+    top: 8,
   },
   singleAmountDisplay: {
     fontSize: 38,
