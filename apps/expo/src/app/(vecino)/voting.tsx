@@ -596,7 +596,7 @@ export default function VotingScreen() {
           {/* Tarjeta de resumen de voto (Fiel a media_1788544476617.png / media_1788544403855.png) */}
           {isAlreadyVoted ? (
             <View style={styles.votedSummaryCard}>
-              {itemsList.map((item: any, idx: number) => {
+              {onlineItems.map((item: any, idx: number) => {
                 const castForThisItem = activeSession.userCasts?.find(
                   (c: any) =>
                     c.itemId === item.id ||
@@ -798,7 +798,7 @@ export default function VotingScreen() {
               showsVerticalScrollIndicator={false}
             >
               {onlineItems.map((item: any, idx: number) => {
-                const currentChoice = choices[item.id];
+                const currentChoice = choices[item.id] ?? choices["__single__"];
                 const choiceLabel = !isJunta
                   ? currentChoice === "APPROVE"
                     ? "A favor"
@@ -1062,6 +1062,14 @@ export default function VotingScreen() {
                           isSelected && styles.juntaOptionBtnSelected,
                         ]}
                         onPress={() => {
+                          // Bug 3 fix: block APPROVE if hasProposals and no proposal selected
+                          if (hasProposals && opt.key === "APPROVE" && !selectedProposals[item.id]) {
+                            Alert.alert(
+                              "Selecciona un presupuesto",
+                              "Debes seleccionar una de las opciones antes de votar a favor.",
+                            );
+                            return;
+                          }
                           handleSelectChoice(item.id, opt.key);
                           // If switching away from APPROVE on multi-option item, clear proposal
                           if (hasProposals && opt.key !== "APPROVE") {

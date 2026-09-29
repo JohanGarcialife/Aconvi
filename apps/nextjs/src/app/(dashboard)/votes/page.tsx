@@ -1617,13 +1617,15 @@ function CreateMeetingView({
       onlineVotingEnabled: boolean;
       autoGenerateOt: boolean;
       otProviderId?: string;
-      proposals: Array<{ companyName: string; amount: string; fileUrl?: string }>;
+      proposals: Array<{ companyName: string; amount: string; fileUrl?: string; providerId?: string }>;
     }>
   >([]);
 
   const [activeItemIndex, setActiveItemIndex] = useState<number>(-1);
   const [newPropCompany, setNewPropCompany] = useState("");
   const [newPropAmount, setNewPropAmount] = useState("");
+  const [newPropProviderId, setNewPropProviderId] = useState<string | null>(null);
+  const [showMeetingProviderDropdown, setShowMeetingProviderDropdown] = useState(false);
   const [isAddingProposal, setIsAddingProposal] = useState(false);
 
   const { data: providers } = useQuery(
@@ -1679,13 +1681,19 @@ function CreateMeetingView({
     }
     const next = [...items];
     if (next[activeItemIndex]) {
+      const matched = (providers as any[] ?? []).find(
+        (p: any) => p.name.toLowerCase().trim() === newPropCompany.toLowerCase().trim(),
+      );
       next[activeItemIndex]!.proposals.push({
         companyName: newPropCompany.trim(),
         amount: formatEuro(newPropAmount.trim()),
+        providerId: newPropProviderId || matched?.id || undefined,
       });
       setItems(next);
       setNewPropCompany("");
       setNewPropAmount("");
+      setNewPropProviderId(null);
+      setShowMeetingProviderDropdown(false);
       setIsAddingProposal(false);
     }
   };
@@ -1727,6 +1735,7 @@ function CreateMeetingView({
           proposals: it.proposals.map((p) => ({
             companyName: p.companyName,
             amount: p.amount,
+            providerId: p.providerId || undefined,
           })),
         })),
     });
@@ -2016,12 +2025,58 @@ function CreateMeetingView({
                         {isAddingProposal && (
                           <div className="p-2.5 rounded-md bg-slate-50 border border-slate-200 space-y-2.5">
                             <div className="grid grid-cols-2 gap-2">
-                              <Input
-                                placeholder="Empresa (ej. Ascensores Madrid S.L.)"
-                                value={newPropCompany}
-                                onChange={(e) => setNewPropCompany(e.target.value)}
-                                className="text-xs h-7.5 bg-white rounded-md"
-                              />
+                              {/* Empresa con autocomplete */}
+                              <div className="space-y-1 relative">
+                                <Input
+                                  placeholder="Empresa (ej. Ascensores Madrid S.L.)"
+                                  value={newPropCompany}
+                                  onChange={(e) => {
+                                    setNewPropCompany(e.target.value);
+                                    setShowMeetingProviderDropdown(true);
+                                    const exact = (providers as any[] ?? []).find(
+                                      (p: any) =>
+                                        p.name.toLowerCase().trim() ===
+                                        e.target.value.toLowerCase().trim(),
+                                    );
+                                    setNewPropProviderId(exact ? exact.id : null);
+                                  }}
+                                  onFocus={() => setShowMeetingProviderDropdown(true)}
+                                  onBlur={() => setTimeout(() => setShowMeetingProviderDropdown(false), 150)}
+                                  className="text-xs h-7.5 bg-white rounded-md"
+                                />
+                                {showMeetingProviderDropdown && newPropCompany.trim().length > 0 && (
+                                  (() => {
+                                    const filtered = (providers as any[] ?? []).filter((p: any) =>
+                                      p.name.toLowerCase().includes(newPropCompany.toLowerCase().trim()),
+                                    );
+                                    if (filtered.length === 0) return null;
+                                    return (
+                                      <div className="absolute top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg z-30 py-1">
+                                        {filtered.map((p: any) => (
+                                          <button
+                                            key={p.id}
+                                            type="button"
+                                            onMouseDown={(e) => {
+                                              e.preventDefault();
+                                              setNewPropCompany(p.name);
+                                              setNewPropProviderId(p.id);
+                                              setShowMeetingProviderDropdown(false);
+                                            }}
+                                            className="w-full text-left px-3 py-1.5 text-xs hover:bg-[#EAF5F2] flex items-center justify-between transition-colors"
+                                          >
+                                            <span className="font-semibold text-slate-800">{p.name}</span>
+                                            {p.speciality && (
+                                              <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                                                {p.speciality}
+                                              </span>
+                                            )}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    );
+                                  })()
+                                )}
+                              </div>
                               <Input
                                 placeholder="Importe (ej. 2.500 €)"
                                 value={newPropAmount}
@@ -2032,7 +2087,13 @@ function CreateMeetingView({
                             <div className="flex justify-end gap-2">
                               <button
                                 type="button"
-                                onClick={() => setIsAddingProposal(false)}
+                                onClick={() => {
+                                  setIsAddingProposal(false);
+                                  setNewPropCompany("");
+                                  setNewPropAmount("");
+                                  setNewPropProviderId(null);
+                                  setShowMeetingProviderDropdown(false);
+                                }}
                                 className="px-2 py-1 text-xs text-slate-500"
                               >
                                 Cancelar

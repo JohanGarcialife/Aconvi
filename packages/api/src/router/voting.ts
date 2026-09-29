@@ -634,6 +634,8 @@ export const votingRouter = createTRPCRouter({
         .returning();
 
       // Insert vote_item for session
+      // Bug fix: save singleItemId so proposals can reference it (item_id is NOT NULL in DB)
+      let singleItemId: string | null = null;
       if (input.type === "JUNTA" && input.items && input.items.length > 0) {
         await ctx.db.insert(voteItem).values(
           input.items.map((item, idx) => ({
@@ -647,8 +649,9 @@ export const votingRouter = createTRPCRouter({
           })),
         );
       } else if (input.type === "SINGLE") {
+        singleItemId = crypto.randomUUID();
         await ctx.db.insert(voteItem).values({
-          id: crypto.randomUUID(),
+          id: singleItemId,
           sessionId,
           orderIndex: 1,
           title: input.title,
@@ -666,7 +669,7 @@ export const votingRouter = createTRPCRouter({
           allProposals.map((bp, idx) => ({
             id: crypto.randomUUID(),
             sessionId,
-            itemId: null,
+            itemId: singleItemId,
             providerId: (bp as any).providerId ?? null,
             companyName: bp.companyName,
             amount: formatEuro(bp.amount),
@@ -747,6 +750,7 @@ export const votingRouter = createTRPCRouter({
                   z.object({
                     companyName: z.string().min(1),
                     amount: z.string().min(1),
+                    providerId: z.string().uuid().optional().nullable(),
                     description: z.string().optional(),
                     fileUrl: z.string().optional(),
                     fileName: z.string().optional(),
@@ -864,6 +868,7 @@ export const votingRouter = createTRPCRouter({
               id: crypto.randomUUID(),
               sessionId,
               itemId,
+              providerId: (bp as any).providerId ?? null,
               companyName: bp.companyName,
               amount: formatEuro(bp.amount),
               description: bp.description ?? null,
