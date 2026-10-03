@@ -1169,6 +1169,11 @@ function CreateSingleVoteView({
       return;
     }
 
+    if (!closesAt.trim()) {
+      alert("Por favor introduce la fecha de cierre de la votación.");
+      return;
+    }
+
     const finalProposals = [...proposals];
     if (isAddingProposal && propCompany.trim() && propAmount.trim()) {
       const matched = (providers as any[] ?? []).find(
@@ -1183,13 +1188,12 @@ function CreateSingleVoteView({
       });
     }
 
-    let safeClosesAt: string | undefined = undefined;
-    if (closesAt) {
-      const d = new Date(closesAt);
-      if (!isNaN(d.getTime())) {
-        safeClosesAt = d.toISOString();
-      }
+    const d = new Date(closesAt);
+    if (isNaN(d.getTime())) {
+      alert("Por favor introduce una fecha de cierre válida.");
+      return;
     }
+    const safeClosesAt = d.toISOString();
 
     createMutation.mutate({
       tenantId: TENANT_ID,
@@ -1495,7 +1499,7 @@ function CreateSingleVoteView({
 
         <div className="space-y-1 pl-8.5 max-w-sm">
           <Label htmlFor="single-closes" className="text-xs font-semibold text-slate-700">
-            Cierre de la votación
+            Cierre de la votación *
           </Label>
           <div className="relative">
             <Calendar className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
@@ -1505,6 +1509,7 @@ function CreateSingleVoteView({
               value={closesAt}
               onChange={(e) => setClosesAt(e.target.value)}
               className="text-xs h-9 pl-8.5 rounded-md cursor-pointer"
+              required
             />
           </div>
         </div>
@@ -1608,22 +1613,25 @@ function CreateMeetingView({
   const [meetingLocation, setMeetingLocation] = useState("");
   const [secondCallDate, setSecondCallDate] = useState("");
   const [secondCallTime, setSecondCallTime] = useState("");
+  const [closesAt, setClosesAt] = useState("");
   const [activationType, setActivationType] = useState<"now" | "schedule">("now");
 
   // Clean empty items list - user adds their own points
   const [items, setItems] = useState<
     Array<{
       title: string;
+      budget: string;
       onlineVotingEnabled: boolean;
       autoGenerateOt: boolean;
       otProviderId?: string;
-      proposals: Array<{ companyName: string; amount: string; fileUrl?: string; providerId?: string }>;
+      proposals: Array<{ companyName: string; amount: string; fileUrl?: string; fileName?: string; providerId?: string }>;
     }>
   >([]);
 
   const [activeItemIndex, setActiveItemIndex] = useState<number>(-1);
   const [newPropCompany, setNewPropCompany] = useState("");
   const [newPropAmount, setNewPropAmount] = useState("");
+  const [newPropFile, setNewPropFile] = useState("");
   const [newPropProviderId, setNewPropProviderId] = useState<string | null>(null);
   const [showMeetingProviderDropdown, setShowMeetingProviderDropdown] = useState(false);
   const [isAddingProposal, setIsAddingProposal] = useState(false);
@@ -1650,6 +1658,7 @@ function CreateMeetingView({
       ...items,
       {
         title: "",
+        budget: "",
         onlineVotingEnabled: true,
         autoGenerateOt: false,
         otProviderId: "",
@@ -1688,10 +1697,13 @@ function CreateMeetingView({
         companyName: newPropCompany.trim(),
         amount: formatEuro(newPropAmount.trim()),
         providerId: newPropProviderId || matched?.id || undefined,
+        fileName: newPropFile || undefined,
+        fileUrl: newPropFile ? "https://example.com/" + encodeURIComponent(newPropFile) : undefined,
       });
       setItems(next);
       setNewPropCompany("");
       setNewPropAmount("");
+      setNewPropFile("");
       setNewPropProviderId(null);
       setShowMeetingProviderDropdown(false);
       setIsAddingProposal(false);
@@ -1701,6 +1713,11 @@ function CreateMeetingView({
   const handlePublishMeeting = () => {
     if (!title.trim() || !meetingDate) {
       alert("Por favor completa el título y la fecha de la junta.");
+      return;
+    }
+
+    if (!closesAt.trim()) {
+      alert("Por favor introduce la fecha límite para votar online.");
       return;
     }
 
@@ -1719,16 +1736,23 @@ function CreateMeetingView({
       }
     }
 
+    const safeClosesAt = (() => {
+      const d = new Date(closesAt);
+      return !isNaN(d.getTime()) ? d.toISOString() : undefined;
+    })();
+
     createMeetingMutation.mutate({
       tenantId: TENANT_ID,
       title: title.trim(),
       meetingDate: fullMeetingDate,
       meetingLocation: meetingLocation.trim() || "Salón Comunitario",
       secondCallDate: fullSecondCall,
+      closesAt: safeClosesAt,
       items: items
         .filter((it) => it.title.trim().length > 0)
         .map((it) => ({
           title: it.title.trim(),
+          budget: it.budget?.trim() ? formatEuro(it.budget.trim()) : undefined,
           onlineVotingEnabled: it.onlineVotingEnabled,
           autoGenerateOt: it.autoGenerateOt ?? false,
           otProviderId: it.otProviderId || undefined,
@@ -1736,6 +1760,8 @@ function CreateMeetingView({
             companyName: p.companyName,
             amount: p.amount,
             providerId: p.providerId || undefined,
+            fileName: p.fileName || undefined,
+            fileUrl: p.fileUrl || undefined,
           })),
         })),
     });
@@ -1829,6 +1855,25 @@ function CreateMeetingView({
                 value={secondCallTime}
                 onChange={(e) => setSecondCallTime(e.target.value)}
                 className="text-xs h-9 rounded-md"
+              />
+            </div>
+          </div>
+
+          {/* Fecha límite votación online — obligatoria */}
+          <div className="space-y-1">
+            <Label htmlFor="meet-closes" className="text-xs font-semibold text-slate-700">
+              Fecha límite para votar online *
+            </Label>
+            <p className="text-[11px] text-slate-500">Los propietarios deben votar antes de esta fecha.</p>
+            <div className="relative">
+              <Calendar className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+              <Input
+                id="meet-closes"
+                type="datetime-local"
+                value={closesAt}
+                onChange={(e) => setClosesAt(e.target.value)}
+                className="text-xs h-9 pl-8.5 rounded-md cursor-pointer"
+                required
               />
             </div>
           </div>
@@ -1964,6 +2009,23 @@ function CreateMeetingView({
                         </div>
                       </div>
 
+                      {/* Importe opcional del punto */}
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-slate-700">
+                          Importe (opcional)
+                        </label>
+                        <Input
+                          placeholder="Ej: 1.000 €"
+                          value={it.budget ?? ""}
+                          onChange={(e) => {
+                            const next = [...items];
+                            next[idx]!.budget = e.target.value;
+                            setItems(next);
+                          }}
+                          className="text-xs h-8 bg-white rounded-md max-w-xs"
+                        />
+                      </div>
+
                       {/* Generar orden de trabajo si se aprueba */}
                       <div className="pt-2.5 border-t border-slate-100 space-y-2">
                         <label className="flex items-center gap-2 cursor-pointer">
@@ -2084,6 +2146,37 @@ function CreateMeetingView({
                                 className="text-xs h-7.5 bg-white rounded-md"
                               />
                             </div>
+
+                            {/* Documento adjunto (opcional) */}
+                            <div className="rounded-md border-2 border-dashed border-slate-200 bg-white p-2 text-center cursor-pointer hover:border-[#008075] transition-colors">
+                              {newPropFile ? (
+                                <div className="flex items-center justify-between px-2 text-xs">
+                                  <div className="flex items-center gap-2 text-slate-800 font-medium">
+                                    <span className="p-0.5 rounded bg-rose-50 text-rose-600 font-bold text-[10px]">
+                                      PDF
+                                    </span>
+                                    <span>{newPropFile}</span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setNewPropFile("")}
+                                    className="text-slate-400 hover:text-slate-600"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => setNewPropFile("Presupuesto_adjunto.pdf")}
+                                  className="flex flex-col items-center justify-center w-full py-1 text-xs text-slate-500"
+                                >
+                                  <Upload className="w-4 h-4 text-slate-400 mb-1" />
+                                  <span>Arrastrar documento o hacer clic para adjuntar (opcional)</span>
+                                </button>
+                              )}
+                            </div>
+
                             <div className="flex justify-end gap-2">
                               <button
                                 type="button"
@@ -2091,6 +2184,7 @@ function CreateMeetingView({
                                   setIsAddingProposal(false);
                                   setNewPropCompany("");
                                   setNewPropAmount("");
+                                  setNewPropFile("");
                                   setNewPropProviderId(null);
                                   setShowMeetingProviderDropdown(false);
                                 }}
@@ -2115,7 +2209,26 @@ function CreateMeetingView({
                             className="flex items-center justify-between p-2 rounded bg-slate-50 text-xs"
                           >
                             <span className="font-medium text-slate-800">{p.companyName}</span>
-                            <span className="font-bold text-slate-900">{p.amount}</span>
+                            <div className="flex items-center gap-2.5">
+                              <span className="font-bold text-slate-900">{p.amount}</span>
+                              {p.fileName && (
+                                <span className="inline-flex items-center gap-1 text-[11px] text-slate-400">
+                                  <Paperclip className="w-3 h-3" />
+                                  {p.fileName}
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const next = [...items];
+                                  next[idx]!.proposals = next[idx]!.proposals.filter((_, i) => i !== pIdx);
+                                  setItems(next);
+                                }}
+                                className="p-0.5 text-slate-400 hover:text-red-500"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
                           </div>
                         ))}
                       </div>

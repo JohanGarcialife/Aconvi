@@ -939,9 +939,13 @@ export default function VecinoHome() {
                           3}{" "}
                         respondidas
                       </Text>
-                    ) : !isClosed && voting.budget ? (
-                      <Text style={styles.votingAmount}>{formatEuro(voting.budget)}</Text>
-                    ) : null}
+                     ) : !isClosed && (voting.budgetProposals?.length ?? 0) > 1 ? (
+                       <Text style={styles.votingAmount}>
+                         {voting.budgetProposals!.length} presupuestos
+                       </Text>
+                     ) : !isClosed && voting.budget ? (
+                       <Text style={styles.votingAmount}>{formatEuro(voting.budget)}</Text>
+                     ) : null}
 
                     <Text
                       style={[

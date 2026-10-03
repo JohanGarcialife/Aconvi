@@ -1338,7 +1338,11 @@ export default function VotingScreen() {
                   choices["__single__"] === "REJECT" &&
                     styles.multiVoteStanceBtnSelected,
                 ]}
-                onPress={() => handleSelectChoice("__single__", "REJECT")}
+                onPress={() => {
+                  handleSelectChoice("__single__", "REJECT");
+                  // Bug 3 fix: deselect proposal when switching away from APPROVE
+                  setSelectedProposals((prev) => ({ ...prev, ["__single__"]: undefined as any }));
+                }}
               >
                 <Feather
                   name="thumbs-down"
@@ -1365,7 +1369,11 @@ export default function VotingScreen() {
                   choices["__single__"] === "ABSTAIN" &&
                     styles.multiVoteStanceBtnSelected,
                 ]}
-                onPress={() => handleSelectChoice("__single__", "ABSTAIN")}
+                onPress={() => {
+                  handleSelectChoice("__single__", "ABSTAIN");
+                  // Bug 3 fix: deselect proposal when switching away from APPROVE
+                  setSelectedProposals((prev) => ({ ...prev, ["__single__"]: undefined as any }));
+                }}
               >
                 <Ionicons
                   name="hand-left-outline"

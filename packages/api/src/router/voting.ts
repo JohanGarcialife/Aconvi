@@ -530,7 +530,7 @@ export const votingRouter = createTRPCRouter({
         title: z.string().min(1).max(256),
         budget: z.string().optional(),
         description: z.string().optional(),
-        closesAt: z.string().optional(),
+        closesAt: z.string().min(1, "La fecha de cierre es obligatoria"),
         priority: z.number().int().optional().default(0),
         budgetProposals: z
           .array(
@@ -609,9 +609,7 @@ export const votingRouter = createTRPCRouter({
         input.budget ??
         (allProposals.length === 1
           ? allProposals[0]!.amount
-          : allProposals.length > 1
-            ? allProposals.map((p) => p.amount).join(" · ")
-            : null);
+          : null); // Bug 2 fix: multiple proposals → no budget string, Home shows "N presupuestos"
       const derivedBudget = rawBudget ? formatEuro(rawBudget) : null;
 
       const [created] = await ctx.db
