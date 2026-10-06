@@ -19,6 +19,7 @@ import {
   Edit3,
   FileCheck,
   FileText,
+  Globe,
   Info,
   Layers,
   Paperclip,
@@ -1078,6 +1079,180 @@ function VotingRightsView({ onBack }: { onBack: () => void }) {
   );
 }
 
+function formatScheduledDisplay(dateStr: string, timeStr: string) {
+  if (!dateStr) return "";
+  try {
+    const [year, month, day] = dateStr.split("-").map(Number);
+    if (!year || !month || !day) return "";
+    const d = new Date(year, month - 1, day);
+    const dateFormatted = format(d, "d 'de' MMMM 'de' yyyy", { locale: es });
+    return `${dateFormatted} a las ${timeStr || "09:00"}`;
+  } catch {
+    return `${dateStr} a las ${timeStr}`;
+  }
+}
+
+interface ScheduleVoteModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: (date: string, time: string) => void;
+  initialDate?: string;
+  initialTime?: string;
+  type: "JUNTA" | "SINGLE";
+}
+
+function ScheduleVoteModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  initialDate,
+  initialTime,
+  type,
+}: ScheduleVoteModalProps) {
+  const [selectedDate, setSelectedDate] = useState(initialDate || "2026-10-05");
+  const [selectedTime, setSelectedTime] = useState(initialTime || "23:45");
+
+  useEffect(() => {
+    if (initialDate) setSelectedDate(initialDate);
+    if (initialTime) setSelectedTime(initialTime);
+  }, [initialDate, initialTime, isOpen]);
+
+  if (!isOpen) return null;
+
+  const formattedDateText = (() => {
+    if (!selectedDate) return "Selecciona una fecha";
+    try {
+      const [year, month, day] = selectedDate.split("-").map(Number);
+      if (!year || !month || !day) return selectedDate;
+      const d = new Date(year, month - 1, day);
+      return format(d, "d 'de' MMMM 'de' yyyy", { locale: es });
+    } catch {
+      return selectedDate;
+    }
+  })();
+
+  const previewString = formatScheduledDisplay(selectedDate, selectedTime);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedDate) {
+      alert("Por favor selecciona una fecha.");
+      return;
+    }
+    onConfirm(selectedDate, selectedTime || "09:00");
+  };
+
+  const isJunta = type === "JUNTA";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-in fade-in-0">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-100 p-6 space-y-5 relative animate-in zoom-in-95">
+        {/* Header */}
+        <div className="flex items-start justify-between pr-8">
+          <div>
+            <h2 className="text-xl font-black text-slate-900 tracking-tight">
+              {isJunta ? "Programar junta" : "Programar votación"}
+            </h2>
+            <p className="text-xs text-slate-500 mt-1">
+              {isJunta ? "Elige cuándo se celebrará la junta." : "Elige cuándo se abrirá la votación."}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute top-5 right-5 w-8 h-8 rounded-full bg-slate-100 text-slate-400 hover:text-slate-700 hover:bg-slate-200 flex items-center justify-center transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Campo Fecha */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-700">Fecha</label>
+            <div className="relative border border-slate-200/90 rounded-xl p-3 flex items-center justify-between bg-white hover:border-slate-300 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
+                  <Calendar className="w-4 h-4" />
+                </div>
+                <span className="text-sm font-semibold text-slate-800">
+                  {formattedDateText}
+                </span>
+              </div>
+              <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                required
+              />
+            </div>
+          </div>
+
+          {/* Campo Hora */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-700">Hora</label>
+            <div className="relative border border-slate-200/90 rounded-xl p-3 flex items-center justify-between bg-white hover:border-slate-300 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
+                  <Clock className="w-4 h-4" />
+                </div>
+                <span className="text-sm font-semibold text-slate-800">
+                  {selectedTime || "23:45"}
+                </span>
+              </div>
+              <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+              <input
+                type="time"
+                value={selectedTime}
+                onChange={(e) => setSelectedTime(e.target.value)}
+                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                required
+              />
+            </div>
+          </div>
+
+          {/* Zona horaria */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-700">Zona horaria</label>
+            <div className="border border-slate-200/90 rounded-xl p-3 flex items-center justify-between bg-white">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
+                  <Globe className="w-4 h-4" />
+                </div>
+                <span className="text-sm font-semibold text-slate-800">
+                  España • Europe/Madrid
+                </span>
+              </div>
+              <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+            </div>
+          </div>
+
+          {/* Banner informativo */}
+          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start gap-3">
+            <div className="w-6 h-6 rounded-full bg-slate-600 text-white flex items-center justify-center shrink-0 mt-0.5">
+              <Info className="w-3.5 h-3.5" />
+            </div>
+            <div className="text-xs text-slate-600 leading-relaxed">
+              <div>{isJunta ? "La junta se programará para" : "La votación se programará para"}</div>
+              <div className="font-extrabold text-slate-900 mt-0.5">{previewString}.</div>
+            </div>
+          </div>
+
+          {/* Botón Guardar */}
+          <button
+            type="submit"
+            className="w-full py-3 bg-[#008075] hover:bg-[#006e64] text-white font-bold rounded-xl text-sm transition-colors shadow-2xs mt-2"
+          >
+            {isJunta ? "Programar junta" : "Programar votación"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── 3. VIEW: VOTACIÓN SIN JUNTA (media_1789170007084.png) ─────────────────────
 function CreateSingleVoteView({
   onCancel,
@@ -1093,6 +1268,10 @@ function CreateSingleVoteView({
   const [description, setDescription] = useState("");
   const [budget, setBudget] = useState("");
   const [closesAt, setClosesAt] = useState("");
+  const [activationType, setActivationType] = useState<"now" | "schedule">("now");
+  const [scheduledDate, setScheduledDate] = useState("");
+  const [scheduledTime, setScheduledTime] = useState("");
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
 
   // Clean empty proposals list - user adds their own
   const [proposals, setProposals] = useState<
@@ -1194,12 +1373,18 @@ function CreateSingleVoteView({
       return;
     }
     const safeClosesAt = d.toISOString();
+    const scheduledIso =
+      activationType === "schedule" && scheduledDate
+        ? new Date(`${scheduledDate}T${scheduledTime || "09:00"}:00`).toISOString()
+        : undefined;
 
     createMutation.mutate({
       tenantId: TENANT_ID,
       title: title.trim(),
       description: description.trim() || undefined,
       closesAt: safeClosesAt,
+      scheduledAt: scheduledIso,
+      status: activationType === "schedule" ? "DRAFT" : "OPEN",
       type: "SINGLE",
       budgetProposals: finalProposals.map((p) => ({
         companyName: p.companyName.trim(),
@@ -1573,6 +1758,86 @@ function CreateSingleVoteView({
         )}
       </div>
 
+      {/* "¿Cuándo quieres que se active?" */}
+      <div className="bg-white rounded-lg border border-slate-200/80 p-5 shadow-2xs space-y-3">
+        <h3 className="text-sm font-bold text-slate-900">¿Cuándo quieres que se active?</h3>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          {/* Card 1: Ahora */}
+          <div
+            onClick={() => setActivationType("now")}
+            className={`flex items-start gap-2.5 p-3.5 rounded-md border-2 cursor-pointer transition-all ${
+              activationType === "now"
+                ? "border-[#008075] bg-[#EAF5F2]/30"
+                : "border-slate-200 bg-white hover:border-slate-300"
+            }`}
+          >
+            <div className="w-7 h-7 rounded-md bg-[#EAF5F2] flex items-center justify-center text-[#008075] shrink-0">
+              <Zap className="w-3.5 h-3.5" />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-slate-900">Ahora</div>
+              <div className="text-[11px] text-slate-500 mt-0.5">
+                Se activará y se abrirá la votación en cuanto confirmes.
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2: Programar */}
+          <div
+            onClick={() => {
+              setActivationType("schedule");
+              setShowScheduleModal(true);
+            }}
+            className={`flex items-start gap-2.5 p-3.5 rounded-md border-2 cursor-pointer transition-all ${
+              activationType === "schedule"
+                ? "border-[#008075] bg-[#EAF5F2]/30"
+                : "border-slate-200 bg-white hover:border-slate-300"
+            }`}
+          >
+            <div className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${
+              activationType === "schedule" ? "bg-[#008075] text-white" : "bg-slate-100 text-slate-600"
+            }`}>
+              <Calendar className="w-3.5 h-3.5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              {activationType === "schedule" && scheduledDate ? (
+                <>
+                  <div className="text-xs font-bold text-[#008075]">La votación se programará para</div>
+                  <div className="text-xs font-black text-slate-900 mt-0.5">
+                    {formatScheduledDisplay(scheduledDate, scheduledTime)}
+                  </div>
+                  <div className="text-[10px] text-slate-400 mt-0.5 underline">
+                    Pulsar para cambiar fecha
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="text-xs font-bold text-slate-900">Programar para más tarde</div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">
+                    Se activará en la fecha y hora que elijas.
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <ScheduleVoteModal
+        isOpen={showScheduleModal}
+        onClose={() => setShowScheduleModal(false)}
+        onConfirm={(d, t) => {
+          setScheduledDate(d);
+          setScheduledTime(t);
+          setActivationType("schedule");
+          setShowScheduleModal(false);
+        }}
+        initialDate={scheduledDate}
+        initialTime={scheduledTime}
+        type="SINGLE"
+      />
+
       {/* Bottom Bar */}
       <div className="flex items-center justify-end gap-2.5 pt-1">
         <button
@@ -1589,7 +1854,11 @@ function CreateSingleVoteView({
           className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-[#008075] text-xs font-bold text-white hover:bg-[#006e64] transition-colors shadow-2xs"
         >
           <Check className="w-3.5 h-3.5" />
-          {createMutation.isPending ? "Creando..." : "Crear votación"}
+          {createMutation.isPending
+            ? "Guardando..."
+            : activationType === "schedule"
+              ? "Programar votación"
+              : "Crear votación"}
         </button>
       </div>
     </div>
@@ -1615,6 +1884,9 @@ function CreateMeetingView({
   const [secondCallTime, setSecondCallTime] = useState("");
   const [closesAt, setClosesAt] = useState("");
   const [activationType, setActivationType] = useState<"now" | "schedule">("now");
+  const [scheduledDate, setScheduledDate] = useState("");
+  const [scheduledTime, setScheduledTime] = useState("");
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
 
   // Clean empty items list - user adds their own points
   const [items, setItems] = useState<
@@ -1741,6 +2013,11 @@ function CreateMeetingView({
       return !isNaN(d.getTime()) ? d.toISOString() : undefined;
     })();
 
+    const scheduledIso =
+      activationType === "schedule" && scheduledDate
+        ? new Date(`${scheduledDate}T${scheduledTime || "09:00"}:00`).toISOString()
+        : undefined;
+
     createMeetingMutation.mutate({
       tenantId: TENANT_ID,
       title: title.trim(),
@@ -1748,6 +2025,8 @@ function CreateMeetingView({
       meetingLocation: meetingLocation.trim() || "Salón Comunitario",
       secondCallDate: fullSecondCall,
       closesAt: safeClosesAt,
+      scheduledAt: scheduledIso,
+      status: activationType === "schedule" ? "DRAFT" : "OPEN",
       items: items
         .filter((it) => it.title.trim().length > 0)
         .map((it) => ({
@@ -2268,25 +2547,58 @@ function CreateMeetingView({
 
           {/* Card 2: Programar */}
           <div
-            onClick={() => setActivationType("schedule")}
+            onClick={() => {
+              setActivationType("schedule");
+              setShowScheduleModal(true);
+            }}
             className={`flex items-start gap-2.5 p-3.5 rounded-md border-2 cursor-pointer transition-all ${
               activationType === "schedule"
                 ? "border-[#008075] bg-[#EAF5F2]/30"
                 : "border-slate-200 bg-white hover:border-slate-300"
             }`}
           >
-            <div className="w-7 h-7 rounded-md bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
+            <div className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${
+              activationType === "schedule" ? "bg-[#008075] text-white" : "bg-slate-100 text-slate-600"
+            }`}>
               <Calendar className="w-3.5 h-3.5" />
             </div>
-            <div>
-              <div className="text-xs font-bold text-slate-900">Programar para más tarde</div>
-              <div className="text-[11px] text-slate-500 mt-0.5">
-                Se activará en la fecha y hora que elijas.
-              </div>
+            <div className="flex-1 min-w-0">
+              {activationType === "schedule" && scheduledDate ? (
+                <>
+                  <div className="text-xs font-bold text-[#008075]">La junta se programará para</div>
+                  <div className="text-xs font-black text-slate-900 mt-0.5">
+                    {formatScheduledDisplay(scheduledDate, scheduledTime)}
+                  </div>
+                  <div className="text-[10px] text-slate-400 mt-0.5 underline">
+                    Pulsar para cambiar fecha
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="text-xs font-bold text-slate-900">Programar para más tarde</div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">
+                    Se activará en la fecha y hora que elijas.
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
       </div>
+
+      <ScheduleVoteModal
+        isOpen={showScheduleModal}
+        onClose={() => setShowScheduleModal(false)}
+        onConfirm={(d, t) => {
+          setScheduledDate(d);
+          setScheduledTime(t);
+          setActivationType("schedule");
+          setShowScheduleModal(false);
+        }}
+        initialDate={scheduledDate}
+        initialTime={scheduledTime}
+        type="JUNTA"
+      />
 
       {/* Bottom Bar */}
       <div className="flex items-center justify-end gap-2.5 pt-1">
@@ -2303,7 +2615,11 @@ function CreateMeetingView({
           disabled={createMeetingMutation.isPending}
           className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-[#008075] text-xs font-bold text-white hover:bg-[#006e64] transition-colors shadow-2xs"
         >
-          {createMeetingMutation.isPending ? "Convocando..." : "Crear junta"}
+          {createMeetingMutation.isPending
+            ? "Convocando..."
+            : activationType === "schedule"
+              ? "Programar junta"
+              : "Crear junta"}
         </button>
       </div>
     </div>

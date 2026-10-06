@@ -361,11 +361,28 @@ export default function ProveedorJobScreen() {
     return rawIncidents.filter((i: any) => i.status === "RESUELTA" || i.status === "CERRADA");
   }, [rawIncidents]);
 
+  const finalizadasHoyDB = useMemo(() => {
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    return rawIncidents.filter((i: any) => {
+      if (i.status !== "RESUELTA" && i.status !== "CERRADA") return false;
+      const finishDate = i.resolvedAt
+        ? new Date(i.resolvedAt)
+        : i.updatedAt
+          ? new Date(i.updatedAt)
+          : null;
+      if (!finishDate) return false;
+      const finishDateStr = `${finishDate.getFullYear()}-${String(finishDate.getMonth() + 1).padStart(2, "0")}-${String(finishDate.getDate()).padStart(2, "0")}`;
+      return finishDateStr === todayStr;
+    });
+  }, [rawIncidents]);
+
   const porResponderCount = porResponderDB.length;
   const expiradasCount = rawExpired.length;
   const enCursoCount = enCursoDB.length;
   const programadasCount = programadasDB.length;
   const finalizadasCount = finalizadasDB.length;
+  const finalizadasHoyCount = finalizadasHoyDB.length;
 
   // Unread count based on last seen timestamp
   const unreadCount = useMemo(() => {
@@ -553,7 +570,7 @@ export default function ProveedorJobScreen() {
     });
   }, [programadasDB]);
 
-  // Format All Finalizadas
+  // Format All Finalizadas (Histórico)
   const allFinalizadasItems = useMemo(() => {
     return finalizadasDB.map((i: any, idx: number) => {
       const finishDate = i.updatedAt ? new Date(i.updatedAt) : null;
@@ -573,6 +590,27 @@ export default function ProveedorJobScreen() {
       };
     });
   }, [finalizadasDB]);
+
+  // Format Finalizadas Hoy (Únicamente resueltas hoy)
+  const allFinalizadasHoyItems = useMemo(() => {
+    return finalizadasHoyDB.map((i: any, idx: number) => {
+      const finishDate = i.resolvedAt ? new Date(i.resolvedAt) : i.updatedAt ? new Date(i.updatedAt) : null;
+      const dateStr = finishDate
+        ? finishDate.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })
+        : "Hoy";
+      return {
+        id: i.id,
+        code: i.code || `OT-${i.id ? i.id.substring(0, 4).toUpperCase() : 2458 + idx}`,
+        title: i.title,
+        date: `Hoy · ${dateStr}`,
+        community: i.organization?.name || i.communityName || (i.organizationId ? `Org: ${i.organizationId}` : "Sin comunidad"),
+        cost: i.estimatedCost ? `${i.estimatedCost} €` : undefined,
+        status: i.status,
+        ...getCategoryIcon(i.title),
+        raw: i,
+      };
+    });
+  }, [finalizadasHoyDB]);
 
   // Format All En Curso
   const allEnCursoItems = useMemo(() => {
@@ -605,6 +643,7 @@ export default function ProveedorJobScreen() {
   const filteredEnCurso = useMemo(() => filterList(allEnCursoItems), [allEnCursoItems, filterList]);
   const filteredProgramadas = useMemo(() => filterList(allProgramadasItems), [allProgramadasItems, filterList]);
   const filteredFinalizadas = useMemo(() => filterList(allFinalizadasItems), [allFinalizadasItems, filterList]);
+  const filteredFinalizadasHoy = useMemo(() => filterList(allFinalizadasHoyItems), [allFinalizadasHoyItems, filterList]);
   const filteredProximas = useMemo(() => filterList(proximasProgramadasItems), [proximasProgramadasItems, filterList]);
 
   // Default collapsed view: 2 items for por responder, 5 items for hoy
@@ -892,7 +931,7 @@ export default function ProveedorJobScreen() {
           }}
         >
           <Ionicons name="checkmark-circle-outline" size={22} color="#475569" />
-          <Text style={styles.statNumber}>{finalizadasCount}</Text>
+          <Text style={styles.statNumber}>{finalizadasHoyCount}</Text>
           <Text style={styles.statLabel}>Finalizadas hoy</Text>
         </TouchableOpacity>
       </View>
@@ -1072,17 +1111,17 @@ export default function ProveedorJobScreen() {
               <View style={styles.sectionHeaderRow}>
                 <Ionicons name="checkmark-circle-outline" size={24} color="#475569" style={{ marginRight: 8 }} />
                 <View>
-                  <Text style={styles.sectionTitle}>Finalizadas ({filteredFinalizadas.length})</Text>
-                  <Text style={styles.sectionSubtitle}>Historial de intervenciones resueltas y cerradas.</Text>
+                  <Text style={styles.sectionTitle}>Finalizadas hoy ({filteredFinalizadasHoy.length})</Text>
+                  <Text style={styles.sectionSubtitle}>Intervenciones resueltas o cerradas durante el día de hoy.</Text>
                 </View>
               </View>
               <View style={styles.cardContainer}>
-                {filteredFinalizadas.length === 0 ? (
+                {filteredFinalizadasHoy.length === 0 ? (
                   <View style={{ padding: 24, alignItems: "center" }}>
-                    <Text style={{ fontSize: 13, color: MUTED }}>No hay intervenciones finalizadas.</Text>
+                    <Text style={{ fontSize: 13, color: MUTED }}>No hay intervenciones finalizadas hoy.</Text>
                   </View>
                 ) : (
-                  filteredFinalizadas.map((item: any, idx: number) => (
+                  filteredFinalizadasHoy.map((item: any, idx: number) => (
                     <View key={item.id ?? idx}>
                       {idx > 0 && <View style={styles.cardDivider} />}
                       <TouchableOpacity

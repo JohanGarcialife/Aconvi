@@ -365,6 +365,7 @@ export const voteSession = pgTable("vote_session", {
   coefficientWeighted: boolean("coefficient_weighted").default(true).notNull(),
   priority: integer("priority").default(0).notNull(), // 0: Normal, 1: Alta, etc.
   closesAt: timestamp("closes_at", { mode: "date", withTimezone: true }),
+  scheduledAt: timestamp("scheduled_at", { mode: "date", withTimezone: true }),
   createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
     .defaultNow()
     .notNull(),

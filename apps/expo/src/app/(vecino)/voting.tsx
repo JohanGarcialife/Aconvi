@@ -1311,7 +1311,16 @@ export default function VotingScreen() {
                   choices["__single__"] === "APPROVE" &&
                     styles.multiVoteStanceBtnSelected,
                 ]}
-                onPress={() => handleSelectChoice("__single__", "APPROVE")}
+                onPress={() => {
+                  if (!selectedProposals["__single__"]) {
+                    Alert.alert(
+                      "Selecciona un presupuesto",
+                      "Debes seleccionar una de las opciones antes de votar a favor.",
+                    );
+                    return;
+                  }
+                  handleSelectChoice("__single__", "APPROVE");
+                }}
               >
                 <Feather
                   name="thumbs-up"

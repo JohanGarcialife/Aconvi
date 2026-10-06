@@ -174,7 +174,8 @@ export const votingRouter = createTRPCRouter({
         const isEffectivelyClosed =
           session.status === "CLOSED" ||
           Boolean(session.closesAt && new Date(session.closesAt).getTime() < Date.now()) ||
-          Boolean(session.type === "JUNTA" && session.meetingDate && new Date(session.meetingDate).getTime() < Date.now());
+          Boolean(session.type === "JUNTA" && session.meetingDate && new Date(session.meetingDate).getTime() < Date.now()) ||
+          (!session.closesAt && !(session.type === "JUNTA" && session.meetingDate));
 
         if (isEffectivelyClosed) {
           const isApproveChoice = (c: any) => {
@@ -531,6 +532,8 @@ export const votingRouter = createTRPCRouter({
         budget: z.string().optional(),
         description: z.string().optional(),
         closesAt: z.string().min(1, "La fecha de cierre es obligatoria"),
+        scheduledAt: z.string().optional(),
+        status: z.enum(["OPEN", "DRAFT"]).optional(),
         priority: z.number().int().optional().default(0),
         budgetProposals: z
           .array(
@@ -622,10 +625,11 @@ export const votingRouter = createTRPCRouter({
           title: input.title,
           budget: derivedBudget,
           description: input.description ?? null,
-          status: "OPEN",
+          status: input.status ?? (input.scheduledAt ? "DRAFT" : "OPEN"),
           coefficientWeighted: true,
           priority: input.priority ?? 0,
           closesAt: input.closesAt ? new Date(input.closesAt) : null,
+          scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : null,
           autoGenerateOt: input.autoGenerateOt ?? false,
           otProviderId: input.otProviderId ?? null,
         })
@@ -735,6 +739,8 @@ export const votingRouter = createTRPCRouter({
         meetingLocation: z.string().min(1),
         secondCallDate: z.string().optional(),
         closesAt: z.string().optional(), // Fecha límite para votar online
+        scheduledAt: z.string().optional(),
+        status: z.enum(["OPEN", "DRAFT"]).optional(),
         priority: z.number().int().optional().default(1),
         items: z
           .array(
@@ -815,10 +821,11 @@ export const votingRouter = createTRPCRouter({
           type: "JUNTA",
           title: input.title,
           description: input.description ?? null,
-          status: "OPEN",
+          status: input.status ?? (input.scheduledAt ? "DRAFT" : "OPEN"),
           coefficientWeighted: true,
           priority: input.priority ?? 1,
           closesAt: closesD,
+          scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : null,
           meetingDate: meetingD,
           meetingLocation: input.meetingLocation,
           secondCallDate: secondCallD,

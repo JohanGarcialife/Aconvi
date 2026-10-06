@@ -531,8 +531,16 @@ export default function VecinoHome() {
         (v.type === "JUNTA" && v.meetingDate && new Date(v.meetingDate).getTime() < NOW),
     );
 
+  // Votación válida debe contar obligatoriamente con fecha límite
+  const hasValidDeadline = (v: any) =>
+    Boolean(v.closesAt || (v.type === "JUNTA" && v.meetingDate));
+
   const openVotings = allVotings.filter(
-    (v: any) => v.status === "OPEN" && !v.isArchived && !isExpiredOpen(v),
+    (v: any) =>
+      v.status === "OPEN" &&
+      !v.isArchived &&
+      hasValidDeadline(v) &&
+      !isExpiredOpen(v),
   );
   // Cerradas incluye CLOSED + OPEN expiradas
   const closedVotings = allVotings.filter(
