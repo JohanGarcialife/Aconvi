@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+
 import { Button } from "@acme/ui/button";
 import { Input } from "@acme/ui/input";
 
 import { authClient } from "~/auth/client";
 import { useTRPC } from "~/trpc/react";
-import { useQueryClient } from "@tanstack/react-query";
 
 export function AuthShowcase() {
   const router = useRouter();
@@ -29,7 +30,10 @@ export function AuthShowcase() {
     return (
       <div className="flex flex-col items-center justify-center gap-4">
         <p className="text-center text-2xl">
-          Conectado como <span className="font-bold">{session.user.name || session.user.phoneNumber}</span>
+          Conectado como{" "}
+          <span className="font-bold">
+            {session.user.name || session.user.phoneNumber}
+          </span>
         </p>
         <Button
           size="lg"
@@ -63,13 +67,13 @@ export function AuthShowcase() {
         phoneNumber,
       });
       if (error) throw error;
-      
+
       // If it's the test number, wait a bit for the DB to save and then fetch it
       if (phoneNumber === "+34600000000" || phoneNumber === "+34 600 000 000") {
         setTimeout(async () => {
           try {
             const code = await queryClient.fetchQuery(
-              trpc.auth.getLatestOTP.queryOptions({ phoneNumber })
+              trpc.auth.getLatestOTP.queryOptions({ phoneNumber }),
             );
             if (code) setTestCode(code.split(":")[0] ?? null);
           } catch (e) {
@@ -107,14 +111,16 @@ export function AuthShowcase() {
   };
 
   return (
-    <div className="w-full max-w-sm rounded-2xl border bg-card p-6 shadow-sm">
-      <h2 className="mb-4 text-center text-xl font-bold tracking-tight">Acceso a Aconvi</h2>
+    <div className="bg-card w-full max-w-sm rounded-2xl border p-6 shadow-sm">
+      <h2 className="mb-4 text-center text-xl font-bold tracking-tight">
+        Acceso a Aconvi
+      </h2>
       {error && (
-        <div className="mb-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+        <div className="bg-destructive/10 text-destructive mb-4 rounded-md p-3 text-sm">
           {error}
         </div>
       )}
-      
+
       {step === "phone" ? (
         <form onSubmit={handleSendOtp} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
@@ -126,7 +132,9 @@ export function AuthShowcase() {
               type="tel"
               placeholder="+34 600 000 000"
               value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value.replace(/\s+/g, ""))}
+              onChange={(e) =>
+                setPhoneNumber(e.target.value.replace(/\s+/g, ""))
+              }
               required
             />
           </div>
@@ -151,9 +159,14 @@ export function AuthShowcase() {
             />
           </div>
           {testCode && (
-            <div className="rounded-md bg-primary/10 p-3 text-sm text-primary">
+            <div className="bg-primary/10 text-primary rounded-md p-3 text-sm">
               <p className="font-medium">Modo Pruebas:</p>
-              <p>Tu código es: <span className="text-lg font-bold tracking-widest">{testCode}</span></p>
+              <p>
+                Tu código es:{" "}
+                <span className="text-lg font-bold tracking-widest">
+                  {testCode}
+                </span>
+              </p>
             </div>
           )}
           <Button type="submit" disabled={loading} className="w-full">

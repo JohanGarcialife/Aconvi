@@ -13,6 +13,6 @@ export async function getDevMagicLink(email: string) {
   } catch (e) {
     console.error("Error leyendo .magic-links.json", e);
   }
-  
+
   return null;
 }

@@ -1,6 +1,16 @@
 import { useEffect } from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Linking } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Linking,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { useQuery } from "@tanstack/react-query";
+
 import { api } from "~/utils/api";
 import { markDocsAsSeen } from "~/utils/notifications-tracker";
 
@@ -15,7 +25,7 @@ const CATEGORY_META = {
 
 export default function DocumentsScreen() {
   const { data: documents, isLoading } = useQuery(
-    api.document.all.queryOptions({ tenantId: "org_aconvi_demo" })
+    api.document.all.queryOptions({ tenantId: "org_aconvi_demo" }),
   );
 
   useEffect(() => {
@@ -25,15 +35,19 @@ export default function DocumentsScreen() {
   }, [documents]);
 
   const renderItem = ({ item }: { item: any }) => {
-    const meta = CATEGORY_META[item.category as keyof typeof CATEGORY_META] ?? CATEGORY_META.OTRO;
-    
+    const meta =
+      CATEGORY_META[item.category as keyof typeof CATEGORY_META] ??
+      CATEGORY_META.OTRO;
+
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.card}
         activeOpacity={0.7}
         onPress={() => {
           Alert.alert("Descargando...");
-          Linking.openURL(item.fileUrl).catch(() => Alert.alert("Error", "No se pudo abrir el enlace"));
+          Linking.openURL(item.fileUrl).catch(() =>
+            Alert.alert("Error", "No se pudo abrir el enlace"),
+          );
         }}
       >
         <View style={styles.iconContainer}>
@@ -44,7 +58,9 @@ export default function DocumentsScreen() {
           <View style={styles.metaRow}>
             <Text style={styles.categoryBadge}>{meta.label}</Text>
             {item.description ? (
-              <Text style={styles.description} numberOfLines={1}>{item.description}</Text>
+              <Text style={styles.description} numberOfLines={1}>
+                {item.description}
+              </Text>
             ) : null}
           </View>
         </View>
@@ -81,9 +97,14 @@ export default function DocumentsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f8fafc" },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 40 },
+  center: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 40,
+  },
   listContainer: { padding: 16, gap: 12 },
-  
+
   card: {
     flexDirection: "row",
     alignItems: "center",
@@ -104,7 +125,12 @@ const styles = StyleSheet.create({
   },
   iconText: { fontSize: 24 },
   cardContent: { flex: 1 },
-  cardTitle: { fontSize: 16, fontWeight: "600", color: "#0f172a", marginBottom: 6 },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#0f172a",
+    marginBottom: 6,
+  },
   metaRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   categoryBadge: {
     fontSize: 12,
@@ -117,9 +143,24 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   description: { fontSize: 13, color: "#64748b", flex: 1 },
-  
+
   emoji: { fontSize: 56, marginBottom: 16 },
-  emptyTitle: { fontSize: 20, fontWeight: "700", color: "#0f172a", marginBottom: 8 },
-  emptySubtitle: { fontSize: 14, color: "#64748b", textAlign: "center", lineHeight: 22 },
-  loadingText: { marginTop: 12, fontSize: 14, color: "#64748b", fontWeight: "500" },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#0f172a",
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: "#64748b",
+    textAlign: "center",
+    lineHeight: 22,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: "#64748b",
+    fontWeight: "500",
+  },
 });

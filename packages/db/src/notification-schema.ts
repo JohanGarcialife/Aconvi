@@ -1,5 +1,6 @@
 import { relations } from "drizzle-orm";
-import { pgTable, text, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgEnum, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+
 import { user } from "./auth-schema";
 
 export const platformEnum = pgEnum("push_platform", ["web", "expo", "fcm"]);
@@ -11,7 +12,9 @@ export const pushToken = pgTable("push_token", {
     .references(() => user.id, { onDelete: "cascade" }),
   token: text("token").notNull(),
   platform: platformEnum("platform").notNull(),
-  createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
   updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
     .defaultNow()
     .$onUpdate(() => new Date())
@@ -40,13 +43,21 @@ export const pushAuthSession = pgTable("push_auth_session", {
   loginIp: text("login_ip"),
   // User-Agent of the web browser
   loginUserAgent: text("login_user_agent"),
-  expiresAt: timestamp("expires_at", { mode: "date", withTimezone: true }).notNull(),
-  createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  expiresAt: timestamp("expires_at", {
+    mode: "date",
+    withTimezone: true,
+  }).notNull(),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
 });
 
-export const pushAuthSessionRelations = relations(pushAuthSession, ({ one }) => ({
-  user: one(user, {
-    fields: [pushAuthSession.userId],
-    references: [user.id],
+export const pushAuthSessionRelations = relations(
+  pushAuthSession,
+  ({ one }) => ({
+    user: one(user, {
+      fields: [pushAuthSession.userId],
+      references: [user.id],
+    }),
   }),
-}));
+);

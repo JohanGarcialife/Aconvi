@@ -1,7 +1,8 @@
 const { Pool } = require("pg");
 
 const pool = new Pool({
-  connectionString: "postgresql://neondb_owner:npg_IgHweKx57Xqs@ep-long-voice-amt10dnk-pooler.c-5.us-east-1.aws.neon.tech/neondb?sslmode=require",
+  connectionString:
+    "postgresql://neondb_owner:npg_IgHweKx57Xqs@ep-long-voice-amt10dnk-pooler.c-5.us-east-1.aws.neon.tech/neondb?sslmode=require",
 });
 
 async function run() {
@@ -20,7 +21,7 @@ async function run() {
         "created_at" timestamp with time zone DEFAULT now() NOT NULL
       );
     `);
-    
+
     // Add foreign key constraint safely
     try {
       await client.query(`
@@ -28,7 +29,8 @@ async function run() {
       `);
       console.log("FK constraint added.");
     } catch (e) {
-      if (e.code === '42710') { // duplicate_object
+      if (e.code === "42710") {
+        // duplicate_object
         console.log("FK constraint already exists.");
       } else {
         throw e;

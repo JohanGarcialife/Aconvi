@@ -1,6 +1,8 @@
-import { eq, and, desc } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
+
 import { communityDocument } from "@acme/db/schema";
+
 import { createTRPCRouter, publicProcedure } from "../trpc";
 
 export const DOCUMENT_CATEGORIES = [
@@ -19,10 +21,16 @@ const DEMO_AUTHOR_ID = "user_admin";
 export const documentRouter = createTRPCRouter({
   // ── List all documents for a community ──────────────────────────────────────
   all: publicProcedure
-    .input(z.object({ tenantId: z.string().min(1), category: z.string().optional() }))
+    .input(
+      z.object({
+        tenantId: z.string().min(1),
+        category: z.string().optional(),
+      }),
+    )
     .query(async ({ ctx, input }) => {
       const conditions = [eq(communityDocument.organizationId, input.tenantId)];
-      if (input.category) conditions.push(eq(communityDocument.category, input.category));
+      if (input.category)
+        conditions.push(eq(communityDocument.category, input.category));
 
       return ctx.db.query.communityDocument.findMany({
         where: and(...conditions),

@@ -1,14 +1,23 @@
 "use client";
 
 import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { useTRPC } from "~/trpc/react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Button } from "@acme/ui/button";
-import { Input } from "@acme/ui/input";
-import { Label } from "@acme/ui/label";
+import {
+  CalendarDays,
+  Clock,
+  Plus,
+  Settings,
+  ToggleLeft,
+  ToggleRight,
+  Trees,
+  User,
+  X,
+} from "lucide-react";
+
 import { Badge } from "@acme/ui/badge";
+import { Button } from "@acme/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -18,17 +27,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@acme/ui/dialog";
-import {
-  Trees,
-  Plus,
-  CalendarDays,
-  Clock,
-  User,
-  X,
-  ToggleLeft,
-  ToggleRight,
-  Settings,
-} from "lucide-react";
+import { Input } from "@acme/ui/input";
+import { Label } from "@acme/ui/label";
+
+import { useTRPC } from "~/trpc/react";
 
 const TENANT_ID = "org_aconvi_demo";
 
@@ -169,21 +171,21 @@ function AreaCard({
 }) {
   return (
     <div
-      className={`flex flex-col rounded-xl border bg-card p-5 shadow-xs transition-shadow hover:shadow-sm ${
+      className={`bg-card flex flex-col rounded-xl border p-5 shadow-xs transition-shadow hover:shadow-sm ${
         !area.isActive ? "opacity-60" : ""
       }`}
     >
-      <div className="flex items-start justify-between gap-2 mb-3">
+      <div className="mb-3 flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
-          <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-2">
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2">
             <Trees className="h-4 w-4 text-emerald-600" />
           </div>
           <div>
-            <h3 className="font-semibold text-base leading-tight">
+            <h3 className="text-base leading-tight font-semibold">
               {area.name}
             </h3>
             {area.description && (
-              <p className="text-xs text-muted-foreground mt-0.5">
+              <p className="text-muted-foreground mt-0.5 text-xs">
                 {area.description}
               </p>
             )}
@@ -202,14 +204,14 @@ function AreaCard({
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-3 mt-auto pt-3 border-t">
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      <div className="mt-auto flex flex-wrap gap-3 border-t pt-3">
+        <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
           <Clock className="h-3.5 w-3.5" />
           <span>
             {area.openTime} – {area.closeTime}
           </span>
         </div>
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
           <Settings className="h-3.5 w-3.5" />
           <span>Slots de {area.slotDurationMinutes} min</span>
         </div>
@@ -217,7 +219,7 @@ function AreaCard({
           variant="outline"
           className={
             area.isActive
-              ? "text-emerald-600 border-emerald-200 bg-emerald-50"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-600"
               : "text-muted-foreground"
           }
         >
@@ -239,34 +241,36 @@ function BookingRow({
   const isCancelled = booking.status === "CANCELADA";
   return (
     <div
-      className={`flex items-center gap-4 rounded-lg border bg-card px-4 py-3 ${
+      className={`bg-card flex items-center gap-4 rounded-lg border px-4 py-3 ${
         isCancelled ? "opacity-50" : ""
       }`}
     >
-      <div className="flex flex-col items-center min-w-[56px] text-center">
-        <span className="text-xs text-muted-foreground font-medium">
-          {format(new Date(booking.date + "T00:00:00"), "EEE", { locale: es }).toUpperCase()}
+      <div className="flex min-w-[56px] flex-col items-center text-center">
+        <span className="text-muted-foreground text-xs font-medium">
+          {format(new Date(booking.date + "T00:00:00"), "EEE", {
+            locale: es,
+          }).toUpperCase()}
         </span>
-        <span className="text-lg font-bold leading-tight">
+        <span className="text-lg leading-tight font-bold">
           {format(new Date(booking.date + "T00:00:00"), "d", { locale: es })}
         </span>
-        <span className="text-xs text-muted-foreground">
+        <span className="text-muted-foreground text-xs">
           {format(new Date(booking.date + "T00:00:00"), "MMM", { locale: es })}
         </span>
       </div>
 
-      <div className="h-10 w-px bg-border shrink-0" />
+      <div className="bg-border h-10 w-px shrink-0" />
 
-      <div className="flex flex-col flex-1 min-w-0">
-        <span className="font-medium text-sm truncate">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate text-sm font-medium">
           {booking.commonArea?.name ?? "Zona desconocida"}
         </span>
-        <div className="flex items-center gap-3 mt-0.5">
-          <span className="text-xs text-muted-foreground flex items-center gap-1">
+        <div className="mt-0.5 flex items-center gap-3">
+          <span className="text-muted-foreground flex items-center gap-1 text-xs">
             <Clock className="h-3 w-3" />
             {booking.startTime} – {booking.endTime}
           </span>
-          <span className="text-xs text-muted-foreground flex items-center gap-1">
+          <span className="text-muted-foreground flex items-center gap-1 text-xs">
             <User className="h-3 w-3" />
             {booking.user?.name ?? "Vecino"}
           </span>
@@ -278,7 +282,7 @@ function BookingRow({
         className={
           isCancelled
             ? "text-muted-foreground"
-            : "text-emerald-600 border-emerald-200 bg-emerald-50"
+            : "border-emerald-200 bg-emerald-50 text-emerald-600"
         }
       >
         {isCancelled ? "Cancelada" : "Confirmada"}
@@ -288,7 +292,7 @@ function BookingRow({
         <Button
           variant="ghost"
           size="icon"
-          className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0"
+          className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-7 w-7 shrink-0"
           onClick={() => onCancel(booking.id)}
           title="Cancelar reserva"
         >
@@ -349,7 +353,9 @@ export default function CommonAreasPage() {
   const areas = areasQuery.data ?? [];
   const bookings = bookingsQuery.data ?? [];
 
-  const confirmedCount = bookings.filter((b: any) => b.status === "CONFIRMADA").length;
+  const confirmedCount = bookings.filter(
+    (b: any) => b.status === "CONFIRMADA",
+  ).length;
 
   return (
     <div className="flex flex-col gap-6">
@@ -365,7 +371,7 @@ export default function CommonAreasPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {[
           {
             label: "Zonas activas",
@@ -437,10 +443,12 @@ export default function CommonAreasPage() {
       {tab === "areas" && (
         <>
           {areasQuery.isLoading ? (
-            <div className="text-muted-foreground text-sm">Cargando zonas...</div>
+            <div className="text-muted-foreground text-sm">
+              Cargando zonas...
+            </div>
           ) : areas.length === 0 ? (
-            <div className="py-16 text-center border rounded-xl bg-muted/20">
-              <Trees className="mx-auto h-10 w-10 text-muted-foreground mb-3 opacity-40" />
+            <div className="bg-muted/20 rounded-xl border py-16 text-center">
+              <Trees className="text-muted-foreground mx-auto mb-3 h-10 w-10 opacity-40" />
               <p className="text-muted-foreground text-sm">
                 No hay zonas comunes configuradas. Crea la primera zona.
               </p>
@@ -452,7 +460,11 @@ export default function CommonAreasPage() {
                   key={area.id}
                   area={area}
                   onToggle={(id, isActive) =>
-                    toggleMutation.mutate({ tenantId: TENANT_ID, areaId: id, isActive })
+                    toggleMutation.mutate({
+                      tenantId: TENANT_ID,
+                      areaId: id,
+                      isActive,
+                    })
                   }
                 />
               ))}
@@ -480,7 +492,9 @@ export default function CommonAreasPage() {
               <button
                 key={area.id}
                 onClick={() =>
-                  setSelectedAreaId(selectedAreaId === area.id ? undefined : area.id)
+                  setSelectedAreaId(
+                    selectedAreaId === area.id ? undefined : area.id,
+                  )
                 }
                 className={`rounded-full border px-3 py-1 text-xs font-medium transition-all ${
                   selectedAreaId === area.id
@@ -494,10 +508,12 @@ export default function CommonAreasPage() {
           </div>
 
           {bookingsQuery.isLoading ? (
-            <div className="text-muted-foreground text-sm">Cargando reservas...</div>
+            <div className="text-muted-foreground text-sm">
+              Cargando reservas...
+            </div>
           ) : bookings.length === 0 ? (
-            <div className="py-16 text-center border rounded-xl bg-muted/20">
-              <CalendarDays className="mx-auto h-10 w-10 text-muted-foreground mb-3 opacity-40" />
+            <div className="bg-muted/20 rounded-xl border py-16 text-center">
+              <CalendarDays className="text-muted-foreground mx-auto mb-3 h-10 w-10 opacity-40" />
               <p className="text-muted-foreground text-sm">
                 No hay reservas en esta comunidad.
               </p>

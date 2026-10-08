@@ -1,21 +1,22 @@
 import { useState } from "react";
 import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
   ActivityIndicator,
-  Image,
   Alert,
+  Image,
+  ScrollView,
+  StyleSheet,
   Switch,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useLocalSearchParams, useRouter, Stack } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "~/utils/api";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+
+import { api } from "~/utils/api";
 import { getBaseUrl } from "~/utils/base-url";
 
 /** Converts a relative /uploads/... path to an absolute URL. Already-absolute URLs are returned unchanged. */
@@ -42,14 +43,47 @@ const BG = "#F9FAFB";
 const TENANT_ID = "org_aconvi_demo";
 
 // ─── Human-readable status ────────────────────────────────────────────────────
-const STATUS_MAP: Record<string, { label: string; icon: string; color: string; bg: string }> = {
-  RECIBIDA:    { label: "Incidencia recibida",     icon: "✉️",  color: "#92400e", bg: "#fef3c7" },
-  EN_REVISION: { label: "Profesional asignado",     icon: "👤",  color: "#1e40af", bg: "#dbeafe" },
-  AGENDADA:    { label: "Intervención confirmada",  icon: "📅",  color: "#027580", bg: "#e6fffa" },
-  EN_CURSO:    { label: "En intervención",           icon: "🔧",  color: "#065f46", bg: "#d1fae5" },
-  RESUELTA:    { label: "Resuelta",                 icon: "🕒",  color: "#b45309", bg: "#fef3c7" },
-  RECHAZADA:   { label: "No procede",               icon: "✕",   color: "#991b1b", bg: "#fee2e2" },
-  CERRADA:     { label: "Incidencia cerrada",        icon: "✅",  color: "#065f46", bg: "#d1fae5" },
+const STATUS_MAP: Record<
+  string,
+  { label: string; icon: string; color: string; bg: string }
+> = {
+  RECIBIDA: {
+    label: "Incidencia recibida",
+    icon: "✉️",
+    color: "#92400e",
+    bg: "#fef3c7",
+  },
+  EN_REVISION: {
+    label: "Profesional asignado",
+    icon: "👤",
+    color: "#1e40af",
+    bg: "#dbeafe",
+  },
+  AGENDADA: {
+    label: "Intervención confirmada",
+    icon: "📅",
+    color: "#027580",
+    bg: "#e6fffa",
+  },
+  EN_CURSO: {
+    label: "En intervención",
+    icon: "🔧",
+    color: "#065f46",
+    bg: "#d1fae5",
+  },
+  RESUELTA: { label: "Resuelta", icon: "🕒", color: "#b45309", bg: "#fef3c7" },
+  RECHAZADA: {
+    label: "No procede",
+    icon: "✕",
+    color: "#991b1b",
+    bg: "#fee2e2",
+  },
+  CERRADA: {
+    label: "Incidencia cerrada",
+    icon: "✅",
+    color: "#065f46",
+    bg: "#d1fae5",
+  },
 };
 
 // ─── Timeline steps ───────────────────────────────────────────────────────────
@@ -68,40 +102,99 @@ function buildTimeline(history: any[], currentStatus: string): TimelineEntry[] {
   const entries: TimelineEntry[] = (history ?? [])
     .filter((h: any) => !["PROVIDER_REJECTED", "OT_EXPIRED"].includes(h.action))
     .map((h) => {
-      const dateStr = format(new Date(h.createdAt), "d 'de' MMMM '•' HH:mm", { locale: es });
+      const dateStr = format(new Date(h.createdAt), "d 'de' MMMM '•' HH:mm", {
+        locale: es,
+      });
       if (h.action === "CREATED") {
-        return { key: h.id, label: "Incidencia recibida", detail: "Hemos recibido tu incidencia y estamos gestionándola.", icon: "✉️", date: dateStr };
+        return {
+          key: h.id,
+          label: "Incidencia recibida",
+          detail: "Hemos recibido tu incidencia y estamos gestionándola.",
+          icon: "✉️",
+          date: dateStr,
+        };
       }
-      if (h.action === "ASSIGNED" || (h.newStatus === "EN_REVISION" && h.action !== "PROVIDER_ACCEPTED")) {
-        return { key: h.id, label: "Profesional asignado", detail: "Hemos asignado un profesional para atender tu incidencia.", icon: "👤", date: dateStr };
+      if (
+        h.action === "ASSIGNED" ||
+        (h.newStatus === "EN_REVISION" && h.action !== "PROVIDER_ACCEPTED")
+      ) {
+        return {
+          key: h.id,
+          label: "Profesional asignado",
+          detail: "Hemos asignado un profesional para atender tu incidencia.",
+          icon: "👤",
+          date: dateStr,
+        };
       }
       if (h.action === "NO_SHOW" || h.newStatus === "NO_PRESENTADA") {
-        return { key: h.id, label: "Actualización de la intervención", detail: "La intervención prevista no se ha iniciado. Estamos gestionando una nueva actuación.", icon: "⚠️", date: dateStr };
+        return {
+          key: h.id,
+          label: "Actualización de la intervención",
+          detail:
+            "La intervención prevista no se ha iniciado. Estamos gestionando una nueva actuación.",
+          icon: "⚠️",
+          date: dateStr,
+        };
       }
       if (h.action === "PROVIDER_ACCEPTED" || h.newStatus === "AGENDADA") {
         acceptCount++;
         const isReSchedule = acceptCount > 1;
         return {
           key: h.id,
-          label: isReSchedule ? "Nueva intervención programada" : "Intervención programada",
-          detail: isReSchedule ? "Hemos programado una nueva intervención." : "La intervención ha sido programada.",
+          label: isReSchedule
+            ? "Nueva intervención programada"
+            : "Intervención programada",
+          detail: isReSchedule
+            ? "Hemos programado una nueva intervención."
+            : "La intervención ha sido programada.",
           icon: "📅",
           date: dateStr,
         };
       }
       if (h.action === "ARRIVED" || h.newStatus === "EN_CURSO") {
-        return { key: h.id, label: "En intervención", detail: "El profesional ha iniciado la intervención.", icon: "🔧", date: dateStr };
+        return {
+          key: h.id,
+          label: "En intervención",
+          detail: "El profesional ha iniciado la intervención.",
+          icon: "🔧",
+          date: dateStr,
+        };
       }
       if (h.action === "COMPLETED" || h.newStatus === "RESUELTA") {
-        return { key: h.id, label: "Intervención resuelta", detail: "El profesional ha completado la intervención.", icon: "✅", date: dateStr };
+        return {
+          key: h.id,
+          label: "Intervención resuelta",
+          detail: "El profesional ha completado la intervención.",
+          icon: "✅",
+          date: dateStr,
+        };
       }
       if (h.action === "RATED") {
-        return { key: h.id, label: "Valoración enviada", detail: h.comment ?? "Gracias por compartir tu valoración.", icon: "⭐", date: dateStr };
+        return {
+          key: h.id,
+          label: "Valoración enviada",
+          detail: h.comment ?? "Gracias por compartir tu valoración.",
+          icon: "⭐",
+          date: dateStr,
+        };
       }
       if (h.newStatus === "CERRADA") {
-        return { key: h.id, label: "Incidencia cerrada", detail: "El administrador ha validado la actuación y ha cerrado la incidencia.", icon: "🔒", date: dateStr };
+        return {
+          key: h.id,
+          label: "Incidencia cerrada",
+          detail:
+            "El administrador ha validado la actuación y ha cerrado la incidencia.",
+          icon: "🔒",
+          date: dateStr,
+        };
       }
-      return { key: h.id, label: h.action, detail: h.comment ?? "", icon: "•", date: dateStr };
+      return {
+        key: h.id,
+        label: h.action,
+        detail: h.comment ?? "",
+        icon: "•",
+        date: dateStr,
+      };
     });
 
   // Deduplicate "Profesional asignado" so it only appears ONCE for the vecino
@@ -117,9 +210,9 @@ function buildTimeline(history: any[], currentStatus: string): TimelineEntry[] {
 
   // Mark the last entry as current
   if (deduplicatedEntries.length > 0) {
-    deduplicatedEntries[deduplicatedEntries.length - 1] = { 
-      ...deduplicatedEntries[deduplicatedEntries.length - 1]!, 
-      isCurrent: true 
+    deduplicatedEntries[deduplicatedEntries.length - 1] = {
+      ...deduplicatedEntries[deduplicatedEntries.length - 1]!,
+      isCurrent: true,
     };
   }
 
@@ -128,23 +221,47 @@ function buildTimeline(history: any[], currentStatus: string): TimelineEntry[] {
 
 // ─── "Próximo paso" config ────────────────────────────────────────────────────
 const NEXT_STEP: Record<string, { title: string; detail: string }> = {
-  RECIBIDA:    { title: "Asignación de profesional",       detail: "El administrador asignará un profesional para atender tu incidencia." },
-  EN_REVISION: { title: "Confirmación de intervención",     detail: "El profesional asignado confirmará la intervención." },
-  AGENDADA:    { title: "Inicio de intervención",           detail: "El profesional acudirá al lugar e iniciará la intervención." },
-  EN_CURSO:    { title: "Finalización de intervención",     detail: "Te avisaremos cuando el profesional finalice la intervención." },
-  RESUELTA:    { title: "Validación del administrador",     detail: "El administrador revisará la actuación antes de cerrar la incidencia." },
+  RECIBIDA: {
+    title: "Asignación de profesional",
+    detail:
+      "El administrador asignará un profesional para atender tu incidencia.",
+  },
+  EN_REVISION: {
+    title: "Confirmación de intervención",
+    detail: "El profesional asignado confirmará la intervención.",
+  },
+  AGENDADA: {
+    title: "Inicio de intervención",
+    detail: "El profesional acudirá al lugar e iniciará la intervención.",
+  },
+  EN_CURSO: {
+    title: "Finalización de intervención",
+    detail: "Te avisaremos cuando el profesional finalice la intervención.",
+  },
+  RESUELTA: {
+    title: "Validación del administrador",
+    detail:
+      "El administrador revisará la actuación antes de cerrar la incidencia.",
+  },
 };
 
 export default function IncidentDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"seguimiento" | "detalles">("seguimiento");
+  const [activeTab, setActiveTab] = useState<"seguimiento" | "detalles">(
+    "seguimiento",
+  );
   const [notifEnabled, setNotifEnabled] = useState(true);
 
-  const isUuid = !!id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+  const isUuid =
+    !!id &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
   const { data: incident, isLoading } = useQuery({
-    ...api.incident.byId.queryOptions({ id: id as string, tenantId: TENANT_ID }),
+    ...api.incident.byId.queryOptions({
+      id: id as string,
+      tenantId: TENANT_ID,
+    }),
     enabled: isUuid,
     refetchInterval: 10_000,
     refetchOnWindowFocus: true,
@@ -170,19 +287,31 @@ export default function IncidentDetailScreen() {
           <Text style={{ fontSize: 48, marginBottom: 12 }}>🔍</Text>
           <Text style={s.emptyTitle}>Incidencia no encontrada</Text>
           <TouchableOpacity onPress={() => router.back()}>
-            <Text style={{ fontSize: 14, color: PRIMARY, marginTop: 8 }}>← Volver</Text>
+            <Text style={{ fontSize: 14, color: PRIMARY, marginTop: 8 }}>
+              ← Volver
+            </Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
   }
 
-  const st = STATUS_MAP[incident.status] ?? { label: incident.status, icon: "", color: MUTED, bg: BG };
+  const st = STATUS_MAP[incident.status] ?? {
+    label: incident.status,
+    icon: "",
+    color: MUTED,
+    bg: BG,
+  };
   const timeline = buildTimeline(incident.history ?? [], incident.status);
   const nextStep = NEXT_STEP[incident.status];
   const displayId = `#INC-${id.slice(0, 8).toUpperCase()}`;
-  const createdDate = format(new Date(incident.createdAt), "d 'de' MMMM, HH:mm", { locale: es });
-  const isResolved = incident.status === "RESUELTA" || incident.status === "CERRADA";
+  const createdDate = format(
+    new Date(incident.createdAt),
+    "d 'de' MMMM, HH:mm",
+    { locale: es },
+  );
+  const isResolved =
+    incident.status === "RESUELTA" || incident.status === "CERRADA";
   const canRate = incident.status === "CERRADA" && !incident.rating;
   const isRejected = incident.status === "RECHAZADA";
 
@@ -192,7 +321,11 @@ export default function IncidentDetailScreen() {
 
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn} hitSlop={12}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={s.backBtn}
+          hitSlop={12}
+        >
           <Text style={s.backBtnText}>‹</Text>
         </TouchableOpacity>
         <Text style={s.headerLogo}>Aconvi</Text>
@@ -221,9 +354,13 @@ export default function IncidentDetailScreen() {
           </View>
           <View style={{ flex: 1, gap: 4 }}>
             <View style={s.incidentCardTop}>
-              <Text style={s.incidentTitle} numberOfLines={2}>{incident.title}</Text>
+              <Text style={s.incidentTitle} numberOfLines={2}>
+                {incident.title}
+              </Text>
               <View style={[s.badge, { backgroundColor: st.bg }]}>
-                <Text style={[s.badgeText, { color: st.color }]}>{st.label}</Text>
+                <Text style={[s.badgeText, { color: st.color }]}>
+                  {st.label}
+                </Text>
               </View>
             </View>
             <Text style={s.incidentMeta}>📍 {createdDate}</Text>
@@ -257,17 +394,39 @@ export default function IncidentDetailScreen() {
                   <View key={entry.key} style={s.timelineRow}>
                     {/* Icon column */}
                     <View style={s.timelineIconCol}>
-                      <View style={[s.timelineCircle, entry.isCurrent && s.timelineCircleActive]}>
-                        <Text style={[s.timelineCircleText, !entry.isCurrent && { color: MUTED }]}>
+                      <View
+                        style={[
+                          s.timelineCircle,
+                          entry.isCurrent && s.timelineCircleActive,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            s.timelineCircleText,
+                            !entry.isCurrent && { color: MUTED },
+                          ]}
+                        >
                           {entry.icon}
                         </Text>
                       </View>
-                      {!isLast && <View style={[s.timelineLine, entry.isCurrent && s.timelineLineActive]} />}
+                      {!isLast && (
+                        <View
+                          style={[
+                            s.timelineLine,
+                            entry.isCurrent && s.timelineLineActive,
+                          ]}
+                        />
+                      )}
                     </View>
                     {/* Content */}
                     <View style={s.timelineContent}>
                       <View style={s.timelineTitleRow}>
-                        <Text style={[s.timelineLabel, entry.isCurrent && s.timelineLabelActive]}>
+                        <Text
+                          style={[
+                            s.timelineLabel,
+                            entry.isCurrent && s.timelineLabelActive,
+                          ]}
+                        >
                           {entry.label}
                         </Text>
                         {entry.isCurrent && (
@@ -277,13 +436,17 @@ export default function IncidentDetailScreen() {
                         )}
                       </View>
                       <Text style={s.timelineDetail}>{entry.detail}</Text>
-                      {entry.date && <Text style={s.timelineDate}>{entry.date}</Text>}
+                      {entry.date && (
+                        <Text style={s.timelineDate}>{entry.date}</Text>
+                      )}
                     </View>
                   </View>
                 );
               })
             ) : (
-              <Text style={{ color: MUTED, fontSize: 14 }}>Sin historial aún.</Text>
+              <Text style={{ color: MUTED, fontSize: 14 }}>
+                Sin historial aún.
+              </Text>
             )}
 
             {/* ── Próximo paso ──────────────────────────────────────────────── */}
@@ -309,9 +472,22 @@ export default function IncidentDetailScreen() {
             )}
 
             {incident.status === "RESUELTA" && !incident.rating && (
-              <View style={{ backgroundColor: "#fef3c7", borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: "#fde68a" }}>
-                <Text style={{ fontSize: 13, color: "#92400e", fontWeight: "600" }}>
-                  🕒 El proveedor ha finalizado la intervención. Podrás valorar el servicio en cuanto el administrador valide y cierre la incidencia.
+              <View
+                style={{
+                  backgroundColor: "#fef3c7",
+                  borderRadius: 12,
+                  padding: 14,
+                  marginBottom: 16,
+                  borderWidth: 1,
+                  borderColor: "#fde68a",
+                }}
+              >
+                <Text
+                  style={{ fontSize: 13, color: "#92400e", fontWeight: "600" }}
+                >
+                  🕒 El proveedor ha finalizado la intervención. Podrás valorar
+                  el servicio en cuanto el administrador valide y cierre la
+                  incidencia.
                 </Text>
               </View>
             )}
@@ -320,7 +496,8 @@ export default function IncidentDetailScreen() {
             <View style={s.notifRow}>
               <View style={{ flex: 1, paddingRight: 12 }}>
                 <Text style={s.notifText}>
-                  Te notificaremos cada vez que haya una actualización en tu incidencia.
+                  Te notificaremos cada vez que haya una actualización en tu
+                  incidencia.
                 </Text>
               </View>
               <Switch
@@ -343,7 +520,9 @@ export default function IncidentDetailScreen() {
               }
               activeOpacity={0.75}
             >
-              <Text style={s.contactBtnText}>💬  Contactar con el administrador</Text>
+              <Text style={s.contactBtnText}>
+                💬 Contactar con el administrador
+              </Text>
               <Text style={s.contactChevron}>›</Text>
             </TouchableOpacity>
           </View>
@@ -362,7 +541,9 @@ export default function IncidentDetailScreen() {
               <View style={s.detailCard}>
                 <Text style={s.detailLabel}>CATEGORÍA</Text>
                 <Text style={[s.detailValue, { textTransform: "capitalize" }]}>
-                  {String((incident as any).category).charAt(0).toUpperCase() +
+                  {String((incident as any).category)
+                    .charAt(0)
+                    .toUpperCase() +
                     String((incident as any).category).slice(1)}
                 </Text>
               </View>
@@ -380,12 +561,16 @@ export default function IncidentDetailScreen() {
               <View style={{ marginBottom: 16 }}>
                 {resolvePhotoUrl((incident as any).finalPhotoUrl) ? (
                   <>
-                    <Text style={[s.detailLabel, { marginBottom: 8 }]}>FOTOS</Text>
+                    <Text style={[s.detailLabel, { marginBottom: 8 }]}>
+                      FOTOS
+                    </Text>
                     <View style={s.photosRow}>
                       <View style={{ flex: 1 }}>
                         <Text style={s.photoCaption}>Así estaba</Text>
                         <Image
-                          source={{ uri: resolvePhotoUrl((incident as any).photoUrl)! }}
+                          source={{
+                            uri: resolvePhotoUrl((incident as any).photoUrl)!,
+                          }}
                           style={s.photoImg}
                           resizeMode="cover"
                         />
@@ -394,7 +579,11 @@ export default function IncidentDetailScreen() {
                       <View style={{ flex: 1 }}>
                         <Text style={s.photoCaption}>Después</Text>
                         <Image
-                          source={{ uri: resolvePhotoUrl((incident as any).finalPhotoUrl)! }}
+                          source={{
+                            uri: resolvePhotoUrl(
+                              (incident as any).finalPhotoUrl,
+                            )!,
+                          }}
                           style={s.photoImg}
                           resizeMode="cover"
                         />
@@ -403,9 +592,13 @@ export default function IncidentDetailScreen() {
                   </>
                 ) : (
                   <>
-                    <Text style={[s.detailLabel, { marginBottom: 8 }]}>FOTO</Text>
+                    <Text style={[s.detailLabel, { marginBottom: 8 }]}>
+                      FOTO
+                    </Text>
                     <Image
-                      source={{ uri: resolvePhotoUrl((incident as any).photoUrl)! }}
+                      source={{
+                        uri: resolvePhotoUrl((incident as any).photoUrl)!,
+                      }}
                       style={{ width: "100%", height: 200, borderRadius: 14 }}
                       resizeMode="cover"
                     />
@@ -447,7 +640,12 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   backBtnText: { fontSize: 26, color: DARK, fontWeight: "300", lineHeight: 30 },
-  headerLogo: { fontSize: 20, fontWeight: "800", color: DARK, letterSpacing: -0.4 },
+  headerLogo: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: DARK,
+    letterSpacing: -0.4,
+  },
 
   // Incident summary card
   incidentCard: {
@@ -458,12 +656,39 @@ const s = StyleSheet.create({
     borderBottomColor: BORDER,
     backgroundColor: "#fff",
   },
-  incidentThumb: { width: 64, height: 64, borderRadius: 12, overflow: "hidden", flexShrink: 0 },
+  incidentThumb: {
+    width: 64,
+    height: 64,
+    borderRadius: 12,
+    overflow: "hidden",
+    flexShrink: 0,
+  },
   incidentThumbImg: { width: 64, height: 64, borderRadius: 12 },
-  thumbPlaceholder: { backgroundColor: `${PRIMARY}12`, alignItems: "center", justifyContent: "center" },
-  incidentCardTop: { flexDirection: "row", justifyContent: "space-between", gap: 8, marginBottom: 2 },
-  incidentTitle: { fontSize: 15, fontWeight: "700", color: DARK, flex: 1, lineHeight: 20 },
-  badge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20, alignSelf: "flex-start", flexShrink: 0 },
+  thumbPlaceholder: {
+    backgroundColor: `${PRIMARY}12`,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  incidentCardTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 8,
+    marginBottom: 2,
+  },
+  incidentTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: DARK,
+    flex: 1,
+    lineHeight: 20,
+  },
+  badge: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 20,
+    alignSelf: "flex-start",
+    flexShrink: 0,
+  },
   badgeText: { fontSize: 11, fontWeight: "700" },
   incidentMeta: { fontSize: 12, color: MUTED },
   incidentId: { fontSize: 11, color: "#9CA3AF" },
@@ -524,7 +749,12 @@ const s = StyleSheet.create({
   },
   timelineLineActive: { backgroundColor: `${PRIMARY}50` },
   timelineContent: { flex: 1, paddingBottom: 24 },
-  timelineTitleRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 },
+  timelineTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 4,
+  },
   timelineLabel: { fontSize: 15, fontWeight: "600", color: MUTED },
   timelineLabelActive: { color: DARK },
   actualBadge: {
@@ -533,13 +763,30 @@ const s = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
-  actualBadgeText: { fontSize: 10, fontWeight: "800", color: PRIMARY, letterSpacing: 0.5 },
-  timelineDetail: { fontSize: 13, color: MUTED, lineHeight: 18, marginBottom: 4 },
+  actualBadgeText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: PRIMARY,
+    letterSpacing: 0.5,
+  },
+  timelineDetail: {
+    fontSize: 13,
+    color: MUTED,
+    lineHeight: 18,
+    marginBottom: 4,
+  },
   timelineDate: { fontSize: 12, color: "#9CA3AF" },
 
   // Próximo paso
   nextStepSection: { marginTop: 4, marginBottom: 20 },
-  nextStepLabel: { fontSize: 13, fontWeight: "700", color: MUTED, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 },
+  nextStepLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: MUTED,
+    marginBottom: 8,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
   nextStepCard: {
     backgroundColor: BG,
     borderRadius: 14,
@@ -547,7 +794,12 @@ const s = StyleSheet.create({
     borderColor: BORDER,
     padding: 16,
   },
-  nextStepTitle: { fontSize: 15, fontWeight: "700", color: DARK, marginBottom: 4 },
+  nextStepTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: DARK,
+    marginBottom: 4,
+  },
   nextStepDetail: { fontSize: 13, color: MUTED, lineHeight: 18 },
 
   // Rate
@@ -606,12 +858,24 @@ const s = StyleSheet.create({
     padding: 14,
     marginBottom: 12,
   },
-  detailLabel: { fontSize: 10, fontWeight: "800", color: "#9CA3AF", letterSpacing: 1, marginBottom: 4 },
+  detailLabel: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#9CA3AF",
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
   detailValue: { fontSize: 14, color: DARK, lineHeight: 20 },
 
   // Photos
   photosRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  photoCaption: { fontSize: 12, color: MUTED, fontWeight: "600", marginBottom: 4, textAlign: "center" },
+  photoCaption: {
+    fontSize: 12,
+    color: MUTED,
+    fontWeight: "600",
+    marginBottom: 4,
+    textAlign: "center",
+  },
   photoImg: { width: "100%", aspectRatio: 1, borderRadius: 12 },
   photoArrow: { fontSize: 20, color: MUTED, fontWeight: "300" },
 });

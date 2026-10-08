@@ -1,7 +1,9 @@
-import { type NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
+import { and, eq, gt } from "drizzle-orm";
+
 import { db } from "@acme/db/client";
 import { session, user } from "@acme/db/schema";
-import { eq, and, gt } from "drizzle-orm";
 
 /**
  * GET /api/auth/set-session?token=<sessionToken>
@@ -34,7 +36,9 @@ export async function GET(req: NextRequest) {
     .catch(() => null);
 
   if (!foundSession) {
-    console.warn(`[SET_SESSION] Session not found or expired for token: ${token.slice(0, 8)}...`);
+    console.warn(
+      `[SET_SESSION] Session not found or expired for token: ${token.slice(0, 8)}...`,
+    );
     return NextResponse.redirect(`${baseUrl}/login?error=invalid_session`);
   }
 

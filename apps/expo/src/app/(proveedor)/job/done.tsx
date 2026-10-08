@@ -1,6 +1,6 @@
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter, Stack, useLocalSearchParams } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 
 const PRIMARY = "#009689";
 const DARK = "#0f172a";
@@ -8,7 +8,11 @@ const MUTED = "#64748b";
 
 export default function JobDoneScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ id?: string; community?: string; cost?: string }>();
+  const params = useLocalSearchParams<{
+    id?: string;
+    community?: string;
+    cost?: string;
+  }>();
 
   const incidentId = params.id ?? "INC-2025-0412";
   const communityName = params.community ?? "Residencial El Lago";

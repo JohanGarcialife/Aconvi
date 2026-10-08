@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { View, ActivityIndicator } from "react-native";
-import { useRouter, useRootNavigationState } from "expo-router";
+import { ActivityIndicator, View } from "react-native";
+import { useRootNavigationState, useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
+
 import { getBaseUrl } from "~/utils/base-url";
 
 /**
@@ -47,22 +48,37 @@ export default function RootIndex() {
         });
 
         if (!res.ok) {
-          console.log("[RootIndex] get-session HTTP error:", res.status, "→ login");
-          await SecureStore.deleteItemAsync("expo_session_token").catch(() => {});
+          console.log(
+            "[RootIndex] get-session HTTP error:",
+            res.status,
+            "→ login",
+          );
+          await SecureStore.deleteItemAsync("expo_session_token").catch(
+            () => {},
+          );
           router.replace("/login");
           return;
         }
 
-        const sessionData = await res.json() as {
+        const sessionData = (await res.json()) as {
           session?: { userId: string };
           user?: { id: string; role?: string };
         } | null;
 
-        console.log("[RootIndex] sessionData:", sessionData?.user?.id, "role:", sessionData?.user?.role);
+        console.log(
+          "[RootIndex] sessionData:",
+          sessionData?.user?.id,
+          "role:",
+          sessionData?.user?.role,
+        );
 
         if (!sessionData?.user) {
-          console.log("[RootIndex] Token invalid/expired → clearing and going to login");
-          await SecureStore.deleteItemAsync("expo_session_token").catch(() => {});
+          console.log(
+            "[RootIndex] Token invalid/expired → clearing and going to login",
+          );
+          await SecureStore.deleteItemAsync("expo_session_token").catch(
+            () => {},
+          );
           await SecureStore.deleteItemAsync("expo_user_id").catch(() => {});
           router.replace("/login");
           return;
@@ -74,8 +90,15 @@ export default function RootIndex() {
 
         // 3. Navegar por rol
         const role = sessionData.user.role ?? "Vecino";
-        const isProvider = role.toLowerCase().includes("proveedor") || role.toLowerCase() === "provider";
-        console.log("[RootIndex] Valid session, role:", role, "isProvider:", isProvider);
+        const isProvider =
+          role.toLowerCase().includes("proveedor") ||
+          role.toLowerCase() === "provider";
+        console.log(
+          "[RootIndex] Valid session, role:",
+          role,
+          "isProvider:",
+          isProvider,
+        );
 
         if (isProvider) {
           router.replace("/(proveedor)/job");
@@ -96,7 +119,14 @@ export default function RootIndex() {
   }, [ready]);
 
   return (
-    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#fff" }}>
+    <View
+      style={{
+        flex: 1,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "#fff",
+      }}
+    >
       <ActivityIndicator color="#4aa19b" size="large" />
     </View>
   );

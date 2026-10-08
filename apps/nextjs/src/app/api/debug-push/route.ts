@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
+import { eq } from "drizzle-orm";
+
 import { db } from "@acme/db/client";
 import { pushToken, user } from "@acme/db/schema";
-import { eq } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,11 @@ export async function GET() {
         user: u ? { name: u.name, email: u.email } : null,
       });
     }
-    return NextResponse.json({ ok: true, count: tokens.length, tokens: results });
+    return NextResponse.json({
+      ok: true,
+      count: tokens.length,
+      tokens: results,
+    });
   } catch (err: any) {
     return NextResponse.json({ ok: false, error: err.message });
   }

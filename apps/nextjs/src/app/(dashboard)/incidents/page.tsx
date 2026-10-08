@@ -1,28 +1,80 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useTRPC } from "~/trpc/react";
-import { Check, Star, Briefcase, Clock, Search, Plus, AlertTriangle, CheckCircle2, XCircle, ChevronDown, ChevronUp, ArrowRight, LogOut, User } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  AlertTriangle,
+  ArrowRight,
+  Briefcase,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  LogOut,
+  Plus,
+  Search,
+  Star,
+  User,
+  XCircle,
+} from "lucide-react";
+
 import { authClient } from "~/auth/client";
 import { useSocketClient } from "~/hooks/useSocketClient";
+import { useTRPC } from "~/trpc/react";
 
 const TENANT_ID = "org_aconvi_demo";
 
-type Status = "RECIBIDA" | "EN_REVISION" | "AGENDADA" | "EN_CURSO" | "RESUELTA" | "RECHAZADA" | "CERRADA" | "CADUCADA" | "NO_PRESENTADA";
+type Status =
+  | "RECIBIDA"
+  | "EN_REVISION"
+  | "AGENDADA"
+  | "EN_CURSO"
+  | "RESUELTA"
+  | "RECHAZADA"
+  | "CERRADA"
+  | "CADUCADA"
+  | "NO_PRESENTADA";
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
-  RECIBIDA:       { label: "Sin asignar",        cls: "bg-amber-50 text-amber-700 border border-amber-200" },
-  EN_REVISION:    { label: "Asignada",            cls: "bg-blue-50 text-blue-700 border border-blue-200" },
-  AGENDADA:       { label: "Agendada",            cls: "bg-violet-50 text-violet-700 border border-violet-200" },
-  EN_CURSO:       { label: "En curso",            cls: "bg-cyan-50 text-cyan-700 border border-cyan-200" },
-  RESUELTA:       { label: "Resuelta",            cls: "bg-emerald-50 text-emerald-700 border border-emerald-200" },
-  RECHAZADA:      { label: "Rechazada",           cls: "bg-red-50 text-red-700 border border-red-200" },
-  CERRADA:        { label: "Cerrada",             cls: "bg-slate-100 text-slate-600 border border-slate-300" },
-  CADUCADA:       { label: "Sin respuesta",       cls: "bg-rose-50 text-rose-700 border border-rose-200" },
-  NO_PRESENTADA:  { label: "Cita no atendida",    cls: "bg-orange-50 text-orange-700 border border-orange-200" },
+  RECIBIDA: {
+    label: "Sin asignar",
+    cls: "bg-amber-50 text-amber-700 border border-amber-200",
+  },
+  EN_REVISION: {
+    label: "Asignada",
+    cls: "bg-blue-50 text-blue-700 border border-blue-200",
+  },
+  AGENDADA: {
+    label: "Agendada",
+    cls: "bg-violet-50 text-violet-700 border border-violet-200",
+  },
+  EN_CURSO: {
+    label: "En curso",
+    cls: "bg-cyan-50 text-cyan-700 border border-cyan-200",
+  },
+  RESUELTA: {
+    label: "Resuelta",
+    cls: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+  },
+  RECHAZADA: {
+    label: "Rechazada",
+    cls: "bg-red-50 text-red-700 border border-red-200",
+  },
+  CERRADA: {
+    label: "Cerrada",
+    cls: "bg-slate-100 text-slate-600 border border-slate-300",
+  },
+  CADUCADA: {
+    label: "Sin respuesta",
+    cls: "bg-rose-50 text-rose-700 border border-rose-200",
+  },
+  NO_PRESENTADA: {
+    label: "Cita no atendida",
+    cls: "bg-orange-50 text-orange-700 border border-orange-200",
+  },
 };
 
 const PRIORITY_COLOR: Record<string, string> = {
@@ -32,40 +84,67 @@ const PRIORITY_COLOR: Record<string, string> = {
   BAJA: "bg-slate-300",
 };
 
-const STEPS = ["RECIBIDA", "EN_REVISION", "AGENDADA", "EN_CURSO", "RESUELTA", "CERRADA"];
+const STEPS = [
+  "RECIBIDA",
+  "EN_REVISION",
+  "AGENDADA",
+  "EN_CURSO",
+  "RESUELTA",
+  "CERRADA",
+];
 
 const resolvePhotoUrl = (url: string | null | undefined): string | null => {
   if (!url) return null;
-  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) {
+  if (
+    url.startsWith("http://") ||
+    url.startsWith("https://") ||
+    url.startsWith("data:")
+  ) {
     return url;
   }
   return url.startsWith("/") ? url : `/${url}`;
 };
 
 function StatusBadge({ status }: { status: string }) {
-  const s = STATUS_LABEL[status] ?? { label: status, cls: "bg-slate-100 text-slate-600" };
-  return <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${s.cls}`}>{s.label}</span>;
+  const s = STATUS_LABEL[status] ?? {
+    label: status,
+    cls: "bg-slate-100 text-slate-600",
+  };
+  return (
+    <span
+      className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${s.cls}`}
+    >
+      {s.label}
+    </span>
+  );
 }
 
 function Timeline({ status }: { status: string }) {
   const idx = STEPS.indexOf(status);
   return (
-    <div className="flex items-center gap-0 my-5">
+    <div className="my-5 flex items-center gap-0">
       {STEPS.map((step, i) => {
         const done = idx > i || (idx === i && i === STEPS.length - 1);
         const active = idx === i && i < STEPS.length - 1;
         const label = STATUS_LABEL[step]?.label ?? step;
         return (
-          <div key={step} className="flex items-center flex-1 last:flex-none">
+          <div key={step} className="flex flex-1 items-center last:flex-none">
             <div className="flex flex-col items-center gap-1">
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all
-                ${done ? "bg-teal-500 border-teal-500 text-white" : active ? "border-teal-500 text-teal-600 bg-white" : "border-slate-200 text-slate-400 bg-slate-50"}`}>
+              <div
+                className={`flex h-7 w-7 items-center justify-center rounded-full border-2 text-xs font-bold transition-all ${done ? "border-teal-500 bg-teal-500 text-white" : active ? "border-teal-500 bg-white text-teal-600" : "border-slate-200 bg-slate-50 text-slate-400"}`}
+              >
                 {done ? <Check size={13} strokeWidth={3} /> : i + 1}
               </div>
-              <span className={`text-[10px] whitespace-nowrap ${done || active ? "text-slate-800 font-semibold" : "text-slate-400"}`}>{label}</span>
+              <span
+                className={`text-[10px] whitespace-nowrap ${done || active ? "font-semibold text-slate-800" : "text-slate-400"}`}
+              >
+                {label}
+              </span>
             </div>
             {i < STEPS.length - 1 && (
-              <div className={`flex-1 h-0.5 mb-4 mx-1 ${done ? "bg-teal-500" : "bg-slate-200"}`} />
+              <div
+                className={`mx-1 mb-4 h-0.5 flex-1 ${done ? "bg-teal-500" : "bg-slate-200"}`}
+              />
             )}
           </div>
         );
@@ -81,7 +160,10 @@ function formatTimelineEntry(h: any) {
 
   if (h.action === "CREATED") {
     title = "Incidencia comunicada";
-    comment = comment && comment !== "—" && comment !== "-" ? comment : "El vecino ha informado del problema.";
+    comment =
+      comment && comment !== "—" && comment !== "-"
+        ? comment
+        : "El vecino ha informado del problema.";
     dotColor = "bg-teal-600";
   } else if (h.action === "ASSIGNED") {
     title = "Proveedor asignado";
@@ -106,19 +188,27 @@ function formatTimelineEntry(h: any) {
   } else if (h.action === "COMPLETED") {
     title = "Trabajo completado";
     comment =
-      comment && (comment.toLowerCase().includes("pruebas") || comment.toLowerCase().includes("finalizado"))
+      comment &&
+      (comment.toLowerCase().includes("pruebas") ||
+        comment.toLowerCase().includes("finalizado"))
         ? "El proveedor ha finalizado la intervención."
         : comment || "El proveedor ha finalizado la intervención.";
     dotColor = "bg-emerald-600";
   } else if (h.action === "RATED") {
     title = "El vecino ha valorado el servicio";
     if (comment) {
-      const match = comment.match(/Valoró con (\d+) estrellas(?::\s*["“]?(.*?)["”]?)?$/i);
+      const match = comment.match(
+        /Valoró con (\d+) estrellas(?::\s*["“]?(.*?)["”]?)?$/i,
+      );
       if (match && match[1]) {
         const starNum = parseInt(match[1], 10) || 5;
-        const starStr = "★".repeat(starNum) + "☆".repeat(Math.max(0, 5 - starNum));
+        const starStr =
+          "★".repeat(starNum) + "☆".repeat(Math.max(0, 5 - starNum));
         const rest = match[2]?.trim();
-        comment = rest && rest !== "Sin comentario" ? `${starStr} / "${rest}"` : starStr;
+        comment =
+          rest && rest !== "Sin comentario"
+            ? `${starStr} / "${rest}"`
+            : starStr;
       }
     }
     dotColor = "bg-amber-500";
@@ -128,7 +218,8 @@ function formatTimelineEntry(h: any) {
     dotColor = "bg-teal-700";
   } else if (h.action === "NO_SHOW") {
     title = "Visita no realizada";
-    comment = "El proveedor no inició la intervención dentro del horario previsto.";
+    comment =
+      "El proveedor no inició la intervención dentro del horario previsto.";
     dotColor = "bg-orange-500";
   } else if (h.action === "OT_EXPIRED") {
     title = "Orden caducada";
@@ -155,7 +246,9 @@ export default function IncidentsPage() {
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
   const [providerOpen, setProviderOpen] = useState(false);
-  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
+    null,
+  );
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [noteText, setNoteText] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -187,7 +280,9 @@ export default function IncidentsPage() {
       void refetch();
     },
   });
-  const { data: providersRaw } = useQuery(trpc.provider.listByOrg.queryOptions({ tenantId: TENANT_ID }));
+  const { data: providersRaw } = useQuery(
+    trpc.provider.listByOrg.queryOptions({ tenantId: TENANT_ID }),
+  );
   const incidents = (incidentsRaw ?? []) as any[];
   const providers = (providersRaw ?? []) as any[];
 
@@ -197,42 +292,63 @@ export default function IncidentsPage() {
         // Immediately update the list cache with the server response
         queryClient.setQueryData(
           trpc.incident.all.queryOptions({ tenantId: TENANT_ID }).queryKey,
-          (old: any) => Array.isArray(old)
-            ? old.map((i: any) => i.id === updated.id ? { ...i, ...updated } : i)
-            : old,
+          (old: any) =>
+            Array.isArray(old)
+              ? old.map((i: any) =>
+                  i.id === updated.id ? { ...i, ...updated } : i,
+                )
+              : old,
         );
       },
-    })
+    }),
   );
   const updateStatus = useMutation(
-    trpc.incident.updateStatus.mutationOptions({ onSuccess: () => { refetch().catch(() => null); } })
+    trpc.incident.updateStatus.mutationOptions({
+      onSuccess: () => {
+        refetch().catch(() => null);
+      },
+    }),
   );
   const rejectMut = useMutation(
-    trpc.incident.reject.mutationOptions({ onSuccess: () => { refetch().catch(() => null); } })
+    trpc.incident.reject.mutationOptions({
+      onSuccess: () => {
+        refetch().catch(() => null);
+      },
+    }),
   );
   const addNote = useMutation(
-    trpc.incident.addNote.mutationOptions({ onSuccess: () => { refetch().catch(() => null); } })
+    trpc.incident.addNote.mutationOptions({
+      onSuccess: () => {
+        refetch().catch(() => null);
+      },
+    }),
   );
   const closeIncident = useMutation(
     trpc.incident.closeIncident.mutationOptions({
       onSuccess: (updated: any) => {
         queryClient.setQueryData(
           trpc.incident.all.queryOptions({ tenantId: TENANT_ID }).queryKey,
-          (old: any) => Array.isArray(old)
-            ? old.map((i: any) => i.id === updated.id ? { ...i, ...updated } : i)
-            : old,
+          (old: any) =>
+            Array.isArray(old)
+              ? old.map((i: any) =>
+                  i.id === updated.id ? { ...i, ...updated } : i,
+                )
+              : old,
         );
         refetch().catch(() => null);
         showToast("✅ Incidencia cerrada y vecino notificado");
       },
       onError: () => showToast("❌ Error al cerrar", false),
-    })
+    }),
   );
 
   // Close user menu on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+      if (
+        userMenuRef.current &&
+        !userMenuRef.current.contains(e.target as Node)
+      ) {
         setUserMenuOpen(false);
       }
     };
@@ -264,7 +380,10 @@ export default function IncidentsPage() {
     .map((n: string) => n[0]?.toUpperCase() ?? "")
     .join("");
   const selected = incidents.find((i: any) => i.id === selectedId) ?? null;
-  const selectedProvider = providers.find((p: any) => p.id === selectedProviderId) ?? providers[0] ?? null;
+  const selectedProvider =
+    providers.find((p: any) => p.id === selectedProviderId) ??
+    providers[0] ??
+    null;
 
   useEffect(() => {
     if (selected) {
@@ -284,7 +403,15 @@ export default function IncidentsPage() {
   }, [incidents.length, selectedId]);
 
   const toggleCheck = (id: string) => {
-    setChecked(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+    setChecked((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) {
+        n.delete(id);
+      } else {
+        n.add(id);
+      }
+      return n;
+    });
   };
 
   const handleAssign = async () => {
@@ -302,19 +429,26 @@ export default function IncidentsPage() {
     if (!selected) return;
     try {
       // @ts-ignore – tRPC mutateAsync types lag
-      await assignProvider.mutateAsync({ tenantId: TENANT_ID, id: selected.id, providerId: selectedProvider.id });
+      await assignProvider.mutateAsync({
+        tenantId: TENANT_ID,
+        id: selected.id,
+        providerId: selectedProvider.id,
+      });
       await refetch();
       showToast("✅ Proveedor asignado y vecino notificado");
-    } catch (err: any) { 
+    } catch (err: any) {
       const msg = err?.message || "Error al asignar el proveedor";
-      showToast(msg, false); 
+      showToast(msg, false);
     }
   };
 
   const handleBulkAssignClick = () => {
     if (checked.size === 0) return;
     if (!selectedProvider) {
-      showToast("Selecciona un proveedor en el panel derecho antes de asignar.", false);
+      showToast(
+        "Selecciona un proveedor en el panel derecho antes de asignar.",
+        false,
+      );
       return;
     }
     setShowBulkConfirmModal(true);
@@ -323,7 +457,7 @@ export default function IncidentsPage() {
   const executeBulkAssign = async () => {
     if (!selectedProvider || checked.size === 0) return;
     setShowBulkConfirmModal(false);
-    
+
     const selectedIncs = incidents.filter((i: any) => checked.has(i.id));
     if (selectedIncs.length === 0) return;
 
@@ -333,7 +467,11 @@ export default function IncidentsPage() {
     for (const inc of selectedIncs) {
       try {
         // @ts-ignore – tRPC mutateAsync types lag
-        await assignProvider.mutateAsync({ tenantId: TENANT_ID, id: inc.id, providerId: selectedProvider.id });
+        await assignProvider.mutateAsync({
+          tenantId: TENANT_ID,
+          id: inc.id,
+          providerId: selectedProvider.id,
+        });
         successCount++;
       } catch (err) {
         console.error(`[bulkAssign] Failed to assign ${inc.id}:`, err);
@@ -345,9 +483,14 @@ export default function IncidentsPage() {
     await refetch();
 
     if (failCount > 0) {
-      showToast(`✅ ${successCount} asignadas, ❌ ${failCount} no se pudieron asignar`, false);
+      showToast(
+        `✅ ${successCount} asignadas, ❌ ${failCount} no se pudieron asignar`,
+        false,
+      );
     } else {
-      showToast(`✅ ${successCount} ${successCount === 1 ? "orden de trabajo asignada" : "órdenes de trabajo asignadas"} a ${selectedProvider.name}`);
+      showToast(
+        `✅ ${successCount} ${successCount === 1 ? "orden de trabajo asignada" : "órdenes de trabajo asignadas"} a ${selectedProvider.name}`,
+      );
     }
   };
 
@@ -357,7 +500,9 @@ export default function IncidentsPage() {
       // @ts-ignore – tRPC mutateAsync types lag
       await rejectMut.mutateAsync({ tenantId: TENANT_ID, id: selected.id });
       showToast("Incidencia marcada como no procede");
-    } catch { showToast("❌ Error", false); }
+    } catch {
+      showToast("❌ Error", false);
+    }
   };
 
   const handleClose = () => {
@@ -374,66 +519,89 @@ export default function IncidentsPage() {
     setShowCloseModal(false);
   };
 
-
   const handleAddNote = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selected || !noteText.trim()) return;
     // @ts-ignore – tRPC mutateAsync types lag
-    await addNote.mutateAsync({ tenantId: TENANT_ID, incidentId: selected.id, content: noteText.trim() });
+    await addNote.mutateAsync({
+      tenantId: TENANT_ID,
+      incidentId: selected.id,
+      content: noteText.trim(),
+    });
     setNoteText("");
   };
 
   const FILTERS = [
-    { key: "ALL",          label: "Todas" },
-    { key: "RECIBIDA",     label: "Pendientes" },
-    { key: "EN_REVISION",  label: "En revisión" },
-    { key: "AGENDADA",     label: "Agendadas" },
-    { key: "EN_CURSO",     label: "En curso" },
-    { key: "RESUELTA",     label: "Resueltas" },
-    { key: "RECHAZADA",    label: "Rechazadas" },
-    { key: "CADUCADA",     label: "Sin respuesta" },
-    { key: "NO_PRESENTADA",label: "Cita no atendida" },
-    { key: "CERRADA",      label: "Cerradas" },
+    { key: "ALL", label: "Todas" },
+    { key: "RECIBIDA", label: "Pendientes" },
+    { key: "EN_REVISION", label: "En revisión" },
+    { key: "AGENDADA", label: "Agendadas" },
+    { key: "EN_CURSO", label: "En curso" },
+    { key: "RESUELTA", label: "Resueltas" },
+    { key: "RECHAZADA", label: "Rechazadas" },
+    { key: "CADUCADA", label: "Sin respuesta" },
+    { key: "NO_PRESENTADA", label: "Cita no atendida" },
+    { key: "CERRADA", label: "Cerradas" },
   ];
 
   return (
-    <div className="flex h-screen flex-col bg-slate-50 -m-4 md:-m-8 overflow-hidden">
+    <div className="-m-4 flex h-screen flex-col overflow-hidden bg-slate-50 md:-m-8">
       {/* Toast (Top-Right) */}
       {toast && (
-        <div className={`fixed top-6 right-6 z-[100] flex max-w-md items-start gap-3 rounded-2xl p-4 shadow-2xl transition-all duration-300 border backdrop-blur-md ${
-          toast.ok 
-            ? "bg-slate-900/95 text-white border-slate-700 shadow-slate-900/20" 
-            : "bg-red-600/95 text-white border-red-500 shadow-red-500/30"
-        }`}>
-          <span className="text-xl mt-0.5">{toast.ok ? "✅" : "⚠️"}</span>
+        <div
+          className={`fixed top-6 right-6 z-[100] flex max-w-md items-start gap-3 rounded-2xl border p-4 shadow-2xl backdrop-blur-md transition-all duration-300 ${
+            toast.ok
+              ? "border-slate-700 bg-slate-900/95 text-white shadow-slate-900/20"
+              : "border-red-500 bg-red-600/95 text-white shadow-red-500/30"
+          }`}
+        >
+          <span className="mt-0.5 text-xl">{toast.ok ? "✅" : "⚠️"}</span>
           <div className="flex-1 pr-2">
-            <h4 className="font-bold text-sm leading-tight">{toast.ok ? "Éxito" : "Atención"}</h4>
-            <p className="text-xs mt-1 text-slate-100 font-medium leading-relaxed">{toast.msg.replace(/^(✅|⚠️|❌)\s*/, '')}</p>
+            <h4 className="text-sm leading-tight font-bold">
+              {toast.ok ? "Éxito" : "Atención"}
+            </h4>
+            <p className="mt-1 text-xs leading-relaxed font-medium text-slate-100">
+              {toast.msg.replace(/^(✅|⚠️|❌)\s*/, "")}
+            </p>
           </div>
-          <button onClick={() => setToast(null)} className="text-white/70 hover:text-white font-bold p-1 transition-colors">✕</button>
+          <button
+            onClick={() => setToast(null)}
+            className="p-1 font-bold text-white/70 transition-colors hover:text-white"
+          >
+            ✕
+          </button>
         </div>
       )}
 
       {/* ── Bulk Assign Confirmation Modal ─────────────────────────────── */}
       {showBulkConfirmModal && selectedProvider && checked.size > 0 && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="relative mx-4 flex w-full max-w-md flex-col rounded-2xl bg-white shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div className="animate-in fade-in zoom-in-95 relative mx-4 flex w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl duration-150">
             <div className="p-6 text-center">
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-teal-100 text-teal-600">
                 <CheckCircle2 size={28} />
               </div>
               <h2 className="text-lg font-bold text-slate-900">
-                Asignar {checked.size} {checked.size === 1 ? "orden de trabajo" : "órdenes de trabajo"}
+                Asignar {checked.size}{" "}
+                {checked.size === 1 ? "orden de trabajo" : "órdenes de trabajo"}
               </h2>
               <p className="mt-2 text-sm text-slate-600">
-                ¿Quieres asignar {checked.size === 1 ? "esta" : "estas"} <strong className="font-bold text-slate-900">{checked.size} OT</strong> a <strong className="font-bold text-teal-700">{selectedProvider.name}</strong>?
+                ¿Quieres asignar {checked.size === 1 ? "esta" : "estas"}{" "}
+                <strong className="font-bold text-slate-900">
+                  {checked.size} OT
+                </strong>{" "}
+                a{" "}
+                <strong className="font-bold text-teal-700">
+                  {selectedProvider.name}
+                </strong>
+                ?
               </p>
             </div>
             <div className="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
               <button
                 type="button"
                 onClick={() => setShowBulkConfirmModal(false)}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
               >
                 Cancelar
               </button>
@@ -441,9 +609,11 @@ export default function IncidentsPage() {
                 type="button"
                 onClick={executeBulkAssign}
                 disabled={assignProvider.isPending}
-                className="rounded-xl bg-teal-500 px-5 py-2 text-sm font-bold text-white hover:bg-teal-600 disabled:opacity-50 transition-colors shadow-sm"
+                className="rounded-xl bg-teal-500 px-5 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-teal-600 disabled:opacity-50"
               >
-                {assignProvider.isPending ? "Asignando..." : `Asignar ${checked.size} OT`}
+                {assignProvider.isPending
+                  ? "Asignando..."
+                  : `Asignar ${checked.size} OT`}
               </button>
             </div>
           </div>
@@ -453,42 +623,65 @@ export default function IncidentsPage() {
       {/* ── Close Incident Modal ─────────────────────────────────────────── */}
       {showCloseModal && selected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="relative mx-4 flex w-full max-w-2xl flex-col rounded-2xl bg-white shadow-2xl overflow-hidden max-h-[90vh]">
+          <div className="relative mx-4 flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 bg-slate-50 shrink-0">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-slate-50 px-6 py-4">
               <div>
-                <h2 className="text-lg font-bold text-slate-900">Cierre de incidencia</h2>
-                <p className="text-xs text-slate-500 mt-0.5">{selected.title}</p>
+                <h2 className="text-lg font-bold text-slate-900">
+                  Cierre de incidencia
+                </h2>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {selected.title}
+                </p>
               </div>
               <button
                 onClick={() => setShowCloseModal(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-colors text-lg font-light"
-              >×</button>
+                className="flex h-8 w-8 items-center justify-center rounded-full text-lg font-light text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-700"
+              >
+                ×
+              </button>
             </div>
 
             {/* Scrollable body */}
-            <div className="overflow-y-auto px-6 py-5 space-y-5">
-
+            <div className="space-y-5 overflow-y-auto px-6 py-5">
               {/* Before / After photos */}
               <div>
-                <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">Verificación fotográfica</h3>
+                <h3 className="mb-3 text-xs font-bold tracking-wider text-slate-500 uppercase">
+                  Verificación fotográfica
+                </h3>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <p className="mb-1 text-xs font-semibold text-slate-500">Antes</p>
+                    <p className="mb-1 text-xs font-semibold text-slate-500">
+                      Antes
+                    </p>
                     {selected.photoUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={resolvePhotoUrl(selected.photoUrl)!} alt="Foto inicial" className="h-40 w-full rounded-xl object-cover border border-slate-200" />
+                      <img
+                        src={resolvePhotoUrl(selected.photoUrl)!}
+                        alt="Foto inicial"
+                        className="h-40 w-full rounded-xl border border-slate-200 object-cover"
+                      />
                     ) : (
-                      <div className="flex h-40 items-center justify-center rounded-xl bg-slate-100 text-xs text-slate-400">Sin foto</div>
+                      <div className="flex h-40 items-center justify-center rounded-xl bg-slate-100 text-xs text-slate-400">
+                        Sin foto
+                      </div>
                     )}
                   </div>
                   <div>
-                    <p className="mb-1 text-xs font-semibold text-emerald-600">Después (proveedor)</p>
+                    <p className="mb-1 text-xs font-semibold text-emerald-600">
+                      Después (proveedor)
+                    </p>
                     {(selected as any).finalPhotoUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={resolvePhotoUrl((selected as any).finalPhotoUrl)!} alt="Foto final" className="h-40 w-full rounded-xl object-cover border-2 border-emerald-300" />
+                      <img
+                        src={resolvePhotoUrl((selected as any).finalPhotoUrl)!}
+                        alt="Foto final"
+                        className="h-40 w-full rounded-xl border-2 border-emerald-300 object-cover"
+                      />
                     ) : (
-                      <div className="flex h-40 items-center justify-center rounded-xl bg-slate-100 text-xs text-slate-400">Sin foto de cierre</div>
+                      <div className="flex h-40 items-center justify-center rounded-xl bg-slate-100 text-xs text-slate-400">
+                        Sin foto de cierre
+                      </div>
                     )}
                   </div>
                 </div>
@@ -497,21 +690,28 @@ export default function IncidentsPage() {
               {/* Provider & cost summary */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-xs text-slate-400 mb-1">Proveedor</p>
-                  <p className="text-sm font-semibold text-slate-800">{selected.provider?.name ?? "—"}</p>
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-xs text-slate-400 mb-1">Coste estimado</p>
+                  <p className="mb-1 text-xs text-slate-400">Proveedor</p>
                   <p className="text-sm font-semibold text-slate-800">
-                    {(selected as any).estimatedCost != null ? `${(selected as any).estimatedCost} €` : "—"}
+                    {selected.provider?.name ?? "—"}
                   </p>
                 </div>
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-xs text-slate-400 mb-1">Tiempo transcurrido</p>
+                  <p className="mb-1 text-xs text-slate-400">Coste estimado</p>
+                  <p className="text-sm font-semibold text-slate-800">
+                    {(selected as any).estimatedCost != null
+                      ? `${(selected as any).estimatedCost} €`
+                      : "—"}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="mb-1 text-xs text-slate-400">
+                    Tiempo transcurrido
+                  </p>
                   <p className="text-sm font-semibold text-slate-800">
                     {selected.createdAt
                       ? (() => {
-                          const diff = Date.now() - new Date(selected.createdAt).getTime();
+                          const diff =
+                            Date.now() - new Date(selected.createdAt).getTime();
                           const days = Math.floor(diff / 86400000);
                           const hours = Math.floor((diff % 86400000) / 3600000);
                           return days > 0 ? `${days}d ${hours}h` : `${hours}h`;
@@ -523,30 +723,32 @@ export default function IncidentsPage() {
 
               {/* IBAN */}
               <div>
-                <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">
+                <label className="mb-1.5 block text-xs font-bold tracking-wider text-slate-500 uppercase">
                   IBAN del proveedor <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={closeIban}
-                  onChange={e => setCloseIban(e.target.value.toUpperCase())}
+                  onChange={(e) => setCloseIban(e.target.value.toUpperCase())}
                   placeholder="ES00 0000 0000 0000 0000 0000"
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 font-mono text-sm text-slate-800 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 transition-all"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 font-mono text-sm text-slate-800 transition-all outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100"
                 />
-                <p className="mt-1 text-xs text-slate-400">Necesario para registrar el pago al proveedor.</p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Necesario para registrar el pago al proveedor.
+                </p>
               </div>
 
               {/* Final comment */}
               <div>
-                <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">
+                <label className="mb-1.5 block text-xs font-bold tracking-wider text-slate-500 uppercase">
                   Comentario final (opcional)
                 </label>
                 <textarea
                   value={closeComment}
-                  onChange={e => setCloseComment(e.target.value)}
+                  onChange={(e) => setCloseComment(e.target.value)}
                   rows={3}
                   placeholder="Anota cualquier observación antes de cerrar el expediente..."
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 transition-all resize-none"
+                  className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-800 transition-all outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100"
                 />
               </div>
             </div>
@@ -555,19 +757,25 @@ export default function IncidentsPage() {
             <div className="flex shrink-0 items-center justify-between border-t border-slate-200 bg-slate-50 px-6 py-4">
               <button
                 onClick={() => setShowCloseModal(false)}
-                className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+                className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100"
               >
                 Cancelar
               </button>
               <button
                 onClick={confirmClose}
                 disabled={!closeIban.trim() || closeIncident.isPending}
-                className="flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-2.5 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-40 transition-colors"
+                className="flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-2.5 text-sm font-bold text-white transition-colors hover:bg-slate-800 disabled:opacity-40"
               >
-                {closeIncident.isPending
-                  ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> Cerrando...</>
-                  : <><CheckCircle2 size={15} /> Confirmar cierre</>
-                }
+                {closeIncident.isPending ? (
+                  <>
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />{" "}
+                    Cerrando...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 size={15} /> Confirmar cierre
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -579,17 +787,20 @@ export default function IncidentsPage() {
         <h1 className="text-xl font-bold text-slate-900">Incidencias</h1>
         <div className="flex items-center gap-3">
           {/* Search bar - fully functional */}
-          <div className="flex w-72 items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-500 focus-within:border-teal-400 focus-within:ring-2 focus-within:ring-teal-100 transition-all">
+          <div className="flex w-72 items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-500 transition-all focus-within:border-teal-400 focus-within:ring-2 focus-within:ring-teal-100">
             <Search size={15} className="shrink-0 text-slate-400" />
             <input
               type="text"
               value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
+              onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Buscar comunidad, avería, vecino..."
-              className="flex-1 bg-transparent outline-none text-slate-700 placeholder:text-slate-400 text-sm"
+              className="flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
             />
             {searchQuery && (
-              <button onClick={() => setSearchQuery("")} className="text-slate-400 hover:text-slate-600 transition-colors">
+              <button
+                onClick={() => setSearchQuery("")}
+                className="text-slate-400 transition-colors hover:text-slate-600"
+              >
                 <XCircle size={14} />
               </button>
             )}
@@ -598,8 +809,8 @@ export default function IncidentsPage() {
           {/* User avatar with dropdown */}
           <div className="relative" ref={userMenuRef}>
             <button
-              onClick={() => setUserMenuOpen(v => !v)}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-800 text-xs font-bold text-white hover:bg-slate-700 transition-colors cursor-pointer"
+              onClick={() => setUserMenuOpen((v) => !v)}
+              className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-slate-800 text-xs font-bold text-white transition-colors hover:bg-slate-700"
               title={userName}
             >
               {userInitials || "JL"}
@@ -607,24 +818,31 @@ export default function IncidentsPage() {
 
             {/* Dropdown menu */}
             {userMenuOpen && (
-              <div className="absolute right-0 top-11 z-50 w-56 rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden">
+              <div className="absolute top-11 right-0 z-50 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
                 {/* User info */}
-                <div className="px-4 py-3 border-b border-slate-100">
+                <div className="border-b border-slate-100 px-4 py-3">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-800 text-xs font-bold text-white shrink-0">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-800 text-xs font-bold text-white">
                       {userInitials || "JL"}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-900 truncate">{userName}</p>
-                      <p className="text-xs text-slate-400 truncate">{session?.user?.email ?? ""}</p>
+                      <p className="truncate text-sm font-semibold text-slate-900">
+                        {userName}
+                      </p>
+                      <p className="truncate text-xs text-slate-400">
+                        {session?.user?.email ?? ""}
+                      </p>
                     </div>
                   </div>
                 </div>
                 {/* Menu items */}
                 <div className="py-1">
                   <button
-                    onClick={() => { setUserMenuOpen(false); router.push("/profile"); }}
-                    className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+                    onClick={() => {
+                      setUserMenuOpen(false);
+                      router.push("/profile");
+                    }}
+                    className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-slate-600 transition-colors hover:bg-slate-50"
                   >
                     <User size={15} className="text-slate-400" />
                     Mi perfil
@@ -632,7 +850,7 @@ export default function IncidentsPage() {
                   <div className="my-1 border-t border-slate-100" />
                   <button
                     onClick={() => void handleSignOut()}
-                    className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                    className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-red-600 transition-colors hover:bg-red-50"
                   >
                     <LogOut size={15} />
                     Cerrar sesión
@@ -646,26 +864,38 @@ export default function IncidentsPage() {
 
       {/* Body */}
       <div className="flex flex-1 overflow-hidden">
-
         {/* Column 1: List */}
         <div className="flex w-72 shrink-0 flex-col border-r border-slate-200 bg-white">
           {/* Bulk action bar */}
           {checked.size > 0 ? (
             <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-              <button onClick={() => setChecked(new Set())} className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700">
-                <span className="text-slate-400">‹</span> {checked.size} seleccionadas
+              <button
+                onClick={() => setChecked(new Set())}
+                className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700"
+              >
+                <span className="text-slate-400">‹</span> {checked.size}{" "}
+                seleccionadas
               </button>
               <div className="flex items-center gap-2">
-                <button onClick={handleBulkAssignClick} className="rounded-lg bg-teal-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-teal-600">Asignar</button>
-                <button className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-slate-500 hover:bg-slate-50">—</button>
+                <button
+                  onClick={handleBulkAssignClick}
+                  className="rounded-lg bg-teal-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-teal-600"
+                >
+                  Asignar
+                </button>
+                <button className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-slate-500 hover:bg-slate-50">
+                  —
+                </button>
               </div>
             </div>
           ) : (
             <div className="flex flex-wrap gap-1.5 border-b border-slate-100 px-4 py-3">
-              {FILTERS.map(f => (
-                <button key={f.key} onClick={() => setFilterStatus(f.key)}
-                  className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors
-                    ${filterStatus === f.key ? "bg-teal-500 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
+              {FILTERS.map((f) => (
+                <button
+                  key={f.key}
+                  onClick={() => setFilterStatus(f.key)}
+                  className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${filterStatus === f.key ? "bg-teal-500 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}
+                >
                   {f.label}
                 </button>
               ))}
@@ -675,33 +905,51 @@ export default function IncidentsPage() {
           {/* Incident list */}
           <ul className="flex-1 overflow-y-auto">
             {filtered.length === 0 && (
-              <li className="px-4 py-8 text-center text-sm text-slate-400">Sin incidencias</li>
+              <li className="px-4 py-8 text-center text-sm text-slate-400">
+                Sin incidencias
+              </li>
             )}
             {filtered.map((inc: any) => (
-              <li key={inc.id}
-                onClick={() => { setSelectedId(inc.id); setProviderOpen(false); }}
-                className={`flex cursor-pointer items-start gap-3 border-b border-slate-100 px-4 py-3.5 transition-colors hover:bg-slate-50
-                  ${selectedId === inc.id ? "border-l-2 border-l-teal-500 bg-teal-50/40" : "border-l-2 border-l-transparent"}`}>
+              <li
+                key={inc.id}
+                onClick={() => {
+                  setSelectedId(inc.id);
+                  setProviderOpen(false);
+                }}
+                className={`flex cursor-pointer items-start gap-3 border-b border-slate-100 px-4 py-3.5 transition-colors hover:bg-slate-50 ${selectedId === inc.id ? "border-l-2 border-l-teal-500 bg-teal-50/40" : "border-l-2 border-l-transparent"}`}
+              >
                 {/* Checkbox */}
-                <div onClick={e => { e.stopPropagation(); toggleCheck(inc.id); }}
-                  className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 transition-all
-                    ${checked.has(inc.id) ? "border-teal-500 bg-teal-500" : "border-slate-300 bg-white"}`}>
-                  {checked.has(inc.id) && <Check size={10} strokeWidth={3} className="text-white" />}
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleCheck(inc.id);
+                  }}
+                  className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 transition-all ${checked.has(inc.id) ? "border-teal-500 bg-teal-500" : "border-slate-300 bg-white"}`}
+                >
+                  {checked.has(inc.id) && (
+                    <Check size={10} strokeWidth={3} className="text-white" />
+                  )}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <div className={`mt-1 h-2 w-2 shrink-0 rounded-full ${PRIORITY_COLOR[inc.priority] ?? "bg-slate-300"}`} />
-                      <p className="truncate text-sm font-semibold text-slate-900">{inc.title}</p>
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <div
+                        className={`mt-1 h-2 w-2 shrink-0 rounded-full ${PRIORITY_COLOR[inc.priority] ?? "bg-slate-300"}`}
+                      />
+                      <p className="truncate text-sm font-semibold text-slate-900">
+                        {inc.title}
+                      </p>
                     </div>
                     <StatusBadge status={inc.status} />
                   </div>
                   {(inc as any).category && (
-                    <span className="ml-3.5 mt-1 inline-block rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold capitalize text-indigo-600">
+                    <span className="mt-1 ml-3.5 inline-block rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-600 capitalize">
                       {(inc as any).category}
                     </span>
                   )}
-                  <p className="ml-3.5 mt-0.5 text-xs text-slate-400">{inc.reporter?.name ?? "Vecino"}</p>
+                  <p className="mt-0.5 ml-3.5 text-xs text-slate-400">
+                    {inc.reporter?.name ?? "Vecino"}
+                  </p>
                 </div>
               </li>
             ))}
@@ -712,18 +960,23 @@ export default function IncidentsPage() {
         {selected ? (
           <div className="flex flex-1 flex-col overflow-hidden">
             <div className="flex-1 overflow-y-auto px-8 py-6">
-
               {/* Header */}
               <div className="mb-1 flex items-start justify-between gap-4">
                 <div>
-                  <h2 className="text-2xl font-bold text-slate-900">{selected.title}</h2>
-                  <p className="mt-0.5 text-sm text-slate-400">Residencial Los Olivos · Av. de Andalucía, 105</p>
+                  <h2 className="text-2xl font-bold text-slate-900">
+                    {selected.title}
+                  </h2>
+                  <p className="mt-0.5 text-sm text-slate-400">
+                    Residencial Los Olivos · Av. de Andalucía, 105
+                  </p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex shrink-0 items-center gap-2">
                   <StatusBadge status={selected.status} />
                   {selected.status === "RESUELTA" && (
-                    <Link href={`/incidents/validate?incidentId=${selected.id}`}
-                      className="flex items-center gap-1 rounded-lg bg-teal-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-teal-600">
+                    <Link
+                      href={`/incidents/validate?incidentId=${selected.id}`}
+                      className="flex items-center gap-1 rounded-lg bg-teal-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-teal-600"
+                    >
                       Validar <ArrowRight size={12} />
                     </Link>
                   )}
@@ -735,7 +988,7 @@ export default function IncidentsPage() {
 
               {/* Category */}
               {(selected as any).category && (
-                <span className="mb-4 inline-block rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-semibold capitalize text-indigo-600">
+                <span className="mb-4 inline-block rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-600 capitalize">
                   📂 {(selected as any).category}
                 </span>
               )}
@@ -744,19 +997,31 @@ export default function IncidentsPage() {
               <div className="mb-6 aspect-video max-w-lg overflow-hidden rounded-2xl bg-slate-100">
                 {selected.photoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={resolvePhotoUrl(selected.photoUrl)!} alt="Incidencia" className="h-full w-full object-cover" />
+                  <img
+                    src={resolvePhotoUrl(selected.photoUrl)!}
+                    alt="Incidencia"
+                    className="h-full w-full object-cover"
+                  />
                 ) : (
-                  <div className="flex h-full items-center justify-center text-sm text-slate-400">Sin fotografía</div>
+                  <div className="flex h-full items-center justify-center text-sm text-slate-400">
+                    Sin fotografía
+                  </div>
                 )}
               </div>
 
               {/* Final photo (resolved/closed) */}
               {(selected as any).finalPhotoUrl && (
                 <div className="mb-6 max-w-lg">
-                  <h3 className="mb-2 text-sm font-bold text-slate-800">✅ Foto de cierre (proveedor)</h3>
-                  <div className="overflow-hidden rounded-2xl border-2 border-emerald-200 bg-emerald-50 aspect-video">
+                  <h3 className="mb-2 text-sm font-bold text-slate-800">
+                    ✅ Foto de cierre (proveedor)
+                  </h3>
+                  <div className="aspect-video overflow-hidden rounded-2xl border-2 border-emerald-200 bg-emerald-50">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={resolvePhotoUrl((selected as any).finalPhotoUrl)!} alt="Foto final" className="h-full w-full object-cover" />
+                    <img
+                      src={resolvePhotoUrl((selected as any).finalPhotoUrl)!}
+                      alt="Foto final"
+                      className="h-full w-full object-cover"
+                    />
                   </div>
                 </div>
               )}
@@ -764,51 +1029,84 @@ export default function IncidentsPage() {
               {/* Valoración del vecino */}
               {selected.rating != null && (
                 <div className="mb-6 max-w-lg rounded-2xl border border-amber-200 bg-amber-50/50 p-4">
-                  <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-amber-800">⭐ Valoración del Vecino</h3>
-                  <div className="flex items-center gap-1.5 mb-2">
+                  <h3 className="mb-2 text-xs font-bold tracking-wider text-amber-800 uppercase">
+                    ⭐ Valoración del Vecino
+                  </h3>
+                  <div className="mb-2 flex items-center gap-1.5">
                     {[1, 2, 3, 4, 5].map((s) => (
                       <Star
                         key={s}
                         size={16}
-                        className={s <= selected.rating ? "fill-amber-500 text-amber-500" : "text-slate-300"}
+                        className={
+                          s <= selected.rating
+                            ? "fill-amber-500 text-amber-500"
+                            : "text-slate-300"
+                        }
                       />
                     ))}
-                    <span className="ml-2 text-sm font-bold text-slate-800">{selected.rating} / 5</span>
+                    <span className="ml-2 text-sm font-bold text-slate-800">
+                      {selected.rating} / 5
+                    </span>
                   </div>
                   {selected.ratingComment && (
-                    <p className="text-sm italic text-slate-700">"{selected.ratingComment}"</p>
+                    <p className="text-sm text-slate-700 italic">
+                      "{selected.ratingComment}"
+                    </p>
                   )}
                 </div>
               )}
 
               {/* Description */}
               <div className="mb-6">
-                <h3 className="mb-2 text-sm font-bold text-slate-800">Descripción</h3>
-                <p className="text-sm leading-relaxed text-slate-600">{selected.description}</p>
+                <h3 className="mb-2 text-sm font-bold text-slate-800">
+                  Descripción
+                </h3>
+                <p className="text-sm leading-relaxed text-slate-600">
+                  {selected.description}
+                </p>
               </div>
 
               {/* Notes */}
               <div className="mb-6">
-                <h3 className="mb-3 text-sm font-bold text-slate-800">Notas internas</h3>
+                <h3 className="mb-3 text-sm font-bold text-slate-800">
+                  Notas internas
+                </h3>
                 <div className="space-y-2">
                   {(selected.notes ?? []).map((n: any) => {
                     // Detect base64 image data embedded in note content
-                    const base64Match = n.content?.match(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/);
+                    const base64Match = n.content?.match(
+                      /data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/,
+                    );
                     // Detect /uploads/... image path in note content
-                    const uploadsMatch = n.content?.match(/(?:Foto final:\s*)?(\/uploads\/[^\s"']+\.(jpg|jpeg|png|webp|gif))/i);
+                    const uploadsMatch = n.content?.match(
+                      /(?:Foto final:\s*)?(\/uploads\/[^\s"']+\.(jpg|jpeg|png|webp|gif))/i,
+                    );
                     // Extract non-image text
                     let textPart = n.content;
-                    if (base64Match) textPart = textPart.replace(base64Match[0], "").trim();
-                    if (uploadsMatch) textPart = textPart.replace(uploadsMatch[0], "").replace(/Foto final:\s*/gi, "").trim();
+                    if (base64Match)
+                      textPart = textPart.replace(base64Match[0], "").trim();
+                    if (uploadsMatch)
+                      textPart = textPart
+                        .replace(uploadsMatch[0], "")
+                        .replace(/Foto final:\s*/gi, "")
+                        .trim();
                     // Clean up trailing separators
-                    textPart = textPart?.replace(/[·\s]+$/, "").replace(/^[·\s]+/, "").trim();
+                    textPart = textPart
+                      ?.replace(/[·\s]+$/, "")
+                      .replace(/^[·\s]+/, "")
+                      .trim();
 
-                    const imageUrl = base64Match?.[0] ?? (uploadsMatch ? uploadsMatch[1] : null);
+                    const imageUrl =
+                      base64Match?.[0] ??
+                      (uploadsMatch ? uploadsMatch[1] : null);
 
                     return (
-                      <div key={n.id} className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                      <div
+                        key={n.id}
+                        className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3"
+                      >
                         {textPart && (
-                          <p className="text-sm font-medium text-slate-800 break-words whitespace-pre-wrap">
+                          <p className="text-sm font-medium break-words whitespace-pre-wrap text-slate-800">
                             {textPart}
                           </p>
                         )}
@@ -821,19 +1119,29 @@ export default function IncidentsPage() {
                           />
                         )}
                         <p className="mt-1 text-xs text-slate-400">
-                          {n.author?.name ?? "AF"} · {new Date(n.createdAt).toLocaleDateString("es-ES")} {new Date(n.createdAt).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
+                          {n.author?.name ?? "AF"} ·{" "}
+                          {new Date(n.createdAt).toLocaleDateString("es-ES")}{" "}
+                          {new Date(n.createdAt).toLocaleTimeString("es-ES", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
                         </p>
                       </div>
                     );
                   })}
-
                 </div>
                 <form onSubmit={handleAddNote} className="mt-3 flex gap-2">
-                  <input value={noteText} onChange={e => setNoteText(e.target.value)}
+                  <input
+                    value={noteText}
+                    onChange={(e) => setNoteText(e.target.value)}
                     placeholder="Añadir nota interna..."
-                    className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-teal-400" />
-                  <button type="submit" disabled={!noteText.trim() || addNote.isPending}
-                    className="rounded-xl bg-teal-500 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-600 disabled:opacity-40">
+                    className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-teal-400"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!noteText.trim() || addNote.isPending}
+                    className="rounded-xl bg-teal-500 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-600 disabled:opacity-40"
+                  >
                     <Plus size={15} />
                   </button>
                 </form>
@@ -841,26 +1149,38 @@ export default function IncidentsPage() {
 
               {/* Activity history */}
               <div>
-                <h3 className="mb-3 text-sm font-bold text-slate-800">Historial de actividad</h3>
+                <h3 className="mb-3 text-sm font-bold text-slate-800">
+                  Historial de actividad
+                </h3>
                 <div className="relative space-y-4 pl-5">
                   {(selected.history ?? []).length > 1 && (
-                    <div className="absolute left-2 top-2 bottom-4 w-0.5 bg-slate-200" />
+                    <div className="absolute top-2 bottom-4 left-2 w-0.5 bg-slate-200" />
                   )}
                   {[...(selected.history ?? [])].reverse().map((h: any) => {
                     const { title, comment, dotColor } = formatTimelineEntry(h);
 
                     return (
                       <div key={h.id} className="relative flex gap-3">
-                        <div className={`absolute -left-3 top-1 h-3 w-3 rounded-full border-2 border-white z-10 ${dotColor}`} />
+                        <div
+                          className={`absolute top-1 -left-3 z-10 h-3 w-3 rounded-full border-2 border-white ${dotColor}`}
+                        />
                         <div>
                           <p className="text-sm font-semibold text-slate-800">
                             {title}
                           </p>
                           {comment && (
-                            <p className="mt-1 inline-block rounded-lg border border-slate-100 bg-slate-50 px-3 py-1.5 text-xs text-slate-600 font-medium">{comment}</p>
+                            <p className="mt-1 inline-block rounded-lg border border-slate-100 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600">
+                              {comment}
+                            </p>
                           )}
                           <p className="mt-0.5 text-xs text-slate-400">
-                            {new Date(h.createdAt).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                            {new Date(h.createdAt).toLocaleString("es-ES", {
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
                           </p>
                         </div>
                       </div>
@@ -876,15 +1196,20 @@ export default function IncidentsPage() {
                 {/* Normal Admin Actions */}
                 {selected.status === "RECIBIDA" && (
                   <>
-                    <button onClick={handleReject} disabled={selected.status === "RECHAZADA"}
-                      className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors">
+                    <button
+                      onClick={handleReject}
+                      disabled={selected.status === "RECHAZADA"}
+                      className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-40"
+                    >
                       <XCircle size={15} /> No procede
                     </button>
                   </>
                 )}
-                
-              {/* Informational message for provider-managed statuses */}
-                {(selected.status === "EN_REVISION" || selected.status === "AGENDADA" || selected.status === "EN_CURSO") && (
+
+                {/* Informational message for provider-managed statuses */}
+                {(selected.status === "EN_REVISION" ||
+                  selected.status === "AGENDADA" ||
+                  selected.status === "EN_CURSO") && (
                   <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-500">
                     <span>📱</span>
                     <span>El proveedor gestionará esto desde la app móvil</span>
@@ -894,65 +1219,88 @@ export default function IncidentsPage() {
                 {/* AF: close incident after reviewing provider's completed work */}
                 {selected.status === "RESUELTA" && (
                   <button
-                    onClick={() => router.push(`/incidents/validate?incidentId=${selected.id}`)}
-                    className="flex items-center gap-1.5 rounded-xl bg-slate-800 px-5 py-2.5 text-sm font-bold text-white hover:bg-slate-900 transition-colors"
+                    onClick={() =>
+                      router.push(
+                        `/incidents/validate?incidentId=${selected.id}`,
+                      )
+                    }
+                    className="flex items-center gap-1.5 rounded-xl bg-slate-800 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-slate-900"
                   >
-                    <CheckCircle2 size={15} />
-                    ✅ Revisar y cerrar expediente
+                    <CheckCircle2 size={15} />✅ Revisar y cerrar expediente
                   </button>
                 )}
-
               </div>
 
-              {(selected.status === "RECIBIDA" || selected.status === "CADUCADA" || selected.status === "RECHAZADA" || selected.status === "NO_PRESENTADA") && (
-                <button onClick={handleAssign} disabled={!selectedProvider || assignProvider.isPending}
-                  className="flex items-center gap-2 rounded-xl bg-teal-500 px-6 py-2.5 text-sm font-bold text-white hover:bg-teal-600 disabled:opacity-40 transition-colors shadow-sm">
+              {(selected.status === "RECIBIDA" ||
+                selected.status === "CADUCADA" ||
+                selected.status === "RECHAZADA" ||
+                selected.status === "NO_PRESENTADA") && (
+                <button
+                  onClick={handleAssign}
+                  disabled={!selectedProvider || assignProvider.isPending}
+                  className="flex items-center gap-2 rounded-xl bg-teal-500 px-6 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-teal-600 disabled:opacity-40"
+                >
                   <CheckCircle2 size={15} />
                   {assignProvider.isPending
                     ? "Asignando..."
-                    : (selected.status === "CADUCADA" || selected.status === "RECHAZADA" || selected.status === "NO_PRESENTADA")
-                    ? "Reasignar proveedor"
-                    : "Asignar y Notificar Vecino"}
+                    : selected.status === "CADUCADA" ||
+                        selected.status === "RECHAZADA" ||
+                        selected.status === "NO_PRESENTADA"
+                      ? "Reasignar proveedor"
+                      : "Asignar y Notificar Vecino"}
                 </button>
               )}
             </div>
           </div>
         ) : (
-          <div className="flex flex-1 items-center justify-center text-slate-400 text-sm">
+          <div className="flex flex-1 items-center justify-center text-sm text-slate-400">
             Selecciona una incidencia
           </div>
         )}
 
         {/* Column 3: Provider panel */}
         {selected && (
-          <div className="flex w-72 shrink-0 flex-col border-l border-slate-200 bg-white overflow-y-auto">
+          <div className="flex w-72 shrink-0 flex-col overflow-y-auto border-l border-slate-200 bg-white">
             <div className="p-5">
-              <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-slate-400">Proveedor</h3>
+              <h3 className="mb-4 text-xs font-bold tracking-wider text-slate-400 uppercase">
+                Proveedor
+              </h3>
 
               {/* Dropdown trigger */}
               {(() => {
-                const isLocked = ["AGENDADA", "EN_CURSO", "RESUELTA", "CERRADA"].includes(selected.status) || (selected.status === "EN_REVISION" && !!selected.providerId);
+                const isLocked =
+                  ["AGENDADA", "EN_CURSO", "RESUELTA", "CERRADA"].includes(
+                    selected.status,
+                  ) ||
+                  (selected.status === "EN_REVISION" && !!selected.providerId);
                 return (
                   <>
                     <button
-                      onClick={() => !isLocked && setProviderOpen(v => !v)}
+                      onClick={() => !isLocked && setProviderOpen((v) => !v)}
                       disabled={isLocked}
                       className={`flex w-full items-center justify-between rounded-xl border px-4 py-3 text-sm font-semibold transition ${
                         isLocked
-                          ? "border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed"
+                          ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500"
                           : "border-teal-200 bg-teal-50 text-teal-800 hover:bg-teal-100"
                       }`}
                     >
                       <div className="flex items-center gap-2">
-                        <div className={`flex h-6 w-6 items-center justify-center rounded-full ${isLocked ? "bg-slate-400" : "bg-teal-500"} text-white`}>
+                        <div
+                          className={`flex h-6 w-6 items-center justify-center rounded-full ${isLocked ? "bg-slate-400" : "bg-teal-500"} text-white`}
+                        >
                           <Check size={12} strokeWidth={3} />
                         </div>
                         {selectedProvider?.name ?? "Seleccionar proveedor"}
                       </div>
-                      {!isLocked && (providerOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />)}
+                      {!isLocked &&
+                        (providerOpen ? (
+                          <ChevronUp size={15} />
+                        ) : (
+                          <ChevronDown size={15} />
+                        ))}
                     </button>
                     {isLocked && (
-                      <p className="mt-2 text-xs text-slate-500 font-medium">
+                      <p className="mt-2 text-xs font-medium text-slate-500">
                         {selected.status === "EN_REVISION"
                           ? "⏳ Pendiente de respuesta del proveedor (ventana de 2h). No permite cambio de asignación hasta que responda o caduque."
                           : "🔒 La incidencia ha sido aceptada/agendada por el proveedor y no permite cambio de asignación."}
@@ -963,42 +1311,70 @@ export default function IncidentsPage() {
               })()}
 
               {/* Dropdown options */}
-              {providerOpen && !(["AGENDADA", "EN_CURSO", "RESUELTA", "CERRADA"].includes(selected.status) || (selected.status === "EN_REVISION" && !!selected.providerId)) && (
-                <div className="mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                  {providers.map((p: any, i: number) => (
-                    <button key={p.id} onClick={() => { setSelectedProviderId(p.id); setProviderOpen(false); }}
-                      className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50
-                        ${i < providers.length - 1 ? "border-b border-slate-100" : ""}`}>
-                      <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all
-                        ${(selectedProvider?.id === p.id) ? "border-teal-500 bg-teal-500" : "border-slate-300"}`}>
-                        {(selectedProvider?.id === p.id) && <Check size={10} strokeWidth={3} className="text-white" />}
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-slate-800">{p.name}</p>
-                        <p className="text-xs text-slate-400">
-                          {p.isTrusted ? "✓ Historial positivo" : `${p.completedJobs} incidencias resueltas`}
-                        </p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
+              {providerOpen &&
+                !(
+                  ["AGENDADA", "EN_CURSO", "RESUELTA", "CERRADA"].includes(
+                    selected.status,
+                  ) ||
+                  (selected.status === "EN_REVISION" && !!selected.providerId)
+                ) && (
+                  <div className="mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                    {providers.map((p: any, i: number) => (
+                      <button
+                        key={p.id}
+                        onClick={() => {
+                          setSelectedProviderId(p.id);
+                          setProviderOpen(false);
+                        }}
+                        className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50 ${i < providers.length - 1 ? "border-b border-slate-100" : ""}`}
+                      >
+                        <div
+                          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all ${selectedProvider?.id === p.id ? "border-teal-500 bg-teal-500" : "border-slate-300"}`}
+                        >
+                          {selectedProvider?.id === p.id && (
+                            <Check
+                              size={10}
+                              strokeWidth={3}
+                              className="text-white"
+                            />
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-slate-800">
+                            {p.name}
+                          </p>
+                          <p className="text-xs text-slate-400">
+                            {p.isTrusted
+                              ? "✓ Historial positivo"
+                              : `${p.completedJobs} incidencias resueltas`}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
 
               {/* Selected provider card */}
               {selectedProvider && !providerOpen && (
                 <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-4">
-                  <div className="flex items-center gap-3 mb-3">
+                  <div className="mb-3 flex items-center gap-3">
                     <div className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-800 text-sm font-bold text-white">
                       {selectedProvider.avatarInitials ?? "??"}
                     </div>
                     <div>
-                      <p className="font-bold text-slate-900">{selectedProvider.name}</p>
+                      <p className="font-bold text-slate-900">
+                        {selectedProvider.name}
+                      </p>
                       <div className="flex items-center gap-1">
                         <Star size={12} fill="#f59e0b" color="#f59e0b" />
-                        <span className="text-sm font-bold text-slate-700">{selectedProvider.rating?.toFixed(1)}</span>
+                        <span className="text-sm font-bold text-slate-700">
+                          {selectedProvider.rating?.toFixed(1)}
+                        </span>
                       </div>
                       {selectedProvider.isTrusted && (
-                        <p className="text-xs text-teal-600 font-medium">Proveedor de confianza</p>
+                        <p className="text-xs font-medium text-teal-600">
+                          Proveedor de confianza
+                        </p>
                       )}
                     </div>
                   </div>
@@ -1016,7 +1392,10 @@ export default function IncidentsPage() {
                     {selectedProvider.priceRangeMin != null && (
                       <div className="flex items-center gap-2">
                         <span className="text-slate-400">€</span>
-                        <strong>{selectedProvider.priceRangeMin}€ – {selectedProvider.priceRangeMax}€</strong>
+                        <strong>
+                          {selectedProvider.priceRangeMin}€ –{" "}
+                          {selectedProvider.priceRangeMax}€
+                        </strong>
                         <span className="text-slate-400">Coste est.</span>
                       </div>
                     )}
@@ -1026,23 +1405,34 @@ export default function IncidentsPage() {
 
               {/* Assign CTA */}
               {(() => {
-                const isAlreadyAssigned = selected.providerId === selectedProvider?.id;
+                const isAlreadyAssigned =
+                  selected.providerId === selectedProvider?.id;
                 const hasAnyProvider = !!selected.providerId;
-                const isLocked = ["AGENDADA", "EN_CURSO", "RESUELTA", "CERRADA"].includes(selected.status) || (selected.status === "EN_REVISION" && hasAnyProvider);
+                const isLocked =
+                  ["AGENDADA", "EN_CURSO", "RESUELTA", "CERRADA"].includes(
+                    selected.status,
+                  ) ||
+                  (selected.status === "EN_REVISION" && hasAnyProvider);
 
                 let btnText = "Asignar Proveedor";
                 let btnCls = "bg-teal-500 hover:bg-teal-600 text-white";
-                let isBtnDisabled = !selectedProvider || assignProvider.isPending;
+                let isBtnDisabled =
+                  !selectedProvider || assignProvider.isPending;
 
                 if (assignProvider.isPending) {
                   btnText = "Asignando...";
                 } else if (isLocked) {
-                  btnText = selected.status === "EN_REVISION" ? "⏳ Pendiente de Respuesta" : "✓ Trabajo Aceptado / Agendado";
-                  btnCls = "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed";
+                  btnText =
+                    selected.status === "EN_REVISION"
+                      ? "⏳ Pendiente de Respuesta"
+                      : "✓ Trabajo Aceptado / Agendado";
+                  btnCls =
+                    "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed";
                   isBtnDisabled = true;
                 } else if (isAlreadyAssigned) {
                   btnText = "✓ Proveedor Asignado";
-                  btnCls = "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed";
+                  btnCls =
+                    "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed";
                   isBtnDisabled = true;
                 } else if (hasAnyProvider) {
                   btnText = "Reasignar a este Proveedor";
@@ -1050,12 +1440,14 @@ export default function IncidentsPage() {
                 }
 
                 return (
-                  <button 
-                    onClick={handleAssign} 
+                  <button
+                    onClick={handleAssign}
                     disabled={isBtnDisabled}
-                    className={`mt-4 flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold transition-colors shadow-sm ${btnCls}`}
+                    className={`mt-4 flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold shadow-sm transition-colors ${btnCls}`}
                   >
-                    {!isAlreadyAssigned && !isLocked && <CheckCircle2 size={15} />}
+                    {!isAlreadyAssigned && !isLocked && (
+                      <CheckCircle2 size={15} />
+                    )}
                     {btnText}
                   </button>
                 );

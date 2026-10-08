@@ -1,16 +1,16 @@
+import { agendaRouter } from "./router/agenda";
 import { authRouter } from "./router/auth";
-import { postRouter } from "./router/post";
+import { commonAreaRouter } from "./router/commonArea";
+import { communityRouter } from "./router/community";
+import { documentRouter } from "./router/document";
+import { feeRouter } from "./router/fee";
 import { incidentRouter } from "./router/incident";
 import { noticeRouter } from "./router/notice";
-import { communityRouter } from "./router/community";
 import { notificationRouter } from "./router/notification";
-import { commonAreaRouter } from "./router/commonArea";
+import { postRouter } from "./router/post";
 import { providerRouter } from "./router/provider";
-import { documentRouter } from "./router/document";
-import { votingRouter } from "./router/voting";
-import { agendaRouter } from "./router/agenda";
 import { superadminRouter } from "./router/superadmin";
-import { feeRouter } from "./router/fee";
+import { votingRouter } from "./router/voting";
 import { createTRPCRouter } from "./trpc";
 
 export const appRouter = createTRPCRouter({
@@ -28,9 +28,6 @@ export const appRouter = createTRPCRouter({
   superadmin: superadminRouter,
   fee: feeRouter,
 });
-
-
-
 
 // export type definition of API
 export type AppRouter = typeof appRouter;

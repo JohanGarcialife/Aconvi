@@ -1,24 +1,25 @@
-import { useState, useCallback } from "react";
+import { useCallback, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
   ActivityIndicator,
-  RefreshControl,
+  FlatList,
   Modal,
+  RefreshControl,
   ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { api } from "~/utils/api";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+
+import { api } from "~/utils/api";
 import {
-  useReadStatus,
-  markNoticeAsRead,
   markAllNoticesAsRead,
+  markNoticeAsRead,
+  useReadStatus,
 } from "~/utils/notifications-tracker";
 
 const TENANT_ID = "org_aconvi_demo";
@@ -62,7 +63,9 @@ const TYPE_CONFIG = {
 } as const;
 
 function getConfig(type: string) {
-  return TYPE_CONFIG[type as keyof typeof TYPE_CONFIG] ?? TYPE_CONFIG.COMUNICADO;
+  return (
+    TYPE_CONFIG[type as keyof typeof TYPE_CONFIG] ?? TYPE_CONFIG.COMUNICADO
+  );
 }
 
 function formatRelative(date: Date | string): string {
@@ -90,20 +93,35 @@ function NoticeDetailModal({
   const cfg = getConfig(notice.type ?? "COMUNICADO");
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
       <SafeAreaView style={[modalStyles.safe, { backgroundColor: cfg.bg }]}>
         {/* Header */}
         <View style={modalStyles.header}>
-          <View style={[modalStyles.typeTag, { backgroundColor: cfg.badgeBg, borderColor: cfg.border }]}>
+          <View
+            style={[
+              modalStyles.typeTag,
+              { backgroundColor: cfg.badgeBg, borderColor: cfg.border },
+            ]}
+          >
             <Text style={{ fontSize: 14 }}>{cfg.emoji}</Text>
-            <Text style={[modalStyles.typeTagText, { color: cfg.text }]}>{cfg.label}</Text>
+            <Text style={[modalStyles.typeTagText, { color: cfg.text }]}>
+              {cfg.label}
+            </Text>
           </View>
           <TouchableOpacity style={modalStyles.closeBtn} onPress={onClose}>
             <Text style={modalStyles.closeBtnText}>✕</Text>
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={modalStyles.scroll} contentContainerStyle={modalStyles.scrollContent}>
+        <ScrollView
+          style={modalStyles.scroll}
+          contentContainerStyle={modalStyles.scrollContent}
+        >
           {/* Title */}
           <Text style={modalStyles.title}>{notice.title}</Text>
 
@@ -152,7 +170,10 @@ function NoticeCard({
     <TouchableOpacity
       style={[
         styles.card,
-        { borderLeftColor: isUnread ? ALERT_RED : cfg.border, borderLeftWidth: 4 },
+        {
+          borderLeftColor: isUnread ? ALERT_RED : cfg.border,
+          borderLeftWidth: 4,
+        },
         isPinned && styles.cardPinned,
       ]}
       activeOpacity={0.7}
@@ -162,7 +183,9 @@ function NoticeCard({
       <View style={styles.cardTop}>
         <View style={[styles.typeBadge, { backgroundColor: cfg.badgeBg }]}>
           <Text style={styles.typeBadgeEmoji}>{cfg.emoji}</Text>
-          <Text style={[styles.typeBadgeLabel, { color: cfg.text }]}>{cfg.label}</Text>
+          <Text style={[styles.typeBadgeLabel, { color: cfg.text }]}>
+            {cfg.label}
+          </Text>
         </View>
         {isPinned && (
           <View style={styles.pinnedBadge}>
@@ -181,15 +204,27 @@ function NoticeCard({
               gap: 4,
             }}
           >
-            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: ALERT_RED }} />
-            <Text style={{ fontSize: 10, fontWeight: "700", color: ALERT_RED }}>Nuevo</Text>
+            <View
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: 3,
+                backgroundColor: ALERT_RED,
+              }}
+            />
+            <Text style={{ fontSize: 10, fontWeight: "700", color: ALERT_RED }}>
+              Nuevo
+            </Text>
           </View>
         )}
         <Text style={styles.dateText}>{formatRelative(notice.createdAt)}</Text>
       </View>
 
       {/* Title */}
-      <Text style={[styles.cardTitle, isUnread && { fontWeight: "800" }]} numberOfLines={2}>
+      <Text
+        style={[styles.cardTitle, isUnread && { fontWeight: "800" }]}
+        numberOfLines={2}
+      >
         {notice.title}
       </Text>
 
@@ -215,7 +250,9 @@ function EmptyState({ filter }: { filter: NoticeType }) {
     <View style={styles.emptyContainer}>
       <Text style={styles.emptyEmoji}>📭</Text>
       <Text style={styles.emptyTitle}>
-        {filter === "ALL" ? "Sin comunicados" : `Sin ${getConfig(filter).label.toLowerCase()}s`}
+        {filter === "ALL"
+          ? "Sin comunicados"
+          : `Sin ${getConfig(filter).label.toLowerCase()}s`}
       </Text>
       <Text style={styles.emptySubtitle}>
         {filter === "ALL"
@@ -235,13 +272,13 @@ export default function CommunicationScreen() {
   const { readNoticeIds } = useReadStatus();
 
   const { data: notices, isLoading } = useQuery(
-    api.notice.all.queryOptions({ tenantId: TENANT_ID })
+    api.notice.all.queryOptions({ tenantId: TENANT_ID }),
   );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await queryClient.invalidateQueries(
-      api.notice.all.queryFilter({ tenantId: TENANT_ID })
+      api.notice.all.queryFilter({ tenantId: TENANT_ID }),
     );
     setRefreshing(false);
   }, [queryClient]);
@@ -260,7 +297,9 @@ export default function CommunicationScreen() {
       ? sorted
       : sorted.filter((n: any) => (n.type ?? "COMUNICADO") === filter);
 
-  const unreadCount = noticesArray.filter((n: any) => !readNoticeIds.includes(n.id)).length;
+  const unreadCount = noticesArray.filter(
+    (n: any) => !readNoticeIds.includes(n.id),
+  ).length;
 
   const handleOpenNotice = (notice: any) => {
     void markNoticeAsRead(notice.id);
@@ -276,7 +315,9 @@ export default function CommunicationScreen() {
     ALL: noticesArray.length ?? 0,
     URGENTE: noticesArray.filter((n: any) => n.type === "URGENTE").length ?? 0,
     AVISO: noticesArray.filter((n: any) => n.type === "AVISO").length ?? 0,
-    COMUNICADO: noticesArray.filter((n: any) => (n.type ?? "COMUNICADO") === "COMUNICADO").length ?? 0,
+    COMUNICADO:
+      noticesArray.filter((n: any) => (n.type ?? "COMUNICADO") === "COMUNICADO")
+        .length ?? 0,
   };
 
   return (
@@ -285,7 +326,9 @@ export default function CommunicationScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>Tablón Digital</Text>
-          <Text style={styles.headerSubtitle}>Comunicados y avisos de tu comunidad</Text>
+          <Text style={styles.headerSubtitle}>
+            Comunicados y avisos de tu comunidad
+          </Text>
         </View>
         {unreadCount > 0 && (
           <TouchableOpacity
@@ -314,24 +357,44 @@ export default function CommunicationScreen() {
         style={styles.filterScroll}
         contentContainerStyle={styles.filterContent}
       >
-        {(["ALL", "URGENTE", "AVISO", "COMUNICADO"] as NoticeType[]).map((key) => (
-          <TouchableOpacity
-            key={key}
-            style={[styles.filterTab, filter === key && styles.filterTabActive]}
-            onPress={() => setFilter(key)}
-          >
-            <Text style={[styles.filterTabText, filter === key && styles.filterTabTextActive]}>
-              {key === "ALL" ? "Todos" : getConfig(key).label}
-            </Text>
-            {counts[key] > 0 && (
-              <View style={[styles.filterCount, filter === key && styles.filterCountActive]}>
-                <Text style={[styles.filterCountText, filter === key && styles.filterCountTextActive]}>
-                  {counts[key]}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        ))}
+        {(["ALL", "URGENTE", "AVISO", "COMUNICADO"] as NoticeType[]).map(
+          (key) => (
+            <TouchableOpacity
+              key={key}
+              style={[
+                styles.filterTab,
+                filter === key && styles.filterTabActive,
+              ]}
+              onPress={() => setFilter(key)}
+            >
+              <Text
+                style={[
+                  styles.filterTabText,
+                  filter === key && styles.filterTabTextActive,
+                ]}
+              >
+                {key === "ALL" ? "Todos" : getConfig(key).label}
+              </Text>
+              {counts[key] > 0 && (
+                <View
+                  style={[
+                    styles.filterCount,
+                    filter === key && styles.filterCountActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.filterCountText,
+                      filter === key && styles.filterCountTextActive,
+                    ]}
+                  >
+                    {counts[key]}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          ),
+        )}
       </ScrollView>
 
       {/* List */}

@@ -8,30 +8,31 @@
  * 4. Al recuperar la señal (NetInfo listener) → sube automáticamente los pendientes
  */
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
   ActivityIndicator,
-  Image,
+  Alert,
   AppState,
   AppStateStatus,
-  TextInput,
-  ScrollView,
+  Image,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter, Stack, useLocalSearchParams } from "expo-router";
-import * as ImagePicker from "~/utils/safe-image-picker";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import NetInfo from "~/utils/safe-netinfo";
 import * as FileSystem from "expo-file-system/legacy";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useMutation, useQuery } from "@tanstack/react-query";
+
 import { api, queryClient } from "~/utils/api";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import * as ImagePicker from "~/utils/safe-image-picker";
+import NetInfo from "~/utils/safe-netinfo";
 
 const PRIMARY = "#009689";
 const DARK = "#0f172a";
@@ -57,8 +58,12 @@ function useElapsedTimer(startTimestamp?: string | Date | null) {
     return () => clearInterval(interval);
   }, [startTimestamp]);
 
-  const h = Math.floor(elapsed / 3600).toString().padStart(2, "0");
-  const m = Math.floor((elapsed % 3600) / 60).toString().padStart(2, "0");
+  const h = Math.floor(elapsed / 3600)
+    .toString()
+    .padStart(2, "0");
+  const m = Math.floor((elapsed % 3600) / 60)
+    .toString()
+    .padStart(2, "0");
   const s = (elapsed % 60).toString().padStart(2, "0");
   return `${h}:${m}:${s}`;
 }
@@ -101,7 +106,10 @@ async function removeFromQueue(id: string): Promise<void> {
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function CompleteJobScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ incidentId?: string; providerId?: string }>();
+  const params = useLocalSearchParams<{
+    incidentId?: string;
+    providerId?: string;
+  }>();
 
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
@@ -114,7 +122,10 @@ export default function CompleteJobScreen() {
 
   // ─── Fetch incident details ──────────────────────────────────────────────────
   const { data: incident } = useQuery({
-    ...api.incident.byId.queryOptions({ id: params.incidentId ?? "", tenantId: DEMO_TENANT_ID }),
+    ...api.incident.byId.queryOptions({
+      id: params.incidentId ?? "",
+      tenantId: DEMO_TENANT_ID,
+    }),
     enabled: !!params.incidentId,
     refetchInterval: 300000,
   });
@@ -131,21 +142,27 @@ export default function CompleteJobScreen() {
     api.incident.providerComplete.mutationOptions({
       onSuccess: () => {
         // Invalidate all incident caches so screens refresh automatically
-        void queryClient.invalidateQueries(api.incident.assignedToProvider.queryFilter());
+        void queryClient.invalidateQueries(
+          api.incident.assignedToProvider.queryFilter(),
+        );
         void queryClient.invalidateQueries(api.incident.all.queryFilter());
         router.push({
           pathname: "/(proveedor)/job/done",
           params: {
-            id: incident ? `INC-${incident.id.slice(0, 8).toUpperCase()}` : "INC-2025-0412",
+            id: incident
+              ? `INC-${incident.id.slice(0, 8).toUpperCase()}`
+              : "INC-2025-0412",
             community: incident?.organization?.name ?? "Residencial El Lago",
-            cost: incident?.estimatedCost ? `${incident.estimatedCost} €` : "155 €",
-          }
+            cost: incident?.estimatedCost
+              ? `${incident.estimatedCost} €`
+              : "155 €",
+          },
         });
       },
       onError: (e: any) => {
         Alert.alert("Error al cerrar", e.message ?? "Inténtalo más tarde.");
       },
-    })
+    }),
   );
 
   // ─── Sync offline queue ───────────────────────────────────────────────────
@@ -211,19 +228,27 @@ export default function CompleteJobScreen() {
 
   // ─── AppState: al volver al primer plano, intentar sync ──────────────────
   useEffect(() => {
-    const sub = AppState.addEventListener("change", (nextState: AppStateStatus) => {
-      if (appState.current.match(/inactive|background/) && nextState === "active") {
-        void syncQueue();
-      }
-      appState.current = nextState;
-    });
+    const sub = AppState.addEventListener(
+      "change",
+      (nextState: AppStateStatus) => {
+        if (
+          appState.current.match(/inactive|background/) &&
+          nextState === "active"
+        ) {
+          void syncQueue();
+        }
+        appState.current = nextState;
+      },
+    );
     return () => sub.remove();
   }, [syncQueue]);
 
   const [photoBase64, setPhotoBase64] = useState<string | null>(null);
 
   // ─── Upload photo to dedicated endpoint (avoids large tRPC body) ─────────
-  const uploadPhotoToServer = async (base64Data: string): Promise<string | null> => {
+  const uploadPhotoToServer = async (
+    base64Data: string,
+  ): Promise<string | null> => {
     try {
       const { getBaseUrl } = await import("~/utils/base-url");
       const res = await fetch(`${getBaseUrl()}/api/upload-photo`, {
@@ -232,7 +257,7 @@ export default function CompleteJobScreen() {
         body: JSON.stringify({ base64: base64Data }),
       });
       if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
-      const json = await res.json() as { url?: string; error?: string };
+      const json = (await res.json()) as { url?: string; error?: string };
       if (!json.url) throw new Error(json.error ?? "No URL returned");
       return json.url;
     } catch (err) {
@@ -248,7 +273,10 @@ export default function CompleteJobScreen() {
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
-      Alert.alert("Permiso requerido", "Necesitamos acceso para añadir la foto del trabajo.");
+      Alert.alert(
+        "Permiso requerido",
+        "Necesitamos acceso para añadir la foto del trabajo.",
+      );
       return;
     }
 
@@ -284,7 +312,10 @@ export default function CompleteJobScreen() {
           setPhotoBase64(`data:image/jpeg;base64,${b64}`);
         } catch (err) {
           console.warn("[complete] FileSystem base64 fallback failed:", err);
-          Alert.alert("Error al leer foto", "No se pudo procesar la imagen. Intenta de nuevo.");
+          Alert.alert(
+            "Error al leer foto",
+            "No se pudo procesar la imagen. Intenta de nuevo.",
+          );
           setPhotoUri(null);
         } finally {
           setIsReadingPhoto(false);
@@ -294,17 +325,24 @@ export default function CompleteJobScreen() {
   };
 
   const showPhotoOptions = () => {
-    Alert.alert("Foto del trabajo finalizado", "¿Cómo quieres añadir la foto?", [
-      { text: "📷 Cámara", onPress: () => handlePickPhoto(true) },
-      { text: "🖼️ Galería", onPress: () => handlePickPhoto(false) },
-      { text: "Cancelar", style: "cancel" },
-    ]);
+    Alert.alert(
+      "Foto del trabajo finalizado",
+      "¿Cómo quieres añadir la foto?",
+      [
+        { text: "📷 Cámara", onPress: () => handlePickPhoto(true) },
+        { text: "🖼️ Galería", onPress: () => handlePickPhoto(false) },
+        { text: "Cancelar", style: "cancel" },
+      ],
+    );
   };
 
   // ─── Submit ───────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     if (!isPhotoOptional && (!photoUri || !photoBase64)) {
-      Alert.alert("Foto requerida", "Debes añadir una foto del trabajo terminado antes de cerrar.");
+      Alert.alert(
+        "Foto requerida",
+        "Debes añadir una foto del trabajo terminado antes de cerrar.",
+      );
       return;
     }
 
@@ -315,10 +353,14 @@ export default function CompleteJobScreen() {
       router.push({
         pathname: "/(proveedor)/job/done",
         params: {
-          id: incident ? `INC-${incident.id.slice(0, 8).toUpperCase()}` : "INC-2025-0412",
+          id: incident
+            ? `INC-${incident.id.slice(0, 8).toUpperCase()}`
+            : "INC-2025-0412",
           community: incident?.organization?.name ?? "Residencial El Lago",
-          cost: incident?.estimatedCost ? `${incident.estimatedCost} €` : "155 €",
-        }
+          cost: incident?.estimatedCost
+            ? `${incident.estimatedCost} €`
+            : "155 €",
+        },
       });
       return;
     }
@@ -341,14 +383,25 @@ export default function CompleteJobScreen() {
       Alert.alert(
         "📶 Guardado sin conexión",
         "Tu cierre de trabajo se ha guardado localmente. Se enviará automáticamente cuando recuperes señal.",
-        [{ text: "OK", onPress: () => router.push({
-          pathname: "/(proveedor)/job/done",
-          params: {
-            id: incident ? `INC-${incident.id.slice(0, 8).toUpperCase()}` : "INC-2025-0412",
-            community: incident?.organization?.name ?? "Residencial El Lago",
-            cost: incident?.estimatedCost ? `${incident.estimatedCost} €` : "155 €",
-          }
-        }) }],
+        [
+          {
+            text: "OK",
+            onPress: () =>
+              router.push({
+                pathname: "/(proveedor)/job/done",
+                params: {
+                  id: incident
+                    ? `INC-${incident.id.slice(0, 8).toUpperCase()}`
+                    : "INC-2025-0412",
+                  community:
+                    incident?.organization?.name ?? "Residencial El Lago",
+                  cost: incident?.estimatedCost
+                    ? `${incident.estimatedCost} €`
+                    : "155 €",
+                },
+              }),
+          },
+        ],
       );
     } else {
       // ── Online: upload photo first if present, then send URL via tRPC ──
@@ -356,7 +409,10 @@ export default function CompleteJobScreen() {
       if (photoBase64) {
         const res = await uploadPhotoToServer(photoBase64);
         if (!res) {
-          Alert.alert("Error al subir foto", "No se pudo subir la foto. Verifica tu conexión e inténtalo de nuevo.");
+          Alert.alert(
+            "Error al subir foto",
+            "No se pudo subir la foto. Verifica tu conexión e inténtalo de nuevo.",
+          );
           return;
         }
         uploadedUrl = res;
@@ -373,8 +429,10 @@ export default function CompleteJobScreen() {
 
   const isLoading = completeMutation.isPending || isSyncing || isReadingPhoto;
 
-  const arrivalTimestamp = (incident as any)?.startedAt ?? 
-    (incident as any)?.history?.find((h: any) => h.action === "ARRIVED")?.createdAt ??
+  const arrivalTimestamp =
+    (incident as any)?.startedAt ??
+    (incident as any)?.history?.find((h: any) => h.action === "ARRIVED")
+      ?.createdAt ??
     (incident as any)?.assignedAt ??
     (incident as any)?.createdAt;
 
@@ -382,126 +440,172 @@ export default function CompleteJobScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
-      <Stack.Screen options={{ title: "Cerrar trabajo", headerBackTitle: "Regresar" }} />
+      <Stack.Screen
+        options={{ title: "Cerrar trabajo", headerBackTitle: "Regresar" }}
+      />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior="padding"
         keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
-      <ScrollView
-        ref={scrollRef}
-        contentContainerStyle={styles.container}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* Offline/sync banner */}
-        {isOffline && (
-          <View style={styles.offlineBanner}>
-            <Text style={styles.offlineBannerText}>
-              📵 Sin conexión — el cierre se guardará localmente
-            </Text>
-          </View>
-        )}
-
-        {!isOffline && pendingCount > 0 && (
-          <TouchableOpacity style={styles.syncBanner} onPress={syncQueue} disabled={isSyncing}>
-            <Text style={styles.syncBannerText}>
-              {isSyncing
-                ? "⏳ Sincronizando..."
-                : `☁️ ${pendingCount} trabajo${pendingCount > 1 ? "s" : ""} pendiente${pendingCount > 1 ? "s" : ""} de subir. Pulsa para sincronizar.`}
-            </Text>
-          </TouchableOpacity>
-        )}
-
-        {arrivalTimestamp && (
-          <View style={{ backgroundColor: "#F0FDF4", paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginBottom: 16, borderWidth: 1, borderColor: "#BBF7D0", alignSelf: "flex-start" }}>
-            <Text style={{ color: "#166534", fontWeight: "700", fontSize: 15 }}>⏱️ Tiempo de intervención: {elapsedTime}</Text>
-          </View>
-        )}
-
-        <Text style={styles.title}>Foto del trabajo finalizado</Text>
-        <Text style={styles.subtitle}>
-          El administrador validará el trabajo antes de cerrar el expediente.
-        </Text>
-
-        {/* Foto */}
-        {!photoUri ? (
-          <TouchableOpacity style={styles.photoPicker} onPress={showPhotoOptions} activeOpacity={0.7}>
-            <Text style={styles.photoPickerEmoji}>📷</Text>
-            <Text style={styles.photoPickerLabel}>Añadir foto del trabajo terminado</Text>
-            <Text style={{ fontSize: 11, color: MUTED, marginTop: 4 }}>
-              {isPhotoOptional ? "Opcional para esta categoría" : "Obligatorio para cerrar la incidencia"}
-            </Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.photoPreviewContainer}>
-            <Image source={{ uri: photoUri }} style={styles.photoPreviewImg} />
-            <TouchableOpacity
-              style={styles.changePhotoBtn}
-              onPress={showPhotoOptions}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.changePhotoText}>📷 Cambiar foto</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Notas opcionales */}
-        <TextInput
-          style={styles.notesInput}
-          placeholder="Añade notas sobre el trabajo realizado (opcional)..."
-          placeholderTextColor="#94a3b8"
-          multiline
-          value={notes}
-          onChangeText={setNotes}
-          textAlignVertical="top"
-          maxLength={500}
-          onFocus={() => {
-            // Scroll to end so the TextInput + button are visible above keyboard
-            setTimeout(() => {
-              scrollRef.current?.scrollToEnd({ animated: true });
-            }, 150);
-          }}
-        />
-
-        {/* Checklist */}
-        <View style={styles.checklist}>
-          <Text style={styles.checklistTitle}>Antes de enviar, confirma:</Text>
-          {[
-            "La avería está reparada correctamente",
-            "La zona está limpia y ordenada",
-            ...(isPhotoOptional ? [] : ["La foto muestra claramente el trabajo terminado"]),
-          ].map((item) => (
-            <View key={item} style={styles.checkItem}>
-              <Text style={{ color: PRIMARY, fontSize: 14, fontWeight: "700" }}>✓</Text>
-              <Text style={styles.checkItemText}>{item}</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* CTA */}
-        <TouchableOpacity
-          style={[styles.submitButton, ((!isPhotoOptional && (!photoUri || !photoBase64)) || isLoading) && { opacity: 0.5 }]}
-          onPress={handleSubmit}
-          disabled={(!isPhotoOptional && (!photoUri || !photoBase64)) || isLoading}
-          activeOpacity={0.85}
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={styles.container}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          {isLoading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.submitButtonText}>
-              {isOffline ? "💾 Guardar offline" : "✓ Marcar como finalizado"}
-            </Text>
+          {/* Offline/sync banner */}
+          {isOffline && (
+            <View style={styles.offlineBanner}>
+              <Text style={styles.offlineBannerText}>
+                📵 Sin conexión — el cierre se guardará localmente
+              </Text>
+            </View>
           )}
-        </TouchableOpacity>
 
-        <Text style={styles.offlineNote}>
-          {isOffline
-            ? "Sin conexión: se guardará localmente y se enviará automáticamente al recuperar señal."
-            : "El vecino recibirá una notificación cuando valides el trabajo."}
-        </Text>
-      </ScrollView>
+          {!isOffline && pendingCount > 0 && (
+            <TouchableOpacity
+              style={styles.syncBanner}
+              onPress={syncQueue}
+              disabled={isSyncing}
+            >
+              <Text style={styles.syncBannerText}>
+                {isSyncing
+                  ? "⏳ Sincronizando..."
+                  : `☁️ ${pendingCount} trabajo${pendingCount > 1 ? "s" : ""} pendiente${pendingCount > 1 ? "s" : ""} de subir. Pulsa para sincronizar.`}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {arrivalTimestamp && (
+            <View
+              style={{
+                backgroundColor: "#F0FDF4",
+                paddingHorizontal: 16,
+                paddingVertical: 8,
+                borderRadius: 20,
+                marginBottom: 16,
+                borderWidth: 1,
+                borderColor: "#BBF7D0",
+                alignSelf: "flex-start",
+              }}
+            >
+              <Text
+                style={{ color: "#166534", fontWeight: "700", fontSize: 15 }}
+              >
+                ⏱️ Tiempo de intervención: {elapsedTime}
+              </Text>
+            </View>
+          )}
+
+          <Text style={styles.title}>Foto del trabajo finalizado</Text>
+          <Text style={styles.subtitle}>
+            El administrador validará el trabajo antes de cerrar el expediente.
+          </Text>
+
+          {/* Foto */}
+          {!photoUri ? (
+            <TouchableOpacity
+              style={styles.photoPicker}
+              onPress={showPhotoOptions}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.photoPickerEmoji}>📷</Text>
+              <Text style={styles.photoPickerLabel}>
+                Añadir foto del trabajo terminado
+              </Text>
+              <Text style={{ fontSize: 11, color: MUTED, marginTop: 4 }}>
+                {isPhotoOptional
+                  ? "Opcional para esta categoría"
+                  : "Obligatorio para cerrar la incidencia"}
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.photoPreviewContainer}>
+              <Image
+                source={{ uri: photoUri }}
+                style={styles.photoPreviewImg}
+              />
+              <TouchableOpacity
+                style={styles.changePhotoBtn}
+                onPress={showPhotoOptions}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.changePhotoText}>📷 Cambiar foto</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Notas opcionales */}
+          <TextInput
+            style={styles.notesInput}
+            placeholder="Añade notas sobre el trabajo realizado (opcional)..."
+            placeholderTextColor="#94a3b8"
+            multiline
+            value={notes}
+            onChangeText={setNotes}
+            textAlignVertical="top"
+            maxLength={500}
+            onFocus={() => {
+              // Scroll to end so the TextInput + button are visible above keyboard
+              setTimeout(() => {
+                scrollRef.current?.scrollToEnd({ animated: true });
+              }, 150);
+            }}
+          />
+
+          {/* Checklist */}
+          <View style={styles.checklist}>
+            <Text style={styles.checklistTitle}>
+              Antes de enviar, confirma:
+            </Text>
+            {[
+              "La avería está reparada correctamente",
+              "La zona está limpia y ordenada",
+              ...(isPhotoOptional
+                ? []
+                : ["La foto muestra claramente el trabajo terminado"]),
+            ].map((item) => (
+              <View key={item} style={styles.checkItem}>
+                <Text
+                  style={{ color: PRIMARY, fontSize: 14, fontWeight: "700" }}
+                >
+                  ✓
+                </Text>
+                <Text style={styles.checkItemText}>{item}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* CTA */}
+          <TouchableOpacity
+            style={[
+              styles.submitButton,
+              ((!isPhotoOptional && (!photoUri || !photoBase64)) ||
+                isLoading) && { opacity: 0.5 },
+            ]}
+            onPress={handleSubmit}
+            disabled={
+              (!isPhotoOptional && (!photoUri || !photoBase64)) || isLoading
+            }
+            activeOpacity={0.85}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.submitButtonText}>
+                {isOffline ? "💾 Guardar offline" : "✓ Marcar como finalizado"}
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          <Text style={styles.offlineNote}>
+            {isOffline
+              ? "Sin conexión: se guardará localmente y se enviará automáticamente al recuperar señal."
+              : "El vecino recibirá una notificación cuando valides el trabajo."}
+          </Text>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -519,7 +623,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#fde68a",
   },
-  offlineBannerText: { fontSize: 13, color: "#92400e", fontWeight: "600", textAlign: "center" },
+  offlineBannerText: {
+    fontSize: 13,
+    color: "#92400e",
+    fontWeight: "600",
+    textAlign: "center",
+  },
   syncBanner: {
     backgroundColor: "#ecfdf5",
     borderRadius: 10,
@@ -529,8 +638,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#bbf7d0",
   },
-  syncBannerText: { fontSize: 13, color: "#065f46", fontWeight: "600", textAlign: "center" },
-  title: { fontSize: 22, fontWeight: "800", color: DARK, marginBottom: 6, letterSpacing: -0.4 },
+  syncBannerText: {
+    fontSize: 13,
+    color: "#065f46",
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: DARK,
+    marginBottom: 6,
+    letterSpacing: -0.4,
+  },
   subtitle: { fontSize: 13, color: MUTED, lineHeight: 18, marginBottom: 20 },
   photoPicker: {
     borderWidth: 2,
@@ -579,8 +699,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: BORDER,
   },
-  checklistTitle: { fontSize: 13, fontWeight: "700", color: DARK, marginBottom: 10 },
-  checkItem: { flexDirection: "row", gap: 10, marginBottom: 8, alignItems: "flex-start" },
+  checklistTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: DARK,
+    marginBottom: 10,
+  },
+  checkItem: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 8,
+    alignItems: "flex-start",
+  },
   checkItemText: { fontSize: 13, color: MUTED, flex: 1, lineHeight: 18 },
   submitButton: {
     backgroundColor: PRIMARY,
@@ -595,7 +725,12 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   submitButtonText: { color: "#fff", fontSize: 17, fontWeight: "700" },
-  offlineNote: { fontSize: 11, color: MUTED, textAlign: "center", lineHeight: 16 },
+  offlineNote: {
+    fontSize: 11,
+    color: MUTED,
+    textAlign: "center",
+    lineHeight: 16,
+  },
   timerBadge: {
     backgroundColor: "#ecfdf5",
     borderColor: "#a7f3d0",

@@ -1,13 +1,14 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
   Building2,
-  UsersRound,
+  LayoutDashboard,
   Settings,
   ShieldAlert,
+  UsersRound,
 } from "lucide-react";
 
 import {
@@ -16,18 +17,25 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarHeader,
 } from "@acme/ui/sidebar";
-import Image from "next/image";
 
 const items = [
   { title: "SaaS Dashboard", url: "/superadmin", icon: LayoutDashboard },
   { title: "Fincas Globales", url: "/superadmin/communities", icon: Building2 },
-  { title: "Directorio AFs", url: "/superadmin/administrators", icon: UsersRound },
-  { title: "Ajustes de Plataforma", url: "/superadmin/settings", icon: Settings },
+  {
+    title: "Directorio AFs",
+    url: "/superadmin/administrators",
+    icon: UsersRound,
+  },
+  {
+    title: "Ajustes de Plataforma",
+    url: "/superadmin/settings",
+    icon: Settings,
+  },
 ];
 
 export function AppSidebarSuperAdmin() {
@@ -35,13 +43,16 @@ export function AppSidebarSuperAdmin() {
 
   return (
     <Sidebar className="border-r border-slate-200 bg-white text-slate-900">
-      <SidebarHeader className="px-2 py-4 border-b border-slate-200">
-        <Link href="/superadmin" className="flex items-center justify-center no-underline select-none">
+      <SidebarHeader className="border-b border-slate-200 px-2 py-4">
+        <Link
+          href="/superadmin"
+          className="flex items-center justify-center no-underline select-none"
+        >
           <div className="flex flex-col items-center">
             {/* Si tienes una variante de logo claro o simplemente texto */}
-            <span className="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-              <ShieldAlert className="w-5 h-5 text-indigo-600" />
-              Aconvi <span className="text-indigo-600 font-black">SaaS</span>
+            <span className="flex items-center gap-2 text-xl font-bold tracking-tight text-slate-900">
+              <ShieldAlert className="h-5 w-5 text-indigo-600" />
+              Aconvi <span className="font-black text-indigo-600">SaaS</span>
             </span>
           </div>
         </Link>
@@ -71,7 +82,7 @@ export function AppSidebarSuperAdmin() {
                     >
                       <Link
                         href={item.url}
-                        className="flex justify-between items-center w-full"
+                        className="flex w-full items-center justify-between"
                       >
                         <div className="flex items-center gap-3">
                           <item.icon className="h-4 w-4 shrink-0" />
@@ -87,9 +98,9 @@ export function AppSidebarSuperAdmin() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="p-4 flex flex-col gap-3 border-t border-slate-200">
+      <SidebarFooter className="flex flex-col gap-3 border-t border-slate-200 p-4">
         <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-xs text-indigo-700">
-          <p className="leading-snug font-semibold text-center">
+          <p className="text-center leading-snug font-semibold">
             Módulo Maestro SuperAdmin
           </p>
         </div>

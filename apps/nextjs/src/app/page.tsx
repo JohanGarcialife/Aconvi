@@ -89,7 +89,13 @@ export default function LandingPage() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Image src="/logo.png" alt="Aconvi" width={140} height={46} style={{ objectFit: 'contain' }} />
+          <Image
+            src="/logo.png"
+            alt="Aconvi"
+            width={140}
+            height={46}
+            style={{ objectFit: "contain" }}
+          />
         </div>
         <Link
           href="/login"
@@ -157,12 +163,19 @@ export default function LandingPage() {
             lineHeight: 1.7,
           }}
         >
-          Hay una forma distinta de operar comunidades.{" "}
-          <br />Sin llamadas constantes.{" "}
-          <br />Sin depender de todo a la vez.
+          Hay una forma distinta de operar comunidades. <br />
+          Sin llamadas constantes. <br />
+          Sin depender de todo a la vez.
         </p>
 
-        <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 12,
+            justifyContent: "center",
+            flexWrap: "wrap",
+          }}
+        >
           <Link
             href="/login"
             style={{
@@ -214,19 +227,29 @@ export default function LandingPage() {
       </section>
 
       {/* ── Features ── */}
-      <section id="features" style={{ padding: "80px 24px", maxWidth: 1200, margin: "0 auto" }}>
+      <section
+        id="features"
+        style={{ padding: "80px 24px", maxWidth: 1200, margin: "0 auto" }}
+      >
         <div style={{ textAlign: "center", marginBottom: 56 }}>
           <h2
             style={{
               fontSize: "clamp(1.8rem, 4vw, 2.5rem)",
               fontWeight: 800,
               marginBottom: 16,
-              color: "#18181b"
+              color: "#18181b",
             }}
           >
             El problema no es tener herramientas.
           </h2>
-          <p style={{ color: "#52525b", fontSize: 16, maxWidth: 500, margin: "0 auto" }}>
+          <p
+            style={{
+              color: "#52525b",
+              fontSize: 16,
+              maxWidth: 500,
+              margin: "0 auto",
+            }}
+          >
             Es cómo está organizado el trabajo.
           </p>
         </div>
@@ -246,9 +269,10 @@ export default function LandingPage() {
                 border: "1px solid #e4e4e7",
                 borderRadius: 16,
                 padding: 28,
-                transition: "border-color 0.2s, transform 0.2s, box-shadow 0.2s",
+                transition:
+                  "border-color 0.2s, transform 0.2s, box-shadow 0.2s",
               }}
-              className="hover:border-[#00bda5]/40 hover:-translate-y-1 hover:shadow-lg hover:shadow-teal-500/5"
+              className="hover:-translate-y-1 hover:border-[#00bda5]/40 hover:shadow-lg hover:shadow-teal-500/5"
             >
               <div
                 style={{
@@ -265,8 +289,26 @@ export default function LandingPage() {
               >
                 {emoji}
               </div>
-              <h3 style={{ fontWeight: 700, fontSize: 17, marginBottom: 8, color: "#18181b" }}>{title}</h3>
-              <p style={{ color: "#52525b", fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-line" }}>{desc}</p>
+              <h3
+                style={{
+                  fontWeight: 700,
+                  fontSize: 17,
+                  marginBottom: 8,
+                  color: "#18181b",
+                }}
+              >
+                {title}
+              </h3>
+              <p
+                style={{
+                  color: "#52525b",
+                  fontSize: 14,
+                  lineHeight: 1.6,
+                  whiteSpace: "pre-line",
+                }}
+              >
+                {desc}
+              </p>
             </div>
           ))}
         </div>
@@ -287,7 +329,7 @@ export default function LandingPage() {
               fontSize: "clamp(1.8rem, 4vw, 2.5rem)",
               fontWeight: 800,
               marginBottom: 16,
-              color: "#18181b"
+              color: "#18181b",
             }}
           >
             Cuando el trabajo está organizado, todos lo notan.
@@ -327,10 +369,26 @@ export default function LandingPage() {
                 >
                   {emoji}
                 </div>
-                <h3 style={{ fontWeight: 700, fontSize: 17, marginBottom: 8, color: "#18181b" }}>
+                <h3
+                  style={{
+                    fontWeight: 700,
+                    fontSize: 17,
+                    marginBottom: 8,
+                    color: "#18181b",
+                  }}
+                >
                   {role}
                 </h3>
-                <p style={{ color: "#52525b", fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-line" }}>{desc}</p>
+                <p
+                  style={{
+                    color: "#52525b",
+                    fontSize: 14,
+                    lineHeight: 1.6,
+                    whiteSpace: "pre-line",
+                  }}
+                >
+                  {desc}
+                </p>
               </div>
             ))}
           </div>
@@ -384,15 +442,43 @@ export default function LandingPage() {
         }}
       >
         <p style={{ color: "#71717a", fontSize: 13, marginBottom: 8 }}>
-          © {new Date().getFullYear()} Aconvi · Nueva forma de operar comunidades ·{" "}
-          <Link href="/login" style={{ color: "#00bda5", textDecoration: "none", fontWeight: 500 }}>
+          © {new Date().getFullYear()} Aconvi · Nueva forma de operar
+          comunidades ·{" "}
+          <Link
+            href="/login"
+            style={{
+              color: "#00bda5",
+              textDecoration: "none",
+              fontWeight: 500,
+            }}
+          >
             Acceso al Portal
           </Link>
         </p>
         <p style={{ color: "#71717a", fontSize: 12 }}>
-          <a href="#" style={{ color: "#71717a", textDecoration: "none", marginRight: 12 }}>Condiciones Generales</a>
-          <a href="#" style={{ color: "#71717a", textDecoration: "none", marginRight: 12 }}>Política de Privacidad</a>
-          <a href="#" style={{ color: "#71717a", textDecoration: "none" }}>Política de Cookies</a>
+          <a
+            href="#"
+            style={{
+              color: "#71717a",
+              textDecoration: "none",
+              marginRight: 12,
+            }}
+          >
+            Condiciones Generales
+          </a>
+          <a
+            href="#"
+            style={{
+              color: "#71717a",
+              textDecoration: "none",
+              marginRight: 12,
+            }}
+          >
+            Política de Privacidad
+          </a>
+          <a href="#" style={{ color: "#71717a", textDecoration: "none" }}>
+            Política de Cookies
+          </a>
         </p>
       </footer>
     </div>

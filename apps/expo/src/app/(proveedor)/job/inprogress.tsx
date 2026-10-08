@@ -1,16 +1,17 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
   ActivityIndicator,
   Alert,
   AppState,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter, Stack, useLocalSearchParams } from "expo-router";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { useMutation, useQuery } from "@tanstack/react-query";
+
 import { api } from "~/utils/api";
 
 const PRIMARY = "#009689";
@@ -38,20 +39,30 @@ function useElapsedTimer(startTimestamp?: string | Date | null) {
     return () => clearInterval(interval);
   }, [startTimestamp]);
 
-  const h = Math.floor(elapsed / 3600).toString().padStart(2, "0");
-  const m = Math.floor((elapsed % 3600) / 60).toString().padStart(2, "0");
+  const h = Math.floor(elapsed / 3600)
+    .toString()
+    .padStart(2, "0");
+  const m = Math.floor((elapsed % 3600) / 60)
+    .toString()
+    .padStart(2, "0");
   const s = (elapsed % 60).toString().padStart(2, "0");
   return `${h}:${m}:${s}`;
 }
 
 export default function JobInProgressScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ incidentId?: string; providerId?: string }>();
+  const params = useLocalSearchParams<{
+    incidentId?: string;
+    providerId?: string;
+  }>();
   const [arrivedLoading, setArrivedLoading] = useState(false);
 
   // ─── Fetch incident details ───────────────────────────────────────────────
   const { data: incident } = useQuery({
-    ...api.incident.byId.queryOptions({ id: params.incidentId ?? "", tenantId: DEMO_TENANT_ID }),
+    ...api.incident.byId.queryOptions({
+      id: params.incidentId ?? "",
+      tenantId: DEMO_TENANT_ID,
+    }),
     enabled: !!params.incidentId,
     refetchInterval: 300000,
   });
@@ -62,15 +73,21 @@ export default function JobInProgressScreen() {
       onError: (err: any) => {
         Alert.alert(
           "Error de conexión",
-          "No se pudo confirmar tu llegada en el servidor. Por favor, reintenta: " + (err.message || "")
+          "No se pudo confirmar tu llegada en el servidor. Por favor, reintenta: " +
+            (err.message || ""),
         );
       },
-    })
+    }),
   );
 
-  const isArrived = incident?.status === "EN_CURSO" || !!(incident as any)?.startedAt || arrivedMutation.isSuccess;
+  const isArrived =
+    incident?.status === "EN_CURSO" ||
+    !!(incident as any)?.startedAt ||
+    arrivedMutation.isSuccess;
 
-  const scheduledAtTime = (incident as any)?.scheduledAt ? new Date((incident as any).scheduledAt).getTime() : null;
+  const scheduledAtTime = (incident as any)?.scheduledAt
+    ? new Date((incident as any).scheduledAt).getTime()
+    : null;
   const [nowTime, setNowTime] = useState(Date.now());
 
   useEffect(() => {
@@ -80,14 +97,20 @@ export default function JobInProgressScreen() {
   }, [isArrived, scheduledAtTime]);
 
   const EARLY_BUFFER_MS = 15 * 60 * 1000;
-  const canArrive = isArrived || !scheduledAtTime || (nowTime >= scheduledAtTime - EARLY_BUFFER_MS);
+  const canArrive =
+    isArrived ||
+    !scheduledAtTime ||
+    nowTime >= scheduledAtTime - EARLY_BUFFER_MS;
 
   const handleArrived = async () => {
     if (isArrived) {
       // Provider is already on site with live timer running — proceed to photo upload & completion
       router.push({
         pathname: "/(proveedor)/job/complete",
-        params: { incidentId: params.incidentId, providerId: params.providerId },
+        params: {
+          incidentId: params.incidentId,
+          providerId: params.providerId,
+        },
       });
       return;
     }
@@ -107,27 +130,39 @@ export default function JobInProgressScreen() {
     } else {
       router.push({
         pathname: "/(proveedor)/job/complete",
-        params: { incidentId: params.incidentId, providerId: params.providerId },
+        params: {
+          incidentId: params.incidentId,
+          providerId: params.providerId,
+        },
       });
     }
     setArrivedLoading(false);
   };
 
   // Find arrival timestamp from startedAt or history
-  const arrivalTimestamp = (incident as any)?.startedAt ?? 
-    (incident as any)?.history?.find((h: any) => h.action === "ARRIVED")?.createdAt ??
+  const arrivalTimestamp =
+    (incident as any)?.startedAt ??
+    (incident as any)?.history?.find((h: any) => h.action === "ARRIVED")
+      ?.createdAt ??
     (isArrived ? new Date() : null);
 
   const elapsedTime = useElapsedTimer(arrivalTimestamp);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
-      <Stack.Screen options={{ title: isArrived ? "Intervención en curso" : "En camino", headerBackTitle: "Regresar" }} />
+      <Stack.Screen
+        options={{
+          title: isArrived ? "Intervención en curso" : "En camino",
+          headerBackTitle: "Regresar",
+        }}
+      />
 
       <View style={styles.container}>
         {/* Status illustration */}
         <View style={styles.illustration}>
-          <Text style={styles.illustrationEmoji}>{isArrived ? "🔧" : "🚗"}</Text>
+          <Text style={styles.illustrationEmoji}>
+            {isArrived ? "🔧" : "🚗"}
+          </Text>
           <View style={styles.illustrationDots}>
             {[0, 1, 2, 3, 4].map((i) => (
               <View
@@ -143,34 +178,53 @@ export default function JobInProgressScreen() {
           <Text style={styles.illustrationEmoji}>🏢</Text>
         </View>
 
-        <Text style={styles.title}>{isArrived ? "Intervención en sitio" : "OT en curso"}</Text>
+        <Text style={styles.title}>
+          {isArrived ? "Intervención en sitio" : "OT en curso"}
+        </Text>
         {arrivalTimestamp && (
-          <View style={{ backgroundColor: "#F0FDF4", paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginBottom: 12, borderWidth: 1, borderColor: "#BBF7D0" }}>
-            <Text style={{ color: "#166534", fontWeight: "700", fontSize: 16 }}>⏱️ Tiempo de intervención: {elapsedTime}</Text>
+          <View
+            style={{
+              backgroundColor: "#F0FDF4",
+              paddingHorizontal: 16,
+              paddingVertical: 8,
+              borderRadius: 20,
+              marginBottom: 12,
+              borderWidth: 1,
+              borderColor: "#BBF7D0",
+            }}
+          >
+            <Text style={{ color: "#166534", fontWeight: "700", fontSize: 16 }}>
+              ⏱️ Tiempo de intervención: {elapsedTime}
+            </Text>
           </View>
         )}
         <Text style={styles.subtitle}>
-          {incident?.organization?.name ?? "Residencial El Lago"}{"\n"}Av. de Andalucía, 105
+          {incident?.organization?.name ?? "Residencial El Lago"}
+          {"\n"}Av. de Andalucía, 105
         </Text>
 
         {/* Info pills */}
         <View style={styles.pillRow}>
           <View style={styles.pill}>
             <Text style={styles.pillText}>
-              {incident ? `INC-${incident.id.slice(0, 8).toUpperCase()}` : "INC-2025-0412"}
+              {incident
+                ? `INC-${incident.id.slice(0, 8).toUpperCase()}`
+                : "INC-2025-0412"}
             </Text>
           </View>
           <View style={styles.pill}>
-            <Text style={styles.pillText}>{incident?.title ?? "Gotea techo pasillo"}</Text>
+            <Text style={styles.pillText}>
+              {incident?.title ?? "Gotea techo pasillo"}
+            </Text>
           </View>
         </View>
 
         {/* Steps */}
         {[
           { done: true, label: "OT aceptada" },
-          { 
-            done: true, 
-            label: `Estimación enviada (${incident?.estimatedCost ? `${incident.estimatedCost} €` : "155 €"})` 
+          {
+            done: true,
+            label: `Estimación enviada (${incident?.estimatedCost ? `${incident.estimatedCost} €` : "155 €"})`,
           },
           { done: isArrived, label: "Llegada confirmada" },
           { done: false, label: "Trabajo finalizado" },
@@ -202,13 +256,22 @@ export default function JobInProgressScreen() {
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={styles.arrivedButtonText}>
-              {isArrived ? "📸 Finalizar trabajo y subir foto" : "📍 Ya estoy aquí"}
+              {isArrived
+                ? "📸 Finalizar trabajo y subir foto"
+                : "📍 Ya estoy aquí"}
             </Text>
           )}
         </TouchableOpacity>
 
         {!isArrived && !canArrive && (
-          <Text style={{ fontSize: 12, color: "#64748b", marginTop: 6, textAlign: "center" }}>
+          <Text
+            style={{
+              fontSize: 12,
+              color: "#64748b",
+              marginTop: 6,
+              textAlign: "center",
+            }}
+          >
             El botón se habilitará 15 min antes de la cita programada
           </Text>
         )}
@@ -263,7 +326,13 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: 16,
   },
-  pillRow: { flexDirection: "row", gap: 8, marginBottom: 24, flexWrap: "wrap", justifyContent: "center" },
+  pillRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 24,
+    flexWrap: "wrap",
+    justifyContent: "center",
+  },
   pill: {
     backgroundColor: "#f1f5f9",
     borderRadius: 20,

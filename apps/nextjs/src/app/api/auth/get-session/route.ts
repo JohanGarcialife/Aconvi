@@ -1,7 +1,9 @@
-import { type NextRequest, NextResponse } from "next/server";
-import { db } from "@acme/db/client";
-import { user, session } from "@acme/db/schema";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
+
+import { db } from "@acme/db/client";
+import { session, user } from "@acme/db/schema";
 
 /**
  * GET /api/auth/get-session
@@ -40,10 +42,7 @@ export async function GET(req: NextRequest) {
 
     // Check session expiry
     if (foundSession.expiresAt < new Date()) {
-      return NextResponse.json(
-        { error: "Session expired" },
-        { status: 401 },
-      );
+      return NextResponse.json({ error: "Session expired" }, { status: 401 });
     }
 
     // Look up the user
@@ -52,10 +51,7 @@ export async function GET(req: NextRequest) {
     });
 
     if (!foundUser) {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     return NextResponse.json({

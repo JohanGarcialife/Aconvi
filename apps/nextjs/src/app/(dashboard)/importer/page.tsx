@@ -1,9 +1,20 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import * as XLSX from "xlsx";
-import { useTRPC } from "~/trpc/react";
+import { useCallback, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
+import {
+  AlertCircle,
+  Building2,
+  CheckCircle2,
+  ChevronRight,
+  FileSpreadsheet,
+  RefreshCw,
+  UploadCloud,
+  Users,
+  X,
+} from "lucide-react";
+import * as XLSX from "xlsx";
+
 import { Button } from "@acme/ui/button";
 import {
   Table,
@@ -13,17 +24,8 @@ import {
   TableHeader,
   TableRow,
 } from "@acme/ui/table";
-import {
-  UploadCloud,
-  CheckCircle2,
-  AlertCircle,
-  FileSpreadsheet,
-  ChevronRight,
-  Users,
-  Building2,
-  RefreshCw,
-  X,
-} from "lucide-react";
+
+import { useTRPC } from "~/trpc/react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface ParsedRow {
@@ -61,9 +63,10 @@ function groupByCommunity(rows: ParsedRow[]): CommunityGroup[] {
     if (!map.has(name)) {
       map.set(name, {
         name,
-        address: String(
-          row.direccion ?? row["Dirección"] ?? row["direccion"] ?? "",
-        ).trim() || undefined,
+        address:
+          String(
+            row.direccion ?? row["Dirección"] ?? row["direccion"] ?? "",
+          ).trim() || undefined,
         neighbors: [],
       });
     }
@@ -84,12 +87,16 @@ function groupByCommunity(rows: ParsedRow[]): CommunityGroup[] {
           name: neighborName,
           email,
           phone:
-            String(row.telefono ?? row["Teléfono"] ?? row["telefono"] ?? "").trim() ||
-            undefined,
+            String(
+              row.telefono ?? row["Teléfono"] ?? row["telefono"] ?? "",
+            ).trim() || undefined,
           unit:
-            String(row.piso_puerta ?? row["Piso/Puerta"] ?? row["piso"] ?? "").trim() ||
-            undefined,
-          coefficient: Number(row.coeficiente ?? row["Coeficiente"] ?? row["coeficiente"] ?? 100),
+            String(
+              row.piso_puerta ?? row["Piso/Puerta"] ?? row["piso"] ?? "",
+            ).trim() || undefined,
+          coefficient: Number(
+            row.coeficiente ?? row["Coeficiente"] ?? row["coeficiente"] ?? 100,
+          ),
         });
       }
     }
@@ -121,21 +128,27 @@ function DropZone({
   return (
     <div
       onDrop={handleDrop}
-      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setIsDragging(true);
+      }}
       onDragLeave={() => setIsDragging(false)}
-      className={`rounded-xl border-2 border-dashed p-16 flex flex-col items-center justify-center text-center transition-all cursor-pointer ${
+      className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-16 text-center transition-all ${
         isDragging
           ? "border-primary bg-primary/5 scale-[1.01]"
           : "border-border bg-card hover:border-primary/50 hover:bg-muted/30"
       }`}
       onClick={() => document.getElementById("file-upload")?.click()}
     >
-      <div className="rounded-full bg-primary/10 p-4 mb-4">
-        <UploadCloud className={`h-8 w-8 ${isDragging ? "text-primary" : "text-muted-foreground"}`} />
+      <div className="bg-primary/10 mb-4 rounded-full p-4">
+        <UploadCloud
+          className={`h-8 w-8 ${isDragging ? "text-primary" : "text-muted-foreground"}`}
+        />
       </div>
-      <h3 className="font-semibold text-lg mb-1">Arrastra tu Excel aquí</h3>
-      <p className="text-sm text-muted-foreground mb-4 max-w-sm">
-        O haz clic para explorar. Acepta <strong>.xlsx</strong> y <strong>.xls</strong>
+      <h3 className="mb-1 text-lg font-semibold">Arrastra tu Excel aquí</h3>
+      <p className="text-muted-foreground mb-4 max-w-sm text-sm">
+        O haz clic para explorar. Acepta <strong>.xlsx</strong> y{" "}
+        <strong>.xls</strong>
       </p>
       <Button variant="outline" size="sm" asChild>
         <span>
@@ -226,7 +239,6 @@ export default function ExcelImporterPage() {
     importMutation.mutate({ communities });
   };
 
-
   const reset = () => {
     setFile(null);
     setRawRows([]);
@@ -271,26 +283,40 @@ export default function ExcelImporterPage() {
     XLSX.writeFile(wb, "plantilla-aconvi.xlsx");
   };
 
-  const totalNeighbors = communities.reduce((acc, c) => acc + c.neighbors.length, 0);
+  const totalNeighbors = communities.reduce(
+    (acc, c) => acc + c.neighbors.length,
+    0,
+  );
 
   return (
-    <div className="flex flex-col gap-8 max-w-5xl">
+    <div className="flex max-w-5xl flex-col gap-8">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight mb-2">Importador Masivo</h1>
-          <p className="text-muted-foreground text-sm max-w-xl">
-            Carga un Excel con los datos de comunidades y vecinos. Las columnas reconocidas son:{" "}
-            <code className="bg-muted px-1 rounded text-xs">nombre_comunidad</code>,{" "}
-            <code className="bg-muted px-1 rounded text-xs">direccion</code>,{" "}
-            <code className="bg-muted px-1 rounded text-xs">nombre_vecino</code>,{" "}
-            <code className="bg-muted px-1 rounded text-xs">email_vecino</code>,{" "}
-            <code className="bg-muted px-1 rounded text-xs">telefono</code>,{" "}
-            <code className="bg-muted px-1 rounded text-xs">piso_puerta</code>,{" "}
-            <code className="bg-muted px-1 rounded text-xs">coeficiente</code>.
+          <h1 className="mb-2 text-3xl font-bold tracking-tight">
+            Importador Masivo
+          </h1>
+          <p className="text-muted-foreground max-w-xl text-sm">
+            Carga un Excel con los datos de comunidades y vecinos. Las columnas
+            reconocidas son:{" "}
+            <code className="bg-muted rounded px-1 text-xs">
+              nombre_comunidad
+            </code>
+            , <code className="bg-muted rounded px-1 text-xs">direccion</code>,{" "}
+            <code className="bg-muted rounded px-1 text-xs">nombre_vecino</code>
+            ,{" "}
+            <code className="bg-muted rounded px-1 text-xs">email_vecino</code>,{" "}
+            <code className="bg-muted rounded px-1 text-xs">telefono</code>,{" "}
+            <code className="bg-muted rounded px-1 text-xs">piso_puerta</code>,{" "}
+            <code className="bg-muted rounded px-1 text-xs">coeficiente</code>.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={downloadTemplate} className="shrink-0">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={downloadTemplate}
+          className="shrink-0"
+        >
           <FileSpreadsheet className="mr-2 h-4 w-4" />
           Descargar plantilla
         </Button>
@@ -300,12 +326,12 @@ export default function ExcelImporterPage() {
       {result && (
         <div className="rounded-xl border-2 border-green-200 bg-green-50 p-6">
           <div className="flex items-start gap-4">
-            <CheckCircle2 className="h-8 w-8 text-green-600 shrink-0 mt-0.5" />
+            <CheckCircle2 className="mt-0.5 h-8 w-8 shrink-0 text-green-600" />
             <div className="flex-1">
-              <h3 className="font-semibold text-green-900 text-lg mb-2">
+              <h3 className="mb-2 text-lg font-semibold text-green-900">
                 ¡Importación completada!
               </h3>
-              <div className="grid grid-cols-2 gap-3 mb-3">
+              <div className="mb-3 grid grid-cols-2 gap-3">
                 <div className="flex items-center gap-2 text-sm text-green-800">
                   <Building2 className="h-4 w-4" />
                   <strong>{result.communities}</strong> comunidades creadas
@@ -316,16 +342,23 @@ export default function ExcelImporterPage() {
                 </div>
               </div>
               {result.errors.length > 0 && (
-                <div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 p-3">
-                  <p className="text-xs font-semibold text-amber-800 mb-1">
+                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                  <p className="mb-1 text-xs font-semibold text-amber-800">
                     Advertencias ({result.errors.length}):
                   </p>
                   {result.errors.slice(0, 5).map((e, i) => (
-                    <p key={i} className="text-xs text-amber-700">• {e}</p>
+                    <p key={i} className="text-xs text-amber-700">
+                      • {e}
+                    </p>
                   ))}
                 </div>
               )}
-              <Button size="sm" variant="outline" onClick={reset} className="mt-4">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={reset}
+                className="mt-4"
+              >
                 <RefreshCw className="mr-2 h-3.5 w-3.5" />
                 Nueva importación
               </Button>
@@ -344,13 +377,20 @@ export default function ExcelImporterPage() {
       ) : (
         <>
           {/* File indicator */}
-          <div className="flex items-center gap-3 rounded-xl border bg-primary/5 px-5 py-3">
-            <FileSpreadsheet className="h-5 w-5 text-primary" />
-            <span className="font-medium text-sm text-primary flex-1">{file.name}</span>
-            <span className="text-xs text-muted-foreground">
+          <div className="bg-primary/5 flex items-center gap-3 rounded-xl border px-5 py-3">
+            <FileSpreadsheet className="text-primary h-5 w-5" />
+            <span className="text-primary flex-1 text-sm font-medium">
+              {file.name}
+            </span>
+            <span className="text-muted-foreground text-xs">
               {(file.size / 1024).toFixed(0)} KB
             </span>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={reset}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={reset}
+            >
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -364,7 +404,7 @@ export default function ExcelImporterPage() {
                   onClick={() => handleSheetChange(i)}
                   className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-all ${
                     activeSheet === i
-                      ? "bg-primary text-white border-primary"
+                      ? "bg-primary border-primary text-white"
                       : "border-border text-muted-foreground hover:border-primary/40"
                   }`}
                 >
@@ -377,16 +417,31 @@ export default function ExcelImporterPage() {
           {/* Summary cards */}
           <div className="grid gap-4 sm:grid-cols-3">
             {[
-              { icon: FileSpreadsheet, label: "Filas en Excel", value: rawRows.length },
-              { icon: Building2, label: "Comunidades detectadas", value: communities.length },
-              { icon: Users, label: "Vecinos con email válido", value: totalNeighbors },
+              {
+                icon: FileSpreadsheet,
+                label: "Filas en Excel",
+                value: rawRows.length,
+              },
+              {
+                icon: Building2,
+                label: "Comunidades detectadas",
+                value: communities.length,
+              },
+              {
+                icon: Users,
+                label: "Vecinos con email válido",
+                value: totalNeighbors,
+              },
             ].map(({ icon: Icon, label, value }) => (
-              <div key={label} className="flex items-center gap-3 rounded-xl border bg-card p-4">
-                <div className="rounded-lg bg-primary/10 p-2">
-                  <Icon className="h-4 w-4 text-primary" />
+              <div
+                key={label}
+                className="bg-card flex items-center gap-3 rounded-xl border p-4"
+              >
+                <div className="bg-primary/10 rounded-lg p-2">
+                  <Icon className="text-primary h-4 w-4" />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">{label}</p>
+                  <p className="text-muted-foreground text-xs">{label}</p>
                   <p className="text-2xl font-bold">{value}</p>
                 </div>
               </div>
@@ -396,10 +451,11 @@ export default function ExcelImporterPage() {
           {/* Communities preview */}
           {communities.length > 0 && (
             <div className="flex flex-col gap-3">
-              <h2 className="font-semibold text-base">
-                Vista previa de datos ({Math.min(communities.length, 5)} de {communities.length} comunidades)
+              <h2 className="text-base font-semibold">
+                Vista previa de datos ({Math.min(communities.length, 5)} de{" "}
+                {communities.length} comunidades)
               </h2>
-              <div className="rounded-xl border overflow-hidden">
+              <div className="overflow-hidden rounded-xl border">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/30">
@@ -411,15 +467,21 @@ export default function ExcelImporterPage() {
                   </TableHeader>
                   <TableBody>
                     {communities.slice(0, 10).map((c, i) => {
-                      const avgCoef = c.neighbors.length > 0 
-                        ? (c.neighbors.reduce((acc, curr) => acc + (curr.coefficient ?? 0), 0) / c.neighbors.length).toFixed(1)
-                        : "0";
-                      
+                      const avgCoef =
+                        c.neighbors.length > 0
+                          ? (
+                              c.neighbors.reduce(
+                                (acc, curr) => acc + (curr.coefficient ?? 0),
+                                0,
+                              ) / c.neighbors.length
+                            ).toFixed(1)
+                          : "0";
+
                       return (
                         <TableRow key={i}>
                           <TableCell className="font-medium">
                             <div className="flex items-center gap-2">
-                              <Building2 className="h-4 w-4 text-muted-foreground" />
+                              <Building2 className="text-muted-foreground h-4 w-4" />
                               {c.name}
                             </div>
                           </TableCell>
@@ -427,12 +489,12 @@ export default function ExcelImporterPage() {
                             {c.address ?? "—"}
                           </TableCell>
                           <TableCell className="text-right">
-                            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-semibold">
+                            <span className="bg-primary/10 text-primary inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold">
                               <Users className="h-3 w-3" />
                               {c.neighbors.length}
                             </span>
                           </TableCell>
-                          <TableCell className="text-right text-muted-foreground">
+                          <TableCell className="text-muted-foreground text-right">
                             {avgCoef}%
                           </TableCell>
                         </TableRow>
@@ -440,7 +502,10 @@ export default function ExcelImporterPage() {
                     })}
                     {communities.length > 10 && (
                       <TableRow>
-                        <TableCell colSpan={3} className="text-center text-xs text-muted-foreground py-2">
+                        <TableCell
+                          colSpan={3}
+                          className="text-muted-foreground py-2 text-center text-xs"
+                        >
                           + {communities.length - 10} comunidades más
                         </TableCell>
                       </TableRow>
@@ -454,15 +519,17 @@ export default function ExcelImporterPage() {
           {/* Warnings */}
           {rawRows.length > 0 && communities.length === 0 && (
             <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
-              <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
               <div>
-                <p className="font-medium text-amber-800 text-sm">
+                <p className="text-sm font-medium text-amber-800">
                   No se detectaron comunidades válidas
                 </p>
-                <p className="text-xs text-amber-700 mt-1">
+                <p className="mt-1 text-xs text-amber-700">
                   Asegúrate de que el Excel tenga una columna llamada{" "}
-                  <code className="bg-amber-100 px-1 rounded">nombre_comunidad</code>.
-                  Columnas encontradas: {headers.join(", ")}
+                  <code className="rounded bg-amber-100 px-1">
+                    nombre_comunidad
+                  </code>
+                  . Columnas encontradas: {headers.join(", ")}
                 </p>
               </div>
             </div>
@@ -470,14 +537,17 @@ export default function ExcelImporterPage() {
 
           {/* Import button */}
           {communities.length > 0 && (
-            <div className="flex items-center justify-between rounded-xl border bg-card p-5">
+            <div className="bg-card flex items-center justify-between rounded-xl border p-5">
               <div>
                 <p className="font-semibold">¿Todo listo para importar?</p>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground text-sm">
                   Se crearán{" "}
-                  <strong className="text-foreground">{communities.length}</strong>{" "}
+                  <strong className="text-foreground">
+                    {communities.length}
+                  </strong>{" "}
                   comunidades con{" "}
-                  <strong className="text-foreground">{totalNeighbors}</strong> vecinos.
+                  <strong className="text-foreground">{totalNeighbors}</strong>{" "}
+                  vecinos.
                 </p>
               </div>
               <Button

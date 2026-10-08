@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, createContext, useContext } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { io, Socket } from "socket.io-client";
 
 interface WebSocketContextType {
@@ -20,7 +20,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Determine WS URL based on environment. Placeholder:
     const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "http://localhost:3001";
-    
+
     // In a real flow, fetch auth token from session
     const socketInstance = io(wsUrl, {
       auth: { token: "user_fake_token" },

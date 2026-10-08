@@ -1,21 +1,22 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useTRPC } from "~/trpc/react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  Search,
-  CheckCircle2,
-  Building2,
-  Plus,
-  Landmark,
-  Star,
-  Bell,
   ArrowLeft,
+  Bell,
+  Building2,
+  CheckCircle2,
+  Landmark,
   Loader2,
+  Plus,
+  Search,
+  Star,
 } from "lucide-react";
+
+import { useTRPC } from "~/trpc/react";
 
 const TENANT_ID = "org_aconvi_demo";
 
@@ -39,16 +40,16 @@ function ClosedScreen({
 }) {
   return (
     <div className="flex flex-1 items-center justify-center bg-slate-50">
-      <div className="max-w-md w-full text-center px-8 py-12">
+      <div className="w-full max-w-md px-8 py-12 text-center">
         {/* Success icon */}
-        <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-primary/10">
-          <CheckCircle2 className="h-10 w-10 text-primary" />
+        <div className="bg-primary/10 mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full">
+          <CheckCircle2 className="text-primary h-10 w-10" />
         </div>
 
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">
+        <h2 className="mb-2 text-2xl font-bold text-slate-900">
           Expediente cerrado
         </h2>
-        <p className="text-slate-500 text-sm mb-8 leading-relaxed">
+        <p className="mb-8 text-sm leading-relaxed text-slate-500">
           La incidencia ha sido validada y archivada correctamente.{" "}
           <span className="font-semibold text-slate-700">
             El vecino ha recibido una notificación push
@@ -58,14 +59,14 @@ function ClosedScreen({
 
         {initialRating ? (
           /* Real rating submitted by the vecino from mobile app */
-          <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5 text-left shadow-sm mb-8">
-            <div className="flex items-center gap-2 mb-2">
-              <Star className="h-5 w-5 text-amber-500 fill-amber-500" />
-              <p className="text-xs font-bold uppercase tracking-wider text-amber-900">
+          <div className="mb-8 rounded-2xl border border-amber-200 bg-amber-50/60 p-5 text-left shadow-sm">
+            <div className="mb-2 flex items-center gap-2">
+              <Star className="h-5 w-5 fill-amber-500 text-amber-500" />
+              <p className="text-xs font-bold tracking-wider text-amber-900 uppercase">
                 Valoración del Vecino
               </p>
             </div>
-            <div className="flex items-center gap-1 my-1">
+            <div className="my-1 flex items-center gap-1">
               {[1, 2, 3, 4, 5].map((s) => (
                 <Star
                   key={s}
@@ -77,27 +78,27 @@ function ClosedScreen({
               </span>
             </div>
             {initialComment && (
-              <p className="mt-2 text-sm italic text-slate-700 bg-white/70 p-3 rounded-xl border border-amber-100">
+              <p className="mt-2 rounded-xl border border-amber-100 bg-white/70 p-3 text-sm text-slate-700 italic">
                 "{initialComment}"
               </p>
             )}
           </div>
         ) : (
           /* Push notification preview sent to neighbor */
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm mb-8">
+          <div className="mb-8 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm">
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                <Bell className="h-5 w-5 text-primary" />
+              <div className="bg-primary/10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full">
+                <Bell className="text-primary h-5 w-5" />
               </div>
-              <div className="flex-1 min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-xs font-semibold text-slate-900">
                   Aconvi · Enviado al vecino
                 </p>
-                <p className="text-xs text-slate-600 mt-0.5 leading-snug">
-                  Tu incidencia "{incidentTitle}" ha sido resuelta.
-                  ¿Cómo valorarías el servicio?
+                <p className="mt-0.5 text-xs leading-snug text-slate-600">
+                  Tu incidencia "{incidentTitle}" ha sido resuelta. ¿Cómo
+                  valorarías el servicio?
                 </p>
-                <div className="flex gap-1 mt-2">
+                <div className="mt-2 flex gap-1">
                   {[1, 2, 3, 4, 5].map((s) => (
                     <Star key={s} className="h-4 w-4 text-slate-300" />
                   ))}
@@ -109,7 +110,7 @@ function ClosedScreen({
 
         <Link
           href="/incidents"
-          className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-bold text-white hover:bg-primary/90 transition-colors shadow-sm"
+          className="bg-primary hover:bg-primary/90 inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-bold text-white shadow-sm transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
           Volver a incidencias
@@ -130,21 +131,23 @@ function ValidateContent() {
   const [copied, setCopied] = useState(false);
 
   const { data: incident, isLoading } = useQuery({
-    ...trpc.incident.byId.queryOptions({ id: incidentId as string, tenantId: TENANT_ID }),
+    ...trpc.incident.byId.queryOptions({
+      id: incidentId as string,
+      tenantId: TENANT_ID,
+    }),
     enabled: !!incidentId,
     refetchInterval: 5000,
   });
 
-  const addNote = useMutation(
-    trpc.incident.addNote.mutationOptions()
-  );
+  const addNote = useMutation(trpc.incident.addNote.mutationOptions());
 
   const closeIncident = useMutation(
-    trpc.incident.closeIncident.mutationOptions()
+    trpc.incident.closeIncident.mutationOptions(),
   );
 
   const handleCopyIBAN = () => {
-    const iban = (incident as any)?.provider?.iban ?? "ES91 2100 0418 4502 0005 1339";
+    const iban =
+      (incident as any)?.provider?.iban ?? "ES91 2100 0418 4502 0005 1339";
     copyToClipboard(iban);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -163,7 +166,8 @@ function ValidateContent() {
       await addNote.mutateAsync({
         tenantId: TENANT_ID,
         incidentId: incident.id,
-        content: "✅ El administrador ha validado el trabajo y cerrado el expediente.",
+        content:
+          "✅ El administrador ha validado el trabajo y cerrado el expediente.",
       });
     } catch (e) {
       console.error(e);
@@ -177,16 +181,21 @@ function ValidateContent() {
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-50">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <Loader2 className="text-primary h-8 w-8 animate-spin" />
       </div>
     );
   }
 
   if (!incident) {
     return (
-      <div className="flex h-screen flex-col items-center justify-center bg-slate-50 gap-4">
-        <h2 className="text-xl font-bold text-slate-800">Incidencia no encontrada</h2>
-        <Link href="/incidents" className="text-primary font-semibold hover:underline">
+      <div className="flex h-screen flex-col items-center justify-center gap-4 bg-slate-50">
+        <h2 className="text-xl font-bold text-slate-800">
+          Incidencia no encontrada
+        </h2>
+        <Link
+          href="/incidents"
+          className="text-primary font-semibold hover:underline"
+        >
           Volver a incidencias
         </Link>
       </div>
@@ -211,7 +220,9 @@ function ValidateContent() {
   const total = incident.estimatedCost ?? 150;
   const desplazamiento = total > 50 ? 25 : 0;
   const materiales = parseFloat(((total - desplazamiento) * 0.3).toFixed(2));
-  const manoDeObra = parseFloat((total - desplazamiento - materiales).toFixed(2));
+  const manoDeObra = parseFloat(
+    (total - desplazamiento - materiales).toFixed(2),
+  );
 
   return (
     <div className="flex h-screen flex-col bg-slate-50">
@@ -223,7 +234,7 @@ function ValidateContent() {
           {/* Header row */}
           <div className="mb-5 flex items-start justify-between">
             <div>
-              <span className="mb-3 inline-block rounded border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-amber-700">
+              <span className="mb-3 inline-block rounded border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold tracking-wide text-amber-700 uppercase">
                 Pendiente de validación
               </span>
               <h2 className="text-2xl font-bold text-slate-900">
@@ -249,18 +260,22 @@ function ValidateContent() {
               <div className="rounded-2xl border border-slate-200 bg-white p-5">
                 <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2.5 text-sm">
                   <dt className="font-semibold text-slate-900">Proveedor:</dt>
-                  <dd className="text-slate-700">{incident.provider?.name ?? "Sin asignar"}</dd>
+                  <dd className="text-slate-700">
+                    {incident.provider?.name ?? "Sin asignar"}
+                  </dd>
 
                   <dt className="font-semibold text-slate-900">Contacto:</dt>
                   <dd className="text-slate-700">
-                    {incident.provider?.phone ?? "No disponible"} · {incident.provider?.email ?? ""}
+                    {incident.provider?.phone ?? "No disponible"} ·{" "}
+                    {incident.provider?.email ?? ""}
                   </dd>
 
                   <dt className="font-semibold text-slate-900">
                     Nº Incidencia:
                   </dt>
                   <dd className="text-slate-700">
-                    {`INC-${incident.id.slice(0, 8).toUpperCase()}`} · Residencial Los Olivos
+                    {`INC-${incident.id.slice(0, 8).toUpperCase()}`} ·
+                    Residencial Los Olivos
                   </dd>
                 </dl>
               </div>
@@ -273,17 +288,17 @@ function ValidateContent() {
                 </h3>
                 <div className="space-y-1.5 text-sm text-slate-700">
                   <p>
-                    <span className="font-semibold">
-                      Incidencia reportada:
-                    </span>{" "}
+                    <span className="font-semibold">Incidencia reportada:</span>{" "}
                     {incident.description}
                   </p>
                   <p>
-                    <span className="font-semibold">Ubicación:</span> Residencial Los Olivos
+                    <span className="font-semibold">Ubicación:</span>{" "}
+                    Residencial Los Olivos
                   </p>
                   <p>
-                    <span className="font-semibold">Reportado por:</span> {incident.reporter?.name ?? "Vecino"}{" "}
-                    · {new Date(incident.createdAt).toLocaleDateString("es-ES")}
+                    <span className="font-semibold">Reportado por:</span>{" "}
+                    {incident.reporter?.name ?? "Vecino"} ·{" "}
+                    {new Date(incident.createdAt).toLocaleDateString("es-ES")}
                   </p>
                 </div>
               </div>
@@ -295,11 +310,23 @@ function ValidateContent() {
                 </h3>
                 <div className="space-y-2 text-sm">
                   {[
-                    ["Desplazamiento", `${desplazamiento.toFixed(2).replace(".", ",")} €`],
-                    ["Mano de obra", `${manoDeObra.toFixed(2).replace(".", ",")} €`],
-                    ["Materiales", `${materiales.toFixed(2).replace(".", ",")} €`],
+                    [
+                      "Desplazamiento",
+                      `${desplazamiento.toFixed(2).replace(".", ",")} €`,
+                    ],
+                    [
+                      "Mano de obra",
+                      `${manoDeObra.toFixed(2).replace(".", ",")} €`,
+                    ],
+                    [
+                      "Materiales",
+                      `${materiales.toFixed(2).replace(".", ",")} €`,
+                    ],
                   ].map(([label, value]) => (
-                    <div key={label} className="flex justify-between text-slate-700">
+                    <div
+                      key={label}
+                      className="flex justify-between text-slate-700"
+                    >
                       <span>{label}</span>
                       <span>{value}</span>
                     </div>
@@ -323,7 +350,8 @@ function ValidateContent() {
                   Copiar IBAN del proveedor
                 </div>
                 <p className="font-mono text-sm tracking-wide text-slate-900">
-                  {(incident as any).provider?.iban ?? "ES91 2100 0418 4502 0005 1339"}
+                  {(incident as any).provider?.iban ??
+                    "ES91 2100 0418 4502 0005 1339"}
                 </p>
                 <p className="mt-1 text-xs text-slate-400">
                   Titular: {incident.provider?.name ?? "Fontanería Pérez SL"}
@@ -336,12 +364,16 @@ function ValidateContent() {
               {/* Solution photo */}
               <div className="rounded-2xl border border-slate-200 bg-white p-5">
                 <h3 className="mb-3 font-semibold text-slate-900">Solución</h3>
-                <div className="relative mb-3 aspect-video w-full overflow-hidden rounded-xl bg-slate-100 flex items-center justify-center">
+                <div className="relative mb-3 flex aspect-video w-full items-center justify-center overflow-hidden rounded-xl bg-slate-100">
                   {incident.finalPhotoUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={incident.finalPhotoUrl} alt="Solución" className="h-full w-full object-cover" />
+                    <img
+                      src={incident.finalPhotoUrl}
+                      alt="Solución"
+                      className="h-full w-full object-cover"
+                    />
                   ) : (
-                    <div className="absolute inset-0 bg-linear-to-br from-slate-700 to-slate-900 flex items-end">
+                    <div className="absolute inset-0 flex items-end bg-linear-to-br from-slate-700 to-slate-900">
                       <div
                         className="absolute inset-0"
                         style={{
@@ -350,7 +382,7 @@ function ValidateContent() {
                           opacity: 0.85,
                         }}
                       />
-                      <div className="relative z-10 m-3 flex items-center gap-1.5 rounded-full bg-primary/90 px-3 py-1 text-xs font-semibold text-white backdrop-blur-sm">
+                      <div className="bg-primary/90 relative z-10 m-3 flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold text-white backdrop-blur-sm">
                         <CheckCircle2 className="h-3.5 w-3.5" />
                         Reparado (Sin foto de cierre)
                       </div>
@@ -358,7 +390,7 @@ function ValidateContent() {
                   )}
                 </div>
                 <p className="flex items-center gap-1.5 text-xs text-slate-500">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />
+                  <CheckCircle2 className="text-primary h-3.5 w-3.5 shrink-0" />
                   Trabajo marcado como completado por el proveedor
                 </p>
               </div>
@@ -366,50 +398,62 @@ function ValidateContent() {
               {/* Neighbor rating (if rated) */}
               {incident.rating != null && (
                 <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-5">
-                  <h3 className="mb-3 font-semibold text-slate-900">Valoración del Vecino</h3>
-                  <div className="flex items-center gap-1.5 mb-2">
+                  <h3 className="mb-3 font-semibold text-slate-900">
+                    Valoración del Vecino
+                  </h3>
+                  <div className="mb-2 flex items-center gap-1.5">
                     {[1, 2, 3, 4, 5].map((s) => (
                       <Star
                         key={s}
                         className={`h-5 w-5 ${s <= incident.rating! ? "fill-amber-500 text-amber-500" : "text-slate-200"}`}
                       />
                     ))}
-                    <span className="ml-2 text-sm font-bold text-slate-800">{incident.rating} / 5</span>
+                    <span className="ml-2 text-sm font-bold text-slate-800">
+                      {incident.rating} / 5
+                    </span>
                   </div>
                   {incident.ratingComment && (
-                    <p className="text-sm italic text-slate-700">"{incident.ratingComment}"</p>
+                    <p className="text-sm text-slate-700 italic">
+                      "{incident.ratingComment}"
+                    </p>
                   )}
                 </div>
               )}
 
               {/* CTA block */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
+              <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
                 {/* Final confirmation checkbox inside CTA block for immediate visibility */}
-                <div className="pb-3 border-b border-slate-100">
+                <div className="border-b border-slate-100 pb-3">
                   <label
                     onClick={() => setConfirmed((v) => !v)}
                     className="flex cursor-pointer items-start gap-3 select-none"
                   >
                     <div
-                      className={`mt-0.5 h-4 w-4 shrink-0 rounded border-2 transition-all flex items-center justify-center ${
+                      className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 transition-all ${
                         confirmed
                           ? "border-primary bg-primary"
                           : "border-slate-300 bg-white"
                       }`}
                     >
                       {confirmed && (
-                        <svg
-                          viewBox="0 0 12 12"
-                          className="h-3 w-3 fill-white"
-                        >
-                          <path d="M1.5 6l3 3 6-6" stroke="white" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                        <svg viewBox="0 0 12 12" className="h-3 w-3 fill-white">
+                          <path
+                            d="M1.5 6l3 3 6-6"
+                            stroke="white"
+                            strokeWidth="1.8"
+                            fill="none"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
                         </svg>
                       )}
                     </div>
-                    <span className="text-xs text-slate-600 leading-snug">
-                      Confirmo que he revisado la incidencia y apruebo su cierre.{" "}
+                    <span className="text-xs leading-snug text-slate-600">
+                      Confirmo que he revisado la incidencia y apruebo su
+                      cierre.{" "}
                       <span className="text-primary font-medium">
-                        El vecino recibirá una notificación para valorar el servicio.
+                        El vecino recibirá una notificación para valorar el
+                        servicio.
                       </span>
                     </span>
                   </label>
@@ -418,7 +462,7 @@ function ValidateContent() {
                 <button
                   onClick={handleValidate}
                   disabled={!confirmed || pageState === "validating"}
-                  className={`flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-sm font-bold text-white transition-all shadow-sm ${
+                  className={`flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-sm font-bold text-white shadow-sm transition-all ${
                     confirmed && pageState === "pending"
                       ? "bg-primary hover:bg-primary/90 cursor-pointer"
                       : "bg-primary/40 cursor-not-allowed"
@@ -439,7 +483,7 @@ function ValidateContent() {
                   className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
                 >
                   {copied ? (
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
+                    <CheckCircle2 className="text-primary h-4 w-4" />
                   ) : (
                     <Landmark className="h-4 w-4 text-slate-400" />
                   )}
@@ -468,7 +512,7 @@ function ValidateContent() {
                     "El expediente quedará cerrado y archivado.",
                   ].map((item) => (
                     <li key={item} className="flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                      <CheckCircle2 className="text-primary h-4 w-4 shrink-0" />
                       <span>{item}</span>
                     </li>
                   ))}
@@ -489,7 +533,7 @@ function TopBar() {
       <div className="flex items-center gap-3">
         <Link
           href="/incidents"
-          className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-700 transition-colors"
+          className="flex items-center gap-1.5 text-sm text-slate-400 transition-colors hover:text-slate-700"
         >
           <ArrowLeft className="h-4 w-4" />
         </Link>
@@ -516,7 +560,7 @@ export default function IncidentValidatePage() {
     <Suspense
       fallback={
         <div className="flex h-screen items-center justify-center bg-slate-50">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <Loader2 className="text-primary h-8 w-8 animate-spin" />
         </div>
       }
     >

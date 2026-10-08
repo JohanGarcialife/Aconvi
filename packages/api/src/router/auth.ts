@@ -2,10 +2,15 @@ import type { TRPCRouterRecord } from "@trpc/server";
 import { z } from "zod/v4";
 
 import { desc, eq } from "@acme/db";
-import { pushAuthSession, pushToken, user, verification } from "@acme/db/schema";
-import { sendPushToUser } from "./notification";
+import {
+  pushAuthSession,
+  pushToken,
+  user,
+  verification,
+} from "@acme/db/schema";
 
 import { protectedProcedure, publicProcedure } from "../trpc";
+import { sendPushToUser } from "./notification";
 
 // ─── Shared push auth session map (in-memory for dev intercept mode) ──────────
 // @ts-ignore
@@ -20,7 +25,10 @@ export const authRouter = {
   getLatestOTP: publicProcedure
     .input(z.object({ phoneNumber: z.string() }))
     .query(async ({ ctx, input }) => {
-      if (input.phoneNumber !== "+34600000000" && input.phoneNumber !== "+34 600 000 000") {
+      if (
+        input.phoneNumber !== "+34600000000" &&
+        input.phoneNumber !== "+34 600 000 000"
+      ) {
         throw new Error("OTP retrieval only allowed for test number");
       }
       const latest = await ctx.db.query.verification.findFirst({
@@ -37,21 +45,40 @@ export const authRouter = {
   // 3. Sends a push notification to the user's linked device
   // 4. Returns the session token so the web can poll for confirmation
   requestPushAccess: publicProcedure
-    .input(z.object({ corporateUsername: z.string().min(2).max(64), loginUserAgent: z.string().optional() }))
+    .input(
+      z.object({
+        corporateUsername: z.string().min(2).max(64),
+        loginUserAgent: z.string().optional(),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       // Find user by corporate username (case-insensitive)
       const found = await ctx.db.query.user.findFirst({
-        where: eq(user.corporateUsername, input.corporateUsername.toLowerCase().trim()),
+        where: eq(
+          user.corporateUsername,
+          input.corporateUsername.toLowerCase().trim(),
+        ),
       });
 
       if (!found) {
-        throw new Error("Usuario corporativo no encontrado. Verifica tu usuario e inténtalo de nuevo.");
+        throw new Error(
+          "Usuario corporativo no encontrado. Verifica tu usuario e inténtalo de nuevo.",
+        );
       }
 
       // Check if only professional roles can access the web portal
-      const allowedRoles = ["AF", "Agente AF", "SuperAdmin Aconvi", "Agente Aconvi", "Proveedor", "Tecnico"];
+      const allowedRoles = [
+        "AF",
+        "Agente AF",
+        "SuperAdmin Aconvi",
+        "Agente Aconvi",
+        "Proveedor",
+        "Tecnico",
+      ];
       if (!allowedRoles.includes(found.role)) {
-        throw new Error("Tu usuario no tiene acceso al portal web profesional.");
+        throw new Error(
+          "Tu usuario no tiene acceso al portal web profesional.",
+        );
       }
 
       // Create push auth session (3 min expiry)
@@ -69,7 +96,10 @@ export const authRouter = {
 
       // Store in dev intercept map
       // @ts-ignore
-      (globalThis.__pushAuthSessions as Map<string, string>).set(token, "PENDING");
+      (globalThis.__pushAuthSessions as Map<string, string>).set(
+        token,
+        "PENDING",
+      );
 
       // Check if user has any push tokens registered
       const userTokens = await ctx.db.query.pushToken.findMany({
@@ -79,7 +109,9 @@ export const authRouter = {
       if (userTokens.length === 0) {
         // Dev / demo mode: no device linked yet.
         // Auto-confirm is handled in pollPushStatus (3 seconds after creation).
-        console.log(`[PushAuth] No device tokens for ${found.corporateUsername}. Auto-confirm via poll. token=${token}`);
+        console.log(
+          `[PushAuth] No device tokens for ${found.corporateUsername}. Auto-confirm via poll. token=${token}`,
+        );
       } else {
         // Send push notification to all linked devices
         await sendPushToUser(ctx.db, found.id, {
@@ -91,7 +123,9 @@ export const authRouter = {
             username: found.corporateUsername ?? "",
           },
         });
-        console.log(`[PushAuth] Push sent for ${found.corporateUsername} — token=${token}`);
+        console.log(
+          `[PushAuth] Push sent for ${found.corporateUsername} — token=${token}`,
+        );
       }
 
       return { token, userDisplayName: found.name ?? found.corporateUsername };
@@ -159,7 +193,8 @@ export const authRouter = {
       });
 
       if (!session) throw new Error("Sesión no encontrada.");
-      if (session.status !== "PENDING") throw new Error("Esta solicitud ya fue procesada.");
+      if (session.status !== "PENDING")
+        throw new Error("Esta solicitud ya fue procesada.");
       if (new Date() > session.expiresAt) {
         await ctx.db
           .update(pushAuthSession)
@@ -174,7 +209,10 @@ export const authRouter = {
         .where(eq(pushAuthSession.token, input.token));
 
       // @ts-ignore
-      (globalThis.__pushAuthSessions as Map<string, string>).set(input.token, "CONFIRMED");
+      (globalThis.__pushAuthSessions as Map<string, string>).set(
+        input.token,
+        "CONFIRMED",
+      );
 
       console.log(`[PushAuth] Confirmed by device for token=${input.token}`);
       return { ok: true };

@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import * as xlsx from "xlsx";
-import { db } from "@acme/db/client";
-import { user, member, excelImportJob } from "@acme/db/schema";
-import { auth } from "~/auth/server";
 import { eq } from "drizzle-orm";
+import * as xlsx from "xlsx";
+
+import { db } from "@acme/db/client";
+import { excelImportJob, member, user } from "@acme/db/schema";
+
+import { auth } from "~/auth/server";
 
 export async function POST(req: NextRequest) {
   try {
@@ -50,7 +52,8 @@ export async function POST(req: NextRequest) {
       const nombre = row["Nombre"] || row["nombre"] || row["Name"] || "Vecino";
       const email = row["Email"] || row["email"] || row["Correo"];
       let telefono = row["Teléfono"] || row["telefono"] || row["Phone"];
-      const coeficiente = parseFloat(row["Coeficiente"] || row["coeficiente"] || "100") || 100;
+      const coeficiente =
+        parseFloat(row["Coeficiente"] || row["coeficiente"] || "100") || 100;
 
       // Un vecino necesita al menos un email o teléfono
       if (!email && !telefono) {
@@ -67,38 +70,45 @@ export async function POST(req: NextRequest) {
         // Find existing user or create stub
         // We use dummy ID and do ON CONFLICT to avoid failing if they exist
         const newUserId = crypto.randomUUID();
-        
-        await db.insert(user).values({
-          id: newUserId,
-          name: nombre,
-          email: email ? email.toString().toLowerCase() : null,
-          phoneNumber: telefono ? telefono.toString() : null,
-          role: "vecino",
-        }).onConflictDoNothing({ target: user.email }); 
-        
+
+        await db
+          .insert(user)
+          .values({
+            id: newUserId,
+            name: nombre,
+            email: email ? email.toString().toLowerCase() : null,
+            phoneNumber: telefono ? telefono.toString() : null,
+            role: "vecino",
+          })
+          .onConflictDoNothing({ target: user.email });
+
         // At this point we might not know the user ID if it existed and was skipped by ON CONFLICT.
         // Let's fetch it to be safe.
         const existingUser = await db.query.user.findFirst({
-          where: (u, { eq, or }) => or(
-            email ? eq(u.email, email.toString().toLowerCase()) : undefined,
-            telefono ? eq(u.phoneNumber, telefono.toString()) : undefined
-          ),
+          where: (u, { eq, or }) =>
+            or(
+              email ? eq(u.email, email.toString().toLowerCase()) : undefined,
+              telefono ? eq(u.phoneNumber, telefono.toString()) : undefined,
+            ),
         });
 
         if (!existingUser) {
-           errorCount++;
-           continue;
+          errorCount++;
+          continue;
         }
 
         // Add to community (member table)
-        await db.insert(member).values({
-          id: crypto.randomUUID(),
-          organizationId: tenantId,
-          userId: existingUser.id,
-          role: "vecino",
-          coefficient: coeficiente,
-          createdAt: new Date(),
-        }).onConflictDoNothing(); // if already member, skip
+        await db
+          .insert(member)
+          .values({
+            id: crypto.randomUUID(),
+            organizationId: tenantId,
+            userId: existingUser.id,
+            role: "vecino",
+            coefficient: coeficiente,
+            createdAt: new Date(),
+          })
+          .onConflictDoNothing(); // if already member, skip
 
         successCount++;
       } catch (err) {
@@ -108,8 +118,12 @@ export async function POST(req: NextRequest) {
     }
 
     // Update job status
-    const resultJson = JSON.stringify({ successCount, errorCount, total: rawData.length });
-    
+    const resultJson = JSON.stringify({
+      successCount,
+      errorCount,
+      total: rawData.length,
+    });
+
     if (job) {
       await db
         .update(excelImportJob)

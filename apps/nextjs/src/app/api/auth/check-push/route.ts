@@ -1,7 +1,9 @@
-import { type NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
+import { eq, sql } from "drizzle-orm";
+
 import { db } from "@acme/db/client";
 import { pushAuthSession, pushToken, session, user } from "@acme/db/schema";
-import { eq, sql } from "drizzle-orm";
 
 export async function GET(req: NextRequest) {
   try {
@@ -9,7 +11,10 @@ export async function GET(req: NextRequest) {
     const token = searchParams.get("requestId");
 
     if (!token) {
-      return NextResponse.json({ status: "error", error: "requestId requerido." }, { status: 400 });
+      return NextResponse.json(
+        { status: "error", error: "requestId requerido." },
+        { status: 400 },
+      );
     }
 
     // ── Fetch session with DB-side age calculation (avoids timezone mismatch) ──
@@ -32,18 +37,29 @@ export async function GET(req: NextRequest) {
     const pushSession = rows[0];
 
     if (!pushSession) {
-      return NextResponse.json({ status: "error", error: "Solicitud no encontrada." }, { status: 404 });
+      return NextResponse.json(
+        { status: "error", error: "Solicitud no encontrada." },
+        { status: 404 },
+      );
     }
 
     // Check expiry (also DB-side: expiresAt is stored in UTC)
     const isExpired = new Date(pushSession.expiresAt) < new Date();
     if (isExpired && pushSession.status === "PENDING") {
-      await db.update(pushAuthSession).set({ status: "EXPIRED" }).where(eq(pushAuthSession.token, token));
+      await db
+        .update(pushAuthSession)
+        .set({ status: "EXPIRED" })
+        .where(eq(pushAuthSession.token, token));
       return NextResponse.json({ status: "expired" });
     }
 
-    if (pushSession.status === "EXPIRED" || pushSession.status === "CANCELLED") {
-      return NextResponse.json({ status: pushSession.status === "CANCELLED" ? "rejected" : "expired" });
+    if (
+      pushSession.status === "EXPIRED" ||
+      pushSession.status === "CANCELLED"
+    ) {
+      return NextResponse.json({
+        status: pushSession.status === "CANCELLED" ? "rejected" : "expired",
+      });
     }
 
     // If already confirmed, look for an existing web session → return it
@@ -52,33 +68,46 @@ export async function GET(req: NextRequest) {
         where: eq(session.userId, pushSession.userId),
       });
       if (webSession) {
-        return NextResponse.json({ status: "approved", sessionToken: webSession.token });
+        return NextResponse.json({
+          status: "approved",
+          sessionToken: webSession.token,
+        });
       }
     }
 
     // ── Auto-approve for users without a registered push device ───────────────
     if (pushSession.status === "PENDING") {
       const ageMs = Number(pushSession.ageMs);
-      console.log(`[CHECK_PUSH] token=${token.slice(0,8)} ageMs=${Math.round(ageMs)}ms`);
+      console.log(
+        `[CHECK_PUSH] token=${token.slice(0, 8)} ageMs=${Math.round(ageMs)}ms`,
+      );
 
       if (ageMs > 4000) {
         const [userTokens, foundUser] = await Promise.all([
-          db.query.pushToken.findMany({ where: eq(pushToken.userId, pushSession.userId) }),
+          db.query.pushToken.findMany({
+            where: eq(pushToken.userId, pushSession.userId),
+          }),
           db.query.user.findFirst({ where: eq(user.id, pushSession.userId) }),
         ]);
 
-        const isTestUser = foundUser?.corporateUsername === "jluis.test" ||
-                           foundUser?.corporateUsername === "jluis.push";
+        const isTestUser =
+          foundUser?.corporateUsername === "jluis.test" ||
+          foundUser?.corporateUsername === "jluis.push";
         const noDevice = userTokens.length === 0;
 
-        console.log(`[CHECK_PUSH] user=${foundUser?.corporateUsername} noDevice=${noDevice} isTestUser=${isTestUser}`);
+        console.log(
+          `[CHECK_PUSH] user=${foundUser?.corporateUsername} noDevice=${noDevice} isTestUser=${isTestUser}`,
+        );
 
         if (noDevice || isTestUser) {
-          await db.update(pushAuthSession)
+          await db
+            .update(pushAuthSession)
             .set({ status: "CONFIRMED" })
             .where(eq(pushAuthSession.token, token));
           pushSession.status = "CONFIRMED";
-          console.log(`[CHECK_PUSH] ✓ Auto-confirmed: ${foundUser?.corporateUsername ?? foundUser?.id}`);
+          console.log(
+            `[CHECK_PUSH] ✓ Auto-confirmed: ${foundUser?.corporateUsername ?? foundUser?.id}`,
+          );
         }
       }
     }
@@ -101,11 +130,14 @@ export async function GET(req: NextRequest) {
         userAgent: pushSession.loginUserAgent ?? "Web",
       });
 
-      await db.update(pushAuthSession)
+      await db
+        .update(pushAuthSession)
         .set({ status: "EXPIRED" })
         .where(eq(pushAuthSession.token, token));
 
-      console.log(`[CHECK_PUSH] ✓ Web session created → ${sessionToken.slice(0,8)}`);
+      console.log(
+        `[CHECK_PUSH] ✓ Web session created → ${sessionToken.slice(0, 8)}`,
+      );
       return NextResponse.json({ status: "approved", sessionToken });
     }
 
@@ -113,6 +145,9 @@ export async function GET(req: NextRequest) {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Internal error";
     console.error("[API_CHECK_PUSH]", error);
-    return NextResponse.json({ status: "error", error: message }, { status: 500 });
+    return NextResponse.json(
+      { status: "error", error: message },
+      { status: 500 },
+    );
   }
 }

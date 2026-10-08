@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useTRPC } from "~/trpc/react";
+import { useCallback, useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
+
+import { useTRPC } from "~/trpc/react";
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
 
@@ -73,15 +74,18 @@ export function useWebPush() {
   }, [registerMutation]);
 
   const unsubscribe = useCallback(async () => {
-    const registration = await navigator.serviceWorker.getRegistration("/sw.js");
+    const registration =
+      await navigator.serviceWorker.getRegistration("/sw.js");
     if (!registration) return;
     const subscription = await registration.pushManager.getSubscription();
     if (subscription) {
       // @ts-ignore - TS types may lag
-      await registerMutation.mutateAsync({
-        token: JSON.stringify(subscription),
-        platform: "web",
-      }).catch(() => null);
+      await registerMutation
+        .mutateAsync({
+          token: JSON.stringify(subscription),
+          platform: "web",
+        })
+        .catch(() => null);
       await subscription.unsubscribe();
     }
   }, [registerMutation]);

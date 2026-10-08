@@ -1,35 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { useTRPC } from "~/trpc/react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Button } from "@acme/ui/button";
-import { Input } from "@acme/ui/input";
-import { Label } from "@acme/ui/label";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@acme/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@acme/ui/dialog";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@acme/ui/sheet";
+  Building2,
+  Home,
+  Mail,
+  MapPin,
+  Pencil,
+  Percent,
+  Phone,
+  Plus,
+  Trash2,
+  UserPlus,
+  Users,
+} from "lucide-react";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,19 +27,35 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@acme/ui/alert-dialog";
+import { Button } from "@acme/ui/button";
 import {
-  Building2,
-  Users,
-  Plus,
-  UserPlus,
-  Trash2,
-  MapPin,
-  Phone,
-  Mail,
-  Home,
-  Pencil,
-  Percent,
-} from "lucide-react";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@acme/ui/dialog";
+import { Input } from "@acme/ui/input";
+import { Label } from "@acme/ui/label";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@acme/ui/sheet";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@acme/ui/table";
+
+import { useTRPC } from "~/trpc/react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Community = {
@@ -102,7 +104,9 @@ function AddCommunityDialog({ onSuccess }: { onSuccess: () => void }) {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Añadir Comunidad</DialogTitle>
-          <DialogDescription>Crea una nueva finca o comunidad de propietarios.</DialogDescription>
+          <DialogDescription>
+            Crea una nueva finca o comunidad de propietarios.
+          </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
@@ -125,7 +129,9 @@ function AddCommunityDialog({ onSuccess }: { onSuccess: () => void }) {
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Cancelar
+          </Button>
           <Button
             onClick={() => createMutation.mutate({ name, address })}
             disabled={!name.trim() || createMutation.isPending}
@@ -178,13 +184,21 @@ function EditCommunityDialog({
           </div>
           <div className="grid gap-2">
             <Label>Dirección</Label>
-            <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Calle Mayor, 12" />
+            <Input
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="Calle Mayor, 12"
+            />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Cancelar
+          </Button>
           <Button
-            onClick={() => updateMutation.mutate({ id: community.id, name, address })}
+            onClick={() =>
+              updateMutation.mutate({ id: community.id, name, address })
+            }
             disabled={!name.trim() || updateMutation.isPending}
           >
             {updateMutation.isPending ? "Guardando..." : "Guardar cambios"}
@@ -196,23 +210,42 @@ function EditCommunityDialog({
 }
 
 // ─── Add Neighbor Dialog ──────────────────────────────────────────────────────
-function AddNeighborDialog({ tenantId, onSuccess }: { tenantId: string; onSuccess: () => void }) {
+function AddNeighborDialog({
+  tenantId,
+  onSuccess,
+}: {
+  tenantId: string;
+  onSuccess: () => void;
+}) {
   const trpc = useTRPC();
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", phone: "", unit: "", coefficient: "100" });
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    unit: "",
+    coefficient: "100",
+  });
 
   const addMutation = useMutation(
     trpc.community.addNeighbor.mutationOptions({
       onSuccess: () => {
         setOpen(false);
-        setForm({ name: "", email: "", phone: "", unit: "", coefficient: "100" });
+        setForm({
+          name: "",
+          email: "",
+          phone: "",
+          unit: "",
+          coefficient: "100",
+        });
         onSuccess();
       },
     }),
   );
 
-  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm((f) => ({ ...f, [k]: e.target.value }));
+  const set =
+    (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
+      setForm((f) => ({ ...f, [k]: e.target.value }));
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -225,25 +258,48 @@ function AddNeighborDialog({ tenantId, onSuccess }: { tenantId: string; onSucces
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Añadir Vecino</DialogTitle>
-          <DialogDescription>El vecino recibirá acceso a la app con sus datos.</DialogDescription>
+          <DialogDescription>
+            El vecino recibirá acceso a la app con sus datos.
+          </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
             <Label htmlFor="n-name">Nombre completo *</Label>
-            <Input id="n-name" placeholder="Ana García López" value={form.name} onChange={set("name")} />
+            <Input
+              id="n-name"
+              placeholder="Ana García López"
+              value={form.name}
+              onChange={set("name")}
+            />
           </div>
           <div className="grid gap-2">
             <Label htmlFor="n-email">Email *</Label>
-            <Input id="n-email" type="email" placeholder="ana@ejemplo.com" value={form.email} onChange={set("email")} />
+            <Input
+              id="n-email"
+              type="email"
+              placeholder="ana@ejemplo.com"
+              value={form.email}
+              onChange={set("email")}
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-2">
               <Label htmlFor="n-phone">Teléfono</Label>
-              <Input id="n-phone" placeholder="+34 600 000 000" value={form.phone} onChange={set("phone")} />
+              <Input
+                id="n-phone"
+                placeholder="+34 600 000 000"
+                value={form.phone}
+                onChange={set("phone")}
+              />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="n-unit">Piso / Puerta</Label>
-              <Input id="n-unit" placeholder="2B" value={form.unit} onChange={set("unit")} />
+              <Input
+                id="n-unit"
+                placeholder="2B"
+                value={form.unit}
+                onChange={set("unit")}
+              />
             </div>
           </div>
           <div className="grid gap-2">
@@ -258,14 +314,21 @@ function AddNeighborDialog({ tenantId, onSuccess }: { tenantId: string; onSucces
               value={form.coefficient}
               onChange={set("coefficient")}
             />
-            <p className="text-xs text-muted-foreground">Usado para votaciones ponderadas. Suma total de la comunidad debe ser 100.</p>
+            <p className="text-muted-foreground text-xs">
+              Usado para votaciones ponderadas. Suma total de la comunidad debe
+              ser 100.
+            </p>
           </div>
         </div>
         {addMutation.error && (
-          <p className="text-destructive text-sm -mt-2">{addMutation.error.message}</p>
+          <p className="text-destructive -mt-2 text-sm">
+            {addMutation.error.message}
+          </p>
         )}
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Cancelar
+          </Button>
           <Button
             onClick={() =>
               addMutation.mutate({
@@ -315,14 +378,15 @@ function EditNeighborDialog({
     }),
   );
 
-  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm((f) => ({ ...f, [k]: e.target.value }));
+  const set =
+    (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
+      setForm((f) => ({ ...f, [k]: e.target.value }));
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="ghost" size="icon" className="h-8 w-8">
-          <Pencil className="h-4 w-4 text-muted-foreground" />
+          <Pencil className="text-muted-foreground h-4 w-4" />
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
@@ -337,20 +401,37 @@ function EditNeighborDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-2">
               <Label>Teléfono</Label>
-              <Input value={form.phone} onChange={set("phone")} placeholder="+34 600 000 000" />
+              <Input
+                value={form.phone}
+                onChange={set("phone")}
+                placeholder="+34 600 000 000"
+              />
             </div>
             <div className="grid gap-2">
               <Label>Piso / Puerta</Label>
-              <Input value={form.unit} onChange={set("unit")} placeholder="2B" />
+              <Input
+                value={form.unit}
+                onChange={set("unit")}
+                placeholder="2B"
+              />
             </div>
           </div>
           <div className="grid gap-2">
             <Label>Coeficiente (%)</Label>
-            <Input type="number" min={0} max={100} step={0.01} value={form.coefficient} onChange={set("coefficient")} />
+            <Input
+              type="number"
+              min={0}
+              max={100}
+              step={0.01}
+              value={form.coefficient}
+              onChange={set("coefficient")}
+            />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Cancelar
+          </Button>
           <Button
             onClick={() =>
               updateMutation.mutate({
@@ -397,7 +478,9 @@ function NeighborsPanel({
     trpc.community.removeNeighbor.mutationOptions({
       onSuccess: () =>
         queryClient.invalidateQueries(
-          trpc.community.neighbors.queryFilter({ tenantId: community?.id ?? "" }),
+          trpc.community.neighbors.queryFilter({
+            tenantId: community?.id ?? "",
+          }),
         ),
     }),
   );
@@ -407,60 +490,72 @@ function NeighborsPanel({
       trpc.community.neighbors.queryFilter({ tenantId: community?.id ?? "" }),
     );
 
-  const vecinos = (neighbors ?? []).filter((n: any) => n.memberRole?.startsWith("vecino"));
+  const vecinos = (neighbors ?? []).filter((n: any) =>
+    n.memberRole?.startsWith("vecino"),
+  );
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
+      <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
         <SheetHeader className="mb-6">
           <SheetTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5 text-primary" />
+            <Users className="text-primary h-5 w-5" />
             Vecinos · {community?.name}
           </SheetTitle>
           <SheetDescription>
-            {vecinos.length} vecinos registrados · Coeficiente total: {
-              vecinos.reduce((s: number, n: any) => s + (n.coefficient ?? 100), 0).toFixed(2)
-            }%
+            {vecinos.length} vecinos registrados · Coeficiente total:{" "}
+            {vecinos
+              .reduce((s: number, n: any) => s + (n.coefficient ?? 100), 0)
+              .toFixed(2)}
+            %
           </SheetDescription>
         </SheetHeader>
 
-        <div className="flex justify-end mb-4">
-          {community && <AddNeighborDialog tenantId={community.id} onSuccess={refreshNeighbors} />}
+        <div className="mb-4 flex justify-end">
+          {community && (
+            <AddNeighborDialog
+              tenantId={community.id}
+              onSuccess={refreshNeighbors}
+            />
+          )}
         </div>
 
         {isLoading ? (
           <p className="text-muted-foreground text-sm">Cargando vecinos...</p>
         ) : vecinos.length === 0 ? (
           <div className="rounded-lg border border-dashed p-8 text-center">
-            <Users className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
-            <p className="text-sm text-muted-foreground">No hay vecinos en esta comunidad todavía.</p>
+            <Users className="text-muted-foreground mx-auto mb-3 h-10 w-10" />
+            <p className="text-muted-foreground text-sm">
+              No hay vecinos en esta comunidad todavía.
+            </p>
           </div>
         ) : (
           <div className="flex flex-col gap-3">
             {vecinos.map((n: any) => (
               <div
                 key={n.id}
-                className="flex items-start justify-between rounded-xl border bg-card p-4 shadow-xs"
+                className="bg-card flex items-start justify-between rounded-xl border p-4 shadow-xs"
               >
-                <div className="flex flex-col gap-1.5 flex-1">
+                <div className="flex flex-1 flex-col gap-1.5">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-sm">{n.name}</span>
-                    <span className="flex items-center gap-0.5 text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
+                    <span className="text-sm font-semibold">{n.name}</span>
+                    <span className="text-muted-foreground bg-muted flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs">
                       <Percent className="h-2.5 w-2.5" />
                       {(n.coefficient ?? 100).toFixed(2)}
                     </span>
                   </div>
-                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
                     <Mail className="h-3 w-3" /> {n.email}
                   </span>
                   {n.phoneNumber && (
-                    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
                       <Phone className="h-3 w-3" /> {n.phoneNumber}
                     </span>
                   )}
                   {n.memberRole?.includes(":") && (
-                    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Home className="h-3 w-3" /> Piso {n.memberRole.replace("vecino:", "")}
+                    <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                      <Home className="h-3 w-3" /> Piso{" "}
+                      {n.memberRole.replace("vecino:", "")}
                     </span>
                   )}
                 </div>
@@ -498,7 +593,9 @@ function NeighborsPanel({
 export default function CommunitiesPage() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const [selectedCommunity, setSelectedCommunity] = useState<Community | null>(null);
+  const [selectedCommunity, setSelectedCommunity] = useState<Community | null>(
+    null,
+  );
   const [panelOpen, setPanelOpen] = useState(false);
 
   const { data: communities, isLoading } = useQuery(
@@ -537,19 +634,25 @@ export default function CommunitiesPage() {
         {/* Stats */}
         <div className="grid gap-4 sm:grid-cols-3">
           {[
-            { icon: Building2, label: "Comunidades", value: communities?.length ?? 0 },
+            {
+              icon: Building2,
+              label: "Comunidades",
+              value: communities?.length ?? 0,
+            },
             { icon: Users, label: "Vecinos totales", value: "—" },
             { icon: Home, label: "Dirección media", value: "—" },
           ].map(({ icon: Icon, label, value }) => (
             <div
               key={label}
-              className="flex items-center gap-4 rounded-xl border bg-card p-5 shadow-xs"
+              className="bg-card flex items-center gap-4 rounded-xl border p-5 shadow-xs"
             >
-              <div className="rounded-lg bg-primary/10 p-2.5">
-                <Icon className="h-5 w-5 text-primary" />
+              <div className="bg-primary/10 rounded-lg p-2.5">
+                <Icon className="text-primary h-5 w-5" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground font-medium">{label}</p>
+                <p className="text-muted-foreground text-xs font-medium">
+                  {label}
+                </p>
                 <p className="text-2xl font-bold">{value}</p>
               </div>
             </div>
@@ -557,7 +660,7 @@ export default function CommunitiesPage() {
         </div>
 
         {/* Table */}
-        <div className="rounded-xl border overflow-hidden">
+        <div className="overflow-hidden rounded-xl border">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/30">
@@ -570,16 +673,20 @@ export default function CommunitiesPage() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                  <TableCell
+                    colSpan={4}
+                    className="text-muted-foreground py-8 text-center"
+                  >
                     Cargando comunidades...
                   </TableCell>
                 </TableRow>
               ) : communities?.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={4} className="py-12 text-center">
-                    <Building2 className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
+                    <Building2 className="text-muted-foreground mx-auto mb-3 h-10 w-10" />
                     <p className="text-muted-foreground text-sm">
-                      No hay comunidades. Crea la primera con el botón de arriba.
+                      No hay comunidades. Crea la primera con el botón de
+                      arriba.
                     </p>
                   </TableCell>
                 </TableRow>
@@ -588,13 +695,13 @@ export default function CommunitiesPage() {
                   <TableRow key={community.id} className="group">
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-primary shrink-0" />
+                        <Building2 className="text-primary h-4 w-4 shrink-0" />
                         {community.name}
                       </div>
                     </TableCell>
                     <TableCell>
                       {getAddress(community) ? (
-                        <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <span className="text-muted-foreground flex items-center gap-1.5 text-sm">
                           <MapPin className="h-3.5 w-3.5" />
                           {getAddress(community)}
                         </span>
@@ -603,11 +710,14 @@ export default function CommunitiesPage() {
                       )}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
-                      {new Date(community.createdAt).toLocaleDateString("es-ES", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })}
+                      {new Date(community.createdAt).toLocaleDateString(
+                        "es-ES",
+                        {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        },
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
@@ -619,29 +729,38 @@ export default function CommunitiesPage() {
                           <Users className="mr-1.5 h-3.5 w-3.5" />
                           Ver Vecinos
                         </Button>
-                        <EditCommunityDialog community={community} onSuccess={refresh} />
+                        <EditCommunityDialog
+                          community={community}
+                          onSuccess={refresh}
+                        />
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                              className="text-destructive hover:bg-destructive/10 h-8 w-8"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
-                              <AlertDialogTitle>¿Eliminar comunidad?</AlertDialogTitle>
+                              <AlertDialogTitle>
+                                ¿Eliminar comunidad?
+                              </AlertDialogTitle>
                               <AlertDialogDescription>
-                                Se eliminarán permanentemente la comunidad <strong>{community.name}</strong> y todos sus vecinos. Esta acción no se puede deshacer.
+                                Se eliminarán permanentemente la comunidad{" "}
+                                <strong>{community.name}</strong> y todos sus
+                                vecinos. Esta acción no se puede deshacer.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancelar</AlertDialogCancel>
                               <AlertDialogAction
                                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                onClick={() => deleteMutation.mutate({ id: community.id })}
+                                onClick={() =>
+                                  deleteMutation.mutate({ id: community.id })
+                                }
                               >
                                 Eliminar
                               </AlertDialogAction>

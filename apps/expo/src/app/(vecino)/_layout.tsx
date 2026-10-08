@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
-import { Tabs } from "expo-router";
-import { View, Text, Platform } from "react-native";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { Platform, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Tabs } from "expo-router";
 import * as SecureStore from "expo-secure-store";
+import { useQuery } from "@tanstack/react-query";
+
 import { api } from "~/utils/api";
 import { authClient } from "~/utils/auth";
 import { useReadStatus } from "~/utils/notifications-tracker";
@@ -62,9 +63,11 @@ export default function VecinoLayout() {
   const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    SecureStore.getItemAsync("expo_user_id").then((id) => {
-      if (id) setUserId(id);
-    }).catch(console.warn);
+    SecureStore.getItemAsync("expo_user_id")
+      .then((id) => {
+        if (id) setUserId(id);
+      })
+      .catch(console.warn);
   }, []);
 
   const insets = useSafeAreaInsets();
@@ -93,9 +96,7 @@ export default function VecinoLayout() {
   );
 
   const docsList = (documents as any[] | undefined) ?? [];
-  const hasUnreadDocs = docsList.some(
-    (d: any) => !seenDocIds.includes(d.id),
-  );
+  const hasUnreadDocs = docsList.some((d: any) => !seenDocIds.includes(d.id));
 
   const feesList = (fees as any[] | undefined) ?? [];
   const hasPendingFees = feesList.some(
@@ -149,7 +150,11 @@ export default function VecinoLayout() {
         options={{
           title: "Comunicados",
           tabBarIcon: ({ focused }) => (
-            <TabIcon name="Comunicados" focused={focused} hasBadge={hasUnreadNotices} />
+            <TabIcon
+              name="Comunicados"
+              focused={focused}
+              hasBadge={hasUnreadNotices}
+            />
           ),
         }}
       />
@@ -168,7 +173,11 @@ export default function VecinoLayout() {
         options={{
           title: "Documentos",
           tabBarIcon: ({ focused }) => (
-            <TabIcon name="Documentos" focused={focused} hasBadge={hasUnreadDocs} />
+            <TabIcon
+              name="Documentos"
+              focused={focused}
+              hasBadge={hasUnreadDocs}
+            />
           ),
         }}
       />
@@ -188,7 +197,11 @@ export default function VecinoLayout() {
         options={{
           title: "Mis cuotas",
           tabBarIcon: ({ focused }) => (
-            <TabIcon name="Mis cuotas" focused={focused} hasBadge={hasPendingFees} />
+            <TabIcon
+              name="Mis cuotas"
+              focused={focused}
+              hasBadge={hasPendingFees}
+            />
           ),
         }}
       />
@@ -201,10 +214,7 @@ export default function VecinoLayout() {
         name="incidents/new"
         options={{ href: null, headerShown: false }}
       />
-      <Tabs.Screen
-        name="rating"
-        options={{ href: null, headerShown: false }}
-      />
+      <Tabs.Screen name="rating" options={{ href: null, headerShown: false }} />
       <Tabs.Screen
         name="votes-history"
         options={{ href: null, headerShown: false }}

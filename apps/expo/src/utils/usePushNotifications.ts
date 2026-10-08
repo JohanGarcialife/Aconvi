@@ -1,25 +1,29 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Platform } from "react-native";
+import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
-import { Platform } from "react-native";
-import Constants from "expo-constants";
+
 import { getBaseUrl } from "./base-url";
 
 // Configure how notifications appear when app is in foreground
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  } as any),
+  handleNotification: async () =>
+    ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    }) as any,
 });
 
 export function usePushNotifications() {
   const [pushToken, setPushToken] = useState<string | null>(null);
   const [permissionStatus, setPermissionStatus] =
     useState<Notifications.PermissionStatus | null>(null);
-  const notificationListener = useRef<Notifications.EventSubscription | null>(null);
+  const notificationListener = useRef<Notifications.EventSubscription | null>(
+    null,
+  );
   const responseListener = useRef<Notifications.EventSubscription | null>(null);
 
   useEffect(() => {
@@ -31,7 +35,10 @@ export function usePushNotifications() {
           console.warn("[Push] No token returned.");
           return;
         }
-        console.log(`[Push] Token acquired (${result.platform}):`, result.token.slice(0, 30) + "...");
+        console.log(
+          `[Push] Token acquired (${result.platform}):`,
+          result.token.slice(0, 30) + "...",
+        );
         setPushToken(result.token);
 
         // Register token with backend
@@ -44,7 +51,10 @@ export function usePushNotifications() {
     // Listener: receives notification while app is open
     notificationListener.current =
       Notifications.addNotificationReceivedListener((notification) => {
-        console.log("[Push] Notification received in foreground:", notification);
+        console.log(
+          "[Push] Notification received in foreground:",
+          notification,
+        );
       });
 
     // Listener: user tapped on a notification
@@ -65,11 +75,19 @@ export function usePushNotifications() {
 }
 
 // ─── Register token with backend via REST ─────────────────────────────────────
-export async function registerTokenWithBackend(token: string, platform: string, explicitSessionToken?: string): Promise<void> {
+export async function registerTokenWithBackend(
+  token: string,
+  platform: string,
+  explicitSessionToken?: string,
+): Promise<void> {
   try {
-    const sessionToken = explicitSessionToken ?? (await SecureStore.getItemAsync("expo_session_token"));
+    const sessionToken =
+      explicitSessionToken ??
+      (await SecureStore.getItemAsync("expo_session_token"));
     if (!sessionToken) {
-      console.warn("[Push] No session token in SecureStore, skipping registration.");
+      console.warn(
+        "[Push] No session token in SecureStore, skipping registration.",
+      );
       return;
     }
 
@@ -94,16 +112,25 @@ export async function registerTokenWithBackend(token: string, platform: string, 
 }
 
 // ─── Token acquisition and registration helper ──────────────────────────────
-export async function acquireAndRegisterPushToken(explicitSessionToken?: string): Promise<{ token: string; platform: string } | null> {
+export async function acquireAndRegisterPushToken(
+  explicitSessionToken?: string,
+): Promise<{ token: string; platform: string } | null> {
   const result = await acquirePushToken();
   if (result) {
-    await registerTokenWithBackend(result.token, result.platform, explicitSessionToken);
+    await registerTokenWithBackend(
+      result.token,
+      result.platform,
+      explicitSessionToken,
+    );
   }
   return result;
 }
 
 // ─── Token acquisition ────────────────────────────────────────────────────────
-async function acquirePushToken(): Promise<{ token: string; platform: string } | null> {
+async function acquirePushToken(): Promise<{
+  token: string;
+  platform: string;
+} | null> {
   // Setup notification channel on Android for instant high-priority alerts
   if (Platform.OS === "android") {
     await Notifications.setNotificationChannelAsync("default", {
@@ -130,7 +157,10 @@ async function acquirePushToken(): Promise<{ token: string; platform: string } |
   }
 
   if (finalStatus !== "granted") {
-    console.warn("[Push] Notification permission not granted. Status:", finalStatus);
+    console.warn(
+      "[Push] Notification permission not granted. Status:",
+      finalStatus,
+    );
     return null;
   }
 
@@ -140,9 +170,19 @@ async function acquirePushToken(): Promise<{ token: string; platform: string } |
     // 1. Try Expo's native device push token (calls Google Play Services FCM directly)
     try {
       const deviceToken = await Notifications.getDevicePushTokenAsync();
-      console.log("[Push] Notifications.getDevicePushTokenAsync acquired:", deviceToken);
-      if (deviceToken && typeof deviceToken.data === "string" && deviceToken.data.length > 20) {
-        console.log("[Push] Native FCM Device Token acquired via expo-notifications:", deviceToken.data.slice(0, 30));
+      console.log(
+        "[Push] Notifications.getDevicePushTokenAsync acquired:",
+        deviceToken,
+      );
+      if (
+        deviceToken &&
+        typeof deviceToken.data === "string" &&
+        deviceToken.data.length > 20
+      ) {
+        console.log(
+          "[Push] Native FCM Device Token acquired via expo-notifications:",
+          deviceToken.data.slice(0, 30),
+        );
         return { token: deviceToken.data, platform: "fcm" };
       }
     } catch (err) {
@@ -153,9 +193,14 @@ async function acquirePushToken(): Promise<{ token: string; platform: string } |
     try {
       const messagingModule = await import("@react-native-firebase/messaging");
       const messaging = messagingModule.default;
-      await messaging().requestPermission().catch(() => {});
+      await messaging()
+        .requestPermission()
+        .catch(() => {});
       const fcmToken = await messaging().getToken();
-      console.log("[Push] Native FCM token acquired via @react-native-firebase/messaging:", fcmToken?.slice(0, 30));
+      console.log(
+        "[Push] Native FCM token acquired via @react-native-firebase/messaging:",
+        fcmToken?.slice(0, 30),
+      );
       if (fcmToken && typeof fcmToken === "string") {
         return { token: fcmToken, platform: "fcm" };
       }
@@ -176,7 +221,10 @@ async function acquirePushToken(): Promise<{ token: string; platform: string } |
     console.log("[Push] Expo Push Token acquired:", tokenData.data);
     return { token: tokenData.data, platform: "expo" };
   } catch (error) {
-    console.warn("[Push] getExpoPushTokenAsync failed, trying device token:", error);
+    console.warn(
+      "[Push] getExpoPushTokenAsync failed, trying device token:",
+      error,
+    );
 
     try {
       const deviceToken = await Notifications.getDevicePushTokenAsync();
@@ -185,7 +233,10 @@ async function acquirePushToken(): Promise<{ token: string; platform: string } |
         return { token: deviceToken.data, platform: "fcm" };
       }
     } catch (fallbackErr) {
-      console.error("[Push] All token acquisition methods failed:", fallbackErr);
+      console.error(
+        "[Push] All token acquisition methods failed:",
+        fallbackErr,
+      );
     }
   }
 

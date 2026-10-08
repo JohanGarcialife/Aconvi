@@ -1,10 +1,16 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useParams } from "next/navigation";
+import {
+  AlertCircle,
+  CheckCircle2,
+  FileSpreadsheet,
+  UploadCloud,
+} from "lucide-react";
+
 import { Button } from "@acme/ui/button";
 import { toast } from "@acme/ui/toast";
-import { UploadCloud, FileSpreadsheet, CheckCircle2, AlertCircle } from "lucide-react";
 
 export default function CommunityImportPage() {
   const { id: tenantId } = useParams() as { id: string };
@@ -46,7 +52,9 @@ export default function CommunityImportPage() {
 
       const data = await response.json();
       setResult(data);
-      toast.success(`Importación completada: ${data.successCount} vecinos añadidos.`);
+      toast.success(
+        `Importación completada: ${data.successCount} vecinos añadidos.`,
+      );
     } catch (err: any) {
       toast.error(err.message || "Error al subir el archivo");
     } finally {
@@ -55,12 +63,15 @@ export default function CommunityImportPage() {
   };
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-8">
+    <div className="mx-auto max-w-3xl space-y-8 p-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight mb-2">Importar Vecinos</h1>
+        <h1 className="mb-2 text-3xl font-bold tracking-tight">
+          Importar Vecinos
+        </h1>
         <p className="text-muted-foreground">
-          Sube un archivo de Excel para dar de alta masivamente a los vecinos de esta comunidad.
-          El archivo debe contener las columnas: <strong>Nombre, Email, Teléfono, Coeficiente</strong>.
+          Sube un archivo de Excel para dar de alta masivamente a los vecinos de
+          esta comunidad. El archivo debe contener las columnas:{" "}
+          <strong>Nombre, Email, Teléfono, Coeficiente</strong>.
         </p>
       </div>
 
@@ -73,28 +84,35 @@ export default function CommunityImportPage() {
               setIsDragging(true);
             }}
             onDragLeave={() => setIsDragging(false)}
-            className={`rounded-xl border-2 border-dashed p-16 flex flex-col items-center justify-center text-center transition-all cursor-pointer ${
+            className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-16 text-center transition-all ${
               isDragging
                 ? "border-primary bg-primary/5 scale-[1.01]"
                 : "border-border bg-card hover:border-primary/50 hover:bg-muted/30"
             }`}
             onClick={() => document.getElementById("file-upload")?.click()}
           >
-            <div className="rounded-full bg-primary/10 p-4 mb-4">
-              <UploadCloud className={`h-8 w-8 ${isDragging ? "text-primary" : "text-muted-foreground"}`} />
+            <div className="bg-primary/10 mb-4 rounded-full p-4">
+              <UploadCloud
+                className={`h-8 w-8 ${isDragging ? "text-primary" : "text-muted-foreground"}`}
+              />
             </div>
-            
+
             {file ? (
               <div className="flex flex-col items-center">
-                <FileSpreadsheet className="h-10 w-10 text-green-500 mb-2" />
-                <h3 className="font-semibold text-lg">{file.name}</h3>
-                <p className="text-sm text-muted-foreground">{(file.size / 1024).toFixed(1)} KB</p>
+                <FileSpreadsheet className="mb-2 h-10 w-10 text-green-500" />
+                <h3 className="text-lg font-semibold">{file.name}</h3>
+                <p className="text-muted-foreground text-sm">
+                  {(file.size / 1024).toFixed(1)} KB
+                </p>
               </div>
             ) : (
               <>
-                <h3 className="font-semibold text-lg mb-1">Arrastra tu Excel aquí</h3>
-                <p className="text-sm text-muted-foreground mb-4 max-w-sm">
-                  O haz clic para explorar. Acepta <strong>.xlsx</strong> y <strong>.xls</strong>
+                <h3 className="mb-1 text-lg font-semibold">
+                  Arrastra tu Excel aquí
+                </h3>
+                <p className="text-muted-foreground mb-4 max-w-sm text-sm">
+                  O haz clic para explorar. Acepta <strong>.xlsx</strong> y{" "}
+                  <strong>.xls</strong>
                 </p>
               </>
             )}
@@ -113,7 +131,11 @@ export default function CommunityImportPage() {
 
           <div className="flex justify-end gap-3">
             {file && (
-              <Button variant="outline" onClick={() => setFile(null)} disabled={isUploading}>
+              <Button
+                variant="outline"
+                onClick={() => setFile(null)}
+                disabled={isUploading}
+              >
                 Cancelar
               </Button>
             )}
@@ -123,30 +145,42 @@ export default function CommunityImportPage() {
           </div>
         </div>
       ) : (
-        <div className="bg-card border rounded-xl p-8 text-center space-y-4">
-          <div className="flex justify-center mb-2">
+        <div className="bg-card space-y-4 rounded-xl border p-8 text-center">
+          <div className="mb-2 flex justify-center">
             <CheckCircle2 className="h-16 w-16 text-green-500" />
           </div>
           <h2 className="text-2xl font-semibold">¡Importación Completada!</h2>
-          
-          <div className="bg-muted/50 rounded-lg p-6 max-w-sm mx-auto flex flex-col gap-3">
+
+          <div className="bg-muted/50 mx-auto flex max-w-sm flex-col gap-3 rounded-lg p-6">
             <div className="flex justify-between border-b pb-2">
-              <span className="text-muted-foreground">Total de filas procesadas</span>
+              <span className="text-muted-foreground">
+                Total de filas procesadas
+              </span>
               <span className="font-bold">{result.total}</span>
             </div>
             <div className="flex justify-between border-b pb-2">
               <span className="text-muted-foreground">Vecinos importados</span>
-              <span className="font-bold text-green-600">{result.successCount}</span>
+              <span className="font-bold text-green-600">
+                {result.successCount}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground flex items-center gap-1">
                 <AlertCircle className="h-4 w-4" /> Errores o duplicados
               </span>
-              <span className="font-bold text-red-500">{result.errorCount}</span>
+              <span className="font-bold text-red-500">
+                {result.errorCount}
+              </span>
             </div>
           </div>
 
-          <Button className="mt-6" onClick={() => { setResult(null); setFile(null); }}>
+          <Button
+            className="mt-6"
+            onClick={() => {
+              setResult(null);
+              setFile(null);
+            }}
+          >
             Importar otro archivo
           </Button>
         </div>

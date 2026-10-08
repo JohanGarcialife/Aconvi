@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-
 import { X } from "lucide-react";
+
 import { cn } from "./utils";
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -22,7 +22,11 @@ interface DialogProps {
   children: React.ReactNode;
 }
 
-function Dialog({ open = false, onOpenChange = () => undefined, children }: DialogProps) {
+function Dialog({
+  open = false,
+  onOpenChange = () => undefined,
+  children,
+}: DialogProps) {
   return (
     <DialogContext.Provider value={{ open, onOpenChange }}>
       {children}
@@ -35,7 +39,10 @@ function DialogTrigger({
   asChild,
   children,
   ...props
-}: { asChild?: boolean; children: React.ReactNode } & React.HTMLAttributes<HTMLElement>) {
+}: {
+  asChild?: boolean;
+  children: React.ReactNode;
+} & React.HTMLAttributes<HTMLElement>) {
   const { onOpenChange } = React.useContext(DialogContext);
   const handleClick = () => onOpenChange(true);
 
@@ -76,7 +83,7 @@ function DialogContent({
         role="dialog"
         aria-modal="true"
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 border bg-background p-6 shadow-lg sm:rounded-xl",
+          "bg-background fixed top-1/2 left-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 border p-6 shadow-lg sm:rounded-xl",
           className,
         )}
         onClick={(e) => e.stopPropagation()}
@@ -85,7 +92,7 @@ function DialogContent({
         {children}
         <button
           type="button"
-          className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring"
+          className="focus:ring-ring absolute top-4 right-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:outline-none"
           onClick={() => onOpenChange(false)}
         >
           <X className="h-4 w-4" />
@@ -97,40 +104,64 @@ function DialogContent({
 }
 
 // ─── Semantic wrappers ────────────────────────────────────────────────────────
-function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+function DialogHeader({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("flex flex-col space-y-1.5 text-center sm:text-left", className)}
+      className={cn(
+        "flex flex-col space-y-1.5 text-center sm:text-left",
+        className,
+      )}
       {...props}
     />
   );
 }
 
-function DialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+function DialogFooter({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2", className)}
+      className={cn(
+        "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2",
+        className,
+      )}
       {...props}
     />
   );
 }
 
-function DialogTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
+function DialogTitle({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLHeadingElement>) {
   return (
     <h2
-      className={cn("text-lg font-semibold leading-none tracking-tight", className)}
+      className={cn(
+        "text-lg leading-none font-semibold tracking-tight",
+        className,
+      )}
       {...props}
     />
   );
 }
 
-function DialogDescription({ className, ...props }: React.HTMLAttributes<HTMLParagraphElement>) {
+function DialogDescription({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLParagraphElement>) {
   return (
-    <p className={cn("text-sm text-muted-foreground", className)} {...props} />
+    <p className={cn("text-muted-foreground text-sm", className)} {...props} />
   );
 }
 
-function DialogClose({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+function DialogClose({
+  children,
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement>) {
   const { onOpenChange } = React.useContext(DialogContext);
   return (
     <button type="button" onClick={() => onOpenChange(false)} {...props}>

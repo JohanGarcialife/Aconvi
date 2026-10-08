@@ -1,21 +1,27 @@
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
   ActivityIndicator,
-  Image,
   Alert,
+  Image,
   Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
   TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter, Stack, useLocalSearchParams, useFocusEffect } from "expo-router";
-import { api, queryClient } from "~/utils/api";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import {
+  Stack,
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
+} from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useMutation, useQuery } from "@tanstack/react-query";
+
+import { api, queryClient } from "~/utils/api";
 import { getBaseUrl } from "~/utils/base-url";
 
 const PRIMARY = "#009689";
@@ -24,11 +30,16 @@ const MUTED = "#64748b";
 const BORDER = "#e2e8f0";
 const RED = "#ef4444";
 
-const DEFAULT_PHOTO = "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?q=80&w=1000";
+const DEFAULT_PHOTO =
+  "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?q=80&w=1000";
 
 function resolvePhotoUrl(url?: string | null) {
   if (!url || url.trim() === "") return DEFAULT_PHOTO;
-  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) {
+  if (
+    url.startsWith("http://") ||
+    url.startsWith("https://") ||
+    url.startsWith("data:")
+  ) {
     return url;
   }
   const path = url.startsWith("/") ? url : `/${url}`;
@@ -37,7 +48,11 @@ function resolvePhotoUrl(url?: string | null) {
 
 export default function AcceptScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ incidentId?: string; providerId?: string; tenantId?: string }>();
+  const params = useLocalSearchParams<{
+    incidentId?: string;
+    providerId?: string;
+    tenantId?: string;
+  }>();
   const incidentId = params.incidentId;
   const providerId = params.providerId ?? "";
   const tenantId = params.tenantId ?? "org_aconvi_demo";
@@ -46,22 +61,31 @@ export default function AcceptScreen() {
   const [rejectReason, setRejectReason] = useState("");
   const [imageError, setImageError] = useState(false);
 
-  const { data: incident, isLoading, refetch } = useQuery(
+  const {
+    data: incident,
+    isLoading,
+    refetch,
+  } = useQuery(
     api.incident.byId.queryOptions(
       { id: incidentId ?? "", tenantId },
-      { enabled: !!incidentId }
-    )
+      { enabled: !!incidentId },
+    ),
   );
 
   useFocusEffect(
     useCallback(() => {
       void refetch();
-    }, [refetch])
+    }, [refetch]),
   );
 
   const rejectMutation = useMutation({
     ...((api.incident as any).providerReject?.mutationOptions?.() ?? {}),
-    mutationFn: async (data: { id: string; tenantId: string; providerId: string; reason?: string }) => {
+    mutationFn: async (data: {
+      id: string;
+      tenantId: string;
+      providerId: string;
+      reason?: string;
+    }) => {
       const opts = (api.incident as any).providerReject.mutationOptions();
       return opts.mutationFn(data);
     },
@@ -71,11 +95,14 @@ export default function AcceptScreen() {
       Alert.alert(
         "Asignación rechazada",
         "La orden de trabajo ha sido devuelta a la administración para su reasignación.",
-        [{ text: "OK", onPress: () => router.replace("/(proveedor)/job") }]
+        [{ text: "OK", onPress: () => router.replace("/(proveedor)/job") }],
       );
     },
     onError: (err: any) => {
-      Alert.alert("Error", err.message || "No se pudo rechazar la orden de trabajo.");
+      Alert.alert(
+        "Error",
+        err.message || "No se pudo rechazar la orden de trabajo.",
+      );
     },
   });
 
@@ -83,8 +110,8 @@ export default function AcceptScreen() {
   const assignedTime = incident?.assignedAt
     ? new Date(incident.assignedAt).getTime()
     : incident?.createdAt
-    ? new Date(incident.createdAt).getTime()
-    : Date.now();
+      ? new Date(incident.createdAt).getTime()
+      : Date.now();
 
   const EXPIRATION_MS = 2 * 60 * 60 * 1000;
   const [remainingMs, setRemainingMs] = useState<number>(() => {
@@ -101,7 +128,9 @@ export default function AcceptScreen() {
     return () => clearInterval(timer);
   }, [assignedTime]);
 
-  const isExpired = remainingMs <= 0 || (incident?.status === "RECIBIDA" && !incident?.assignedAt);
+  const isExpired =
+    remainingMs <= 0 ||
+    (incident?.status === "RECIBIDA" && !incident?.assignedAt);
 
   const formatCountdown = (ms: number) => {
     if (ms <= 0) return "00:00:00";
@@ -116,7 +145,7 @@ export default function AcceptScreen() {
     if (isExpired) {
       Alert.alert(
         "OT Caducada",
-        "Esta orden de trabajo ha superado el límite de 2 horas y ha caducado. No se puede aceptar."
+        "Esta orden de trabajo ha superado el límite de 2 horas y ha caducado. No se puede aceptar.",
       );
       return;
     }
@@ -142,17 +171,21 @@ export default function AcceptScreen() {
         <Stack.Screen options={{ headerShown: false }} />
         <View style={styles.center}>
           <ActivityIndicator color={PRIMARY} size="large" />
-          <Text style={styles.loadingText}>Cargando detalle de asignación...</Text>
+          <Text style={styles.loadingText}>
+            Cargando detalle de asignación...
+          </Text>
         </View>
       </SafeAreaView>
     );
   }
 
-  const orgName = (incident as any)?.organization?.name || "Residencial El Lago";
+  const orgName =
+    (incident as any)?.organization?.name || "Residencial El Lago";
   const address = (incident as any)?.address || "Calle Los Sauces, 345";
   const priority = incident?.priority ?? "Alta";
   const title = incident?.title ?? "Gotera en tejado";
-  const description = incident?.description ?? "Gotea mucho el techo del pasillo";
+  const description =
+    incident?.description ?? "Gotea mucho el techo del pasillo";
   const photoUrl = incident?.photoUrl;
 
   return (
@@ -165,7 +198,9 @@ export default function AcceptScreen() {
           <Ionicons name="chevron-back" size={24} color={DARK} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.communityTitle} numberOfLines={1}>{orgName}</Text>
+          <Text style={styles.communityTitle} numberOfLines={1}>
+            {orgName}
+          </Text>
           <Text style={styles.addressSub}>{address}</Text>
           <Text style={styles.prioritySub}>
             {priority.charAt(0).toUpperCase() + priority.slice(1)} · 2 h
@@ -174,7 +209,10 @@ export default function AcceptScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Countdown Box */}
         <View style={styles.timerCard}>
           <Text style={styles.timerLabel}>Tiempo para aceptar</Text>
@@ -184,7 +222,9 @@ export default function AcceptScreen() {
           {isExpired && (
             <View style={styles.expiredBanner}>
               <Ionicons name="alert-circle" size={16} color={RED} />
-              <Text style={styles.expiredText}>OT Caducada — Límite de 2h superado</Text>
+              <Text style={styles.expiredText}>
+                OT Caducada — Límite de 2h superado
+              </Text>
             </View>
           )}
         </View>
@@ -223,7 +263,12 @@ export default function AcceptScreen() {
             disabled={isExpired}
             activeOpacity={0.8}
           >
-            <Ionicons name="checkmark-circle-outline" size={22} color="#fff" style={{ marginRight: 8 }} />
+            <Ionicons
+              name="checkmark-circle-outline"
+              size={22}
+              color="#fff"
+              style={{ marginRight: 8 }}
+            />
             <Text style={styles.acceptBtnText}>
               {isExpired ? "OT CADUCADA" : "ACEPTAR Y AVISAR"}
             </Text>
@@ -235,7 +280,12 @@ export default function AcceptScreen() {
             disabled={isExpired}
             activeOpacity={0.8}
           >
-            <Ionicons name="close-circle-outline" size={20} color={isExpired ? MUTED : RED} style={{ marginRight: 6 }} />
+            <Ionicons
+              name="close-circle-outline"
+              size={20}
+              color={isExpired ? MUTED : RED}
+              style={{ marginRight: 6 }}
+            />
             <Text style={[styles.rejectBtnText, isExpired && { color: MUTED }]}>
               {isExpired ? "OT CADUCADA" : "RECHAZAR ASIGNACIÓN"}
             </Text>
@@ -253,7 +303,8 @@ export default function AcceptScreen() {
             </View>
 
             <Text style={styles.modalMessage}>
-              ¿Estás seguro de que deseas rechazar esta orden de trabajo? Volverá a la administración para su reasignación.
+              ¿Estás seguro de que deseas rechazar esta orden de trabajo?
+              Volverá a la administración para su reasignación.
             </Text>
 
             <TextInput
@@ -317,8 +368,19 @@ const styles = StyleSheet.create({
 
   timerCard: { alignItems: "center", marginVertical: 12 },
   timerLabel: { fontSize: 14, color: MUTED, fontWeight: "500" },
-  timerValue: { fontSize: 36, fontWeight: "800", color: RED, marginTop: 4, letterSpacing: 1 },
-  expiredBanner: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 },
+  timerValue: {
+    fontSize: 36,
+    fontWeight: "800",
+    color: RED,
+    marginTop: 4,
+    letterSpacing: 1,
+  },
+  expiredBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 6,
+  },
   expiredText: { fontSize: 13, color: RED, fontWeight: "600" },
 
   photoContainer: {
@@ -382,9 +444,19 @@ const styles = StyleSheet.create({
     padding: 20,
     elevation: 8,
   },
-  modalHeader: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12 },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 12,
+  },
   modalTitle: { fontSize: 18, fontWeight: "700", color: DARK },
-  modalMessage: { fontSize: 14, color: MUTED, marginBottom: 16, lineHeight: 20 },
+  modalMessage: {
+    fontSize: 14,
+    color: MUTED,
+    marginBottom: 16,
+    lineHeight: 20,
+  },
   modalInput: {
     borderWidth: 1,
     borderColor: BORDER,
@@ -397,8 +469,17 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   modalActions: { flexDirection: "row", justifyContent: "flex-end", gap: 12 },
-  modalCancelBtn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8 },
+  modalCancelBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
   modalCancelText: { color: MUTED, fontSize: 14, fontWeight: "600" },
-  modalConfirmBtn: { backgroundColor: RED, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8 },
+  modalConfirmBtn: {
+    backgroundColor: RED,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
   modalConfirmText: { color: "#fff", fontSize: 14, fontWeight: "700" },
 });

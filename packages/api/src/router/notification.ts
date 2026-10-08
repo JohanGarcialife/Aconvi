@@ -1,7 +1,9 @@
 import crypto from "crypto";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+
 import { pushToken } from "@acme/db/schema";
+
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 // ─── Internal broadcast to WS server ─────────────────────────────────────────
@@ -54,34 +56,58 @@ export async function sendPushToUser(
       columns: { deviceToken: true },
     });
     if (userRec?.deviceToken) {
-      const alreadyInList = tokens.some((t: any) => t.token === userRec.deviceToken);
+      const alreadyInList = tokens.some(
+        (t: any) => t.token === userRec.deviceToken,
+      );
       if (!alreadyInList) {
-        const plat = (userRec.deviceToken.startsWith("ExponentPushToken") || userRec.deviceToken.startsWith("ExpoPushToken"))
-          ? "expo"
-          : "fcm";
+        const plat =
+          userRec.deviceToken.startsWith("ExponentPushToken") ||
+          userRec.deviceToken.startsWith("ExpoPushToken")
+            ? "expo"
+            : "fcm";
         tokens.push({ token: userRec.deviceToken, platform: plat });
       }
     }
   } catch (err) {
-    console.warn("[sendPushToUser] Could not query user.deviceToken fallback:", err);
+    console.warn(
+      "[sendPushToUser] Could not query user.deviceToken fallback:",
+      err,
+    );
   }
 
   console.log("[sendPushToUser] Found tokens count:", tokens.length);
 
   for (const tok of tokens) {
-    console.log("[sendPushToUser] Dispatching token platform:", tok.platform, "token:", tok.token?.slice(0, 30));
+    console.log(
+      "[sendPushToUser] Dispatching token platform:",
+      tok.platform,
+      "token:",
+      tok.token?.slice(0, 30),
+    );
     if (tok.platform === "fcm") {
       // Native Android FCM token → FCM V1 API direct
       await sendDirectFcmPush(tok.token, notification, db).catch((err) => {
-        console.error("[sendPushToUser] sendDirectFcmPush failed for token:", tok.token?.slice(0, 30), err);
+        console.error(
+          "[sendPushToUser] sendDirectFcmPush failed for token:",
+          tok.token?.slice(0, 30),
+          err,
+        );
       });
     } else if (tok.platform === "expo") {
       await sendExpoPush(tok.token, notification, db).catch((err) => {
-        console.error("[sendPushToUser] sendExpoPush failed for token:", tok.token?.slice(0, 30), err);
+        console.error(
+          "[sendPushToUser] sendExpoPush failed for token:",
+          tok.token?.slice(0, 30),
+          err,
+        );
       });
     } else if (tok.platform === "web") {
       await sendWebPush(tok.token, notification).catch((err) => {
-        console.error("[sendPushToUser] sendWebPush failed for token:", tok.token?.slice(0, 30), err);
+        console.error(
+          "[sendPushToUser] sendWebPush failed for token:",
+          tok.token?.slice(0, 30),
+          err,
+        );
       });
     }
   }
@@ -112,13 +138,21 @@ export async function sendPushToAFs(
 
     // 2. Also find any users globally configured with AF or Admin role
     const globalAfUsers = await db.query.user.findMany({
-      where: inArray(user.role, ["AF", "SuperAdmin", "AgenteAconvi", "admin", "Admin"]),
+      where: inArray(user.role, [
+        "AF",
+        "SuperAdmin",
+        "AgenteAconvi",
+        "admin",
+        "Admin",
+      ]),
       columns: { id: true },
     });
 
     const globalAfUserIds = globalAfUsers.map((u: any) => u.id as string);
 
-    const targetUserIds = [...new Set([...afMemberUserIds, ...globalAfUserIds])];
+    const targetUserIds = [
+      ...new Set([...afMemberUserIds, ...globalAfUserIds]),
+    ];
     console.log("[sendPushToAFs] Target AF user IDs:", targetUserIds);
 
     let sent = 0;
@@ -159,14 +193,22 @@ export async function sendPushToAllMembers(
   try {
     pushTokens = await db.query.pushToken.findMany();
   } catch (err) {
-    console.warn("[sendPushToAllMembers] Could not query pushToken table:", err);
+    console.warn(
+      "[sendPushToAllMembers] Could not query pushToken table:",
+      err,
+    );
   }
 
   const memberUserIds = members.map((m: any) => m.userId as string);
   const tokenUserIds = pushTokens.map((p: any) => p.userId as string);
-  const userIds = [...new Set([...memberUserIds, ...tokenUserIds])].filter(Boolean) as string[];
+  const userIds = [...new Set([...memberUserIds, ...tokenUserIds])].filter(
+    Boolean,
+  ) as string[];
 
-  console.log(`[sendPushToAllMembers] Broadcasting push to ${userIds.length} users:`, userIds);
+  console.log(
+    `[sendPushToAllMembers] Broadcasting push to ${userIds.length} users:`,
+    userIds,
+  );
 
   let sent = 0;
   let failed = 0;
@@ -184,7 +226,10 @@ export async function sendPushToAllMembers(
 }
 
 // ─── Direct FCM V1 HTTP API helper (bypasses Expo for native Android FCM tokens)
-async function getFcmAccessToken(serviceAccount: { client_email: string; private_key: string }): Promise<string> {
+async function getFcmAccessToken(serviceAccount: {
+  client_email: string;
+  private_key: string;
+}): Promise<string> {
   const header = { alg: "RS256", typ: "JWT" };
   const now = Math.floor(Date.now() / 1000);
   const claim = {
@@ -220,15 +265,19 @@ async function getFcmAccessToken(serviceAccount: { client_email: string; private
 
   const data = (await res.json()) as { access_token?: string; error?: string };
   if (!data.access_token) {
-    throw new Error(`Failed to get OAuth2 access token for FCM: ${data.error ?? JSON.stringify(data)}`);
+    throw new Error(
+      `Failed to get OAuth2 access token for FCM: ${data.error ?? JSON.stringify(data)}`,
+    );
   }
   return data.access_token;
 }
 
 const DEFAULT_FCM_SERVICE_ACCOUNT = {
   project_id: "creative-feel-agency",
-  client_email: "firebase-adminsdk-6xe0d@creative-feel-agency.iam.gserviceaccount.com",
-  private_key: "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDYwk5jQVu6OOCy\n6nK7iZsXTajWOCGtaf0HeJkvZ/YRNuWZdxaQZsjdbcC5h8BZ3vuw/6YR6Vu5mzmE\nOz4Z506DEsT04NojOyzO2XmcAvu05wTpRBF6Yv44h64mLLvV+Wa0S9imyTq17bNP\nXFDsDk5S9pTJlSipSejeDLZw6JQfltWJkb89PjjByfhu/fZJUkBaivCSKJVuSl/a\nDNI2eYWOdetCu4csA86qbYzAe5/VWg+LF4vKAUucQHz3ZWSzcZTHlOWO1H9o+PTL\nrLyUalntSsE73cuVI00twOTjcafADOx2uodFi245q9GMSfq0tCMT+Sl1lJRItg5Y\nytf5NYSnAgMBAAECggEAE6XVPij7/A7Qy1b2DGrGPKAE+FoBL3tmfKlhVUs6okfU\nGwuQ54jxlySuLgMQm/Ta4qnhr0j0UAgyd/p4wBdX5girArlo/H2OK7fJzqr0jurL\n5qsNXIchnRUrY3l1k0k2lowzeLbP1BLWSJDJIwSO8/U2+mjDVUkGSy5i0Sw71PsH\n6bgW73+UcgfEvJenqQGBRKuI/E510/O1Kki7epxn+09h7Oq7dzv86joIRJEZDvZz\njSldfV8FsNTzsrQLZBMBmZKs2+Q0QEv0v5VFRAb8xOAvUcxVzDurl70OWuKLqpJ3\njBzH3rIgVMJvvmAi4htYsDIlrivOHdWoHlMERdhI4QKBgQDyr0tWnzrdxtbJFdRd\niTE1kxvk1jX6+Oo7jcNqEhnhvLRzKWALcZY9DaD+HeHHn0J7RcgUx8PGhp/Ur7KR\nAPJIJb2pKAerihBtdPfRkhcfONgqV5f02jnCtkjVN+ZjQF+2ABfS/kMH3ZxghW5S\n1peMiq+1JzYnZGMGpwxWX++woQKBgQDkpt0fkbADlLM+VFczaHJ6XQsKGnoKw+mx\nXdoa7KLtXxwmfNVFpY0K5C/ChB4jR0lEFubY/o4lZofKcmpyTLawbzyNi3Ln40uD\ngGvAObYpEFN3lamj8N4K031mnWRUdcJd5BoNySWUJuRu/OiSoiLugsltZbn3WNE2\nG3210CaIRwKBgQCdCaGOo+rLp+dEp8OL40LckBz0r0iu5nNrpghVkvD8icea3aMw\nxIebaj5LMbrwGbZDXpxiFgIxbNvwHOFHw30EAqf/1c9gyS5oJdBW5Fnh8j6u54+E\n+dF2lc37avjCMN2+P8Eq3y0w4c5XBwCkyge3AedBKeZ5BxStMVtiaSIJAQKBgQC8\n6ANubo4OF0+TYlj89wEFiVNykHdd54huakyky/a7yEVYovAM7368jdPLkB3aJa4p\nXAZzJrRHwBLWNnstXaXd1LkhdCGF5argxTvAf6249W0QMo0KDhlUtnA3VDes8/GW\nYrsHwrSSVyOJctevNddIWLOT92SSL0YBvuq4SHVdRwKBgCtdYe1rliGSV0fwUugE\niww3FQpVZjAgdED2zzBBP8nIK+Pu6HhL6Xl4jVTzPgjEaQqJXV3RPC3i3e1K9GS3\n20iW19LkaNgHYIqOV1K+Ol++It8G/lcw7dsS6BsIV/uAmwrku74DV0VN5EQ4FePk\nR68IoI2ve4sKfFr3WTXY2nil\n-----END PRIVATE KEY-----\n",
+  client_email:
+    "firebase-adminsdk-6xe0d@creative-feel-agency.iam.gserviceaccount.com",
+  private_key:
+    "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDYwk5jQVu6OOCy\n6nK7iZsXTajWOCGtaf0HeJkvZ/YRNuWZdxaQZsjdbcC5h8BZ3vuw/6YR6Vu5mzmE\nOz4Z506DEsT04NojOyzO2XmcAvu05wTpRBF6Yv44h64mLLvV+Wa0S9imyTq17bNP\nXFDsDk5S9pTJlSipSejeDLZw6JQfltWJkb89PjjByfhu/fZJUkBaivCSKJVuSl/a\nDNI2eYWOdetCu4csA86qbYzAe5/VWg+LF4vKAUucQHz3ZWSzcZTHlOWO1H9o+PTL\nrLyUalntSsE73cuVI00twOTjcafADOx2uodFi245q9GMSfq0tCMT+Sl1lJRItg5Y\nytf5NYSnAgMBAAECggEAE6XVPij7/A7Qy1b2DGrGPKAE+FoBL3tmfKlhVUs6okfU\nGwuQ54jxlySuLgMQm/Ta4qnhr0j0UAgyd/p4wBdX5girArlo/H2OK7fJzqr0jurL\n5qsNXIchnRUrY3l1k0k2lowzeLbP1BLWSJDJIwSO8/U2+mjDVUkGSy5i0Sw71PsH\n6bgW73+UcgfEvJenqQGBRKuI/E510/O1Kki7epxn+09h7Oq7dzv86joIRJEZDvZz\njSldfV8FsNTzsrQLZBMBmZKs2+Q0QEv0v5VFRAb8xOAvUcxVzDurl70OWuKLqpJ3\njBzH3rIgVMJvvmAi4htYsDIlrivOHdWoHlMERdhI4QKBgQDyr0tWnzrdxtbJFdRd\niTE1kxvk1jX6+Oo7jcNqEhnhvLRzKWALcZY9DaD+HeHHn0J7RcgUx8PGhp/Ur7KR\nAPJIJb2pKAerihBtdPfRkhcfONgqV5f02jnCtkjVN+ZjQF+2ABfS/kMH3ZxghW5S\n1peMiq+1JzYnZGMGpwxWX++woQKBgQDkpt0fkbADlLM+VFczaHJ6XQsKGnoKw+mx\nXdoa7KLtXxwmfNVFpY0K5C/ChB4jR0lEFubY/o4lZofKcmpyTLawbzyNi3Ln40uD\ngGvAObYpEFN3lamj8N4K031mnWRUdcJd5BoNySWUJuRu/OiSoiLugsltZbn3WNE2\nG3210CaIRwKBgQCdCaGOo+rLp+dEp8OL40LckBz0r0iu5nNrpghVkvD8icea3aMw\nxIebaj5LMbrwGbZDXpxiFgIxbNvwHOFHw30EAqf/1c9gyS5oJdBW5Fnh8j6u54+E\n+dF2lc37avjCMN2+P8Eq3y0w4c5XBwCkyge3AedBKeZ5BxStMVtiaSIJAQKBgQC8\n6ANubo4OF0+TYlj89wEFiVNykHdd54huakyky/a7yEVYovAM7368jdPLkB3aJa4p\nXAZzJrRHwBLWNnstXaXd1LkhdCGF5argxTvAf6249W0QMo0KDhlUtnA3VDes8/GW\nYrsHwrSSVyOJctevNddIWLOT92SSL0YBvuq4SHVdRwKBgCtdYe1rliGSV0fwUugE\niww3FQpVZjAgdED2zzBBP8nIK+Pu6HhL6Xl4jVTzPgjEaQqJXV3RPC3i3e1K9GS3\n20iW19LkaNgHYIqOV1K+Ol++It8G/lcw7dsS6BsIV/uAmwrku74DV0VN5EQ4FePk\nR68IoI2ve4sKfFr3WTXY2nil\n-----END PRIVATE KEY-----\n",
 };
 
 async function sendDirectFcmPush(
@@ -236,8 +285,14 @@ async function sendDirectFcmPush(
   notification: { title: string; body: string; data?: Record<string, string> },
   db?: any,
 ) {
-  if (fcmToken.startsWith("ExponentPushToken[") || fcmToken.startsWith("ExpoPushToken[")) {
-    console.log("[Push] Token in FCM dispatcher is an Expo token, routing to Expo:", fcmToken.slice(0, 25));
+  if (
+    fcmToken.startsWith("ExponentPushToken[") ||
+    fcmToken.startsWith("ExpoPushToken[")
+  ) {
+    console.log(
+      "[Push] Token in FCM dispatcher is an Expo token, routing to Expo:",
+      fcmToken.slice(0, 25),
+    );
     await sendExpoPush(fcmToken, notification, db);
     return;
   }
@@ -253,7 +308,9 @@ async function sendDirectFcmPush(
 
     const serviceAccount = {
       ...rawSa,
-      private_key: rawSa.private_key ? rawSa.private_key.replace(/\\n/g, "\n") : rawSa.private_key,
+      private_key: rawSa.private_key
+        ? rawSa.private_key.replace(/\\n/g, "\n")
+        : rawSa.private_key,
     };
 
     const accessToken = await getFcmAccessToken(serviceAccount);
@@ -316,20 +373,27 @@ async function sendDirectFcmPush(
       },
     );
 
-    const result = await res.json() as any;
+    const result = (await res.json()) as any;
     console.log("[FCM_DIRECT_RESPONSE]", JSON.stringify(result));
 
     // Auto-cleanup stale/unregistered tokens
     if (
       result?.error?.code === 404 ||
       result?.error?.status === "NOT_FOUND" ||
-      result?.error?.details?.some((d: any) => d.errorCode === "UNREGISTERED" || d.errorCode === "INVALID_ARGUMENT") ||
+      result?.error?.details?.some(
+        (d: any) =>
+          d.errorCode === "UNREGISTERED" || d.errorCode === "INVALID_ARGUMENT",
+      ) ||
       result?.error?.message?.includes("not registered")
     ) {
       if (db) {
-        console.log(`[FCM] Removing invalid token from DB: ${fcmToken.slice(0, 25)}...`);
+        console.log(
+          `[FCM] Removing invalid token from DB: ${fcmToken.slice(0, 25)}...`,
+        );
         const { sql } = await import("drizzle-orm");
-        await db.execute(sql`DELETE FROM push_token WHERE token = ${fcmToken}`).catch(() => {});
+        await db
+          .execute(sql`DELETE FROM push_token WHERE token = ${fcmToken}`)
+          .catch(() => {});
       }
     }
   } catch (err) {
@@ -344,9 +408,15 @@ async function sendExpoPush(
   db?: any,
 ) {
   // If token is not an Expo token, route to FCM directly
-  if (!expoPushToken.startsWith("ExponentPushToken[") && !expoPushToken.startsWith("ExpoPushToken[")) {
+  if (
+    !expoPushToken.startsWith("ExponentPushToken[") &&
+    !expoPushToken.startsWith("ExpoPushToken[")
+  ) {
     const rawToken = String(expoPushToken);
-    console.warn("[Push] Token is not an Expo token, routing to direct FCM:", rawToken.slice(0, 25));
+    console.warn(
+      "[Push] Token is not an Expo token, routing to direct FCM:",
+      rawToken.slice(0, 25),
+    );
     await sendDirectFcmPush(rawToken, notification, db);
     return;
   }
@@ -375,17 +445,29 @@ async function sendExpoPush(
       // Auto-cleanup DeviceNotRegistered
       if (db && Array.isArray(results)) {
         for (const ticket of results) {
-          if (ticket.status === "error" && ticket.details?.error === "DeviceNotRegistered") {
-            console.log(`[Expo] Removing unregistered token from DB: ${expoPushToken.slice(0, 25)}...`);
+          if (
+            ticket.status === "error" &&
+            ticket.details?.error === "DeviceNotRegistered"
+          ) {
+            console.log(
+              `[Expo] Removing unregistered token from DB: ${expoPushToken.slice(0, 25)}...`,
+            );
             const { sql } = await import("drizzle-orm");
-            await db.execute(sql`DELETE FROM push_token WHERE token = ${expoPushToken}`).catch(() => {});
+            await db
+              .execute(
+                sql`DELETE FROM push_token WHERE token = ${expoPushToken}`,
+              )
+              .catch(() => {});
           }
         }
       }
     }
   } catch (sdkErr) {
     // expo-server-sdk not available — use raw HTTP API
-    console.warn("[Push] expo-server-sdk unavailable, using raw HTTP:", (sdkErr as Error).message?.slice(0, 60));
+    console.warn(
+      "[Push] expo-server-sdk unavailable, using raw HTTP:",
+      (sdkErr as Error).message?.slice(0, 60),
+    );
     await sendExpoPushRaw(expoPushToken, notification, db);
   }
 }
@@ -409,14 +491,21 @@ async function sendExpoPushRaw(
       channelId: "default",
     }),
   });
-  const result = await res.json() as any;
+  const result = (await res.json()) as any;
   console.log("[EXPO_PUSH_RAW_RESPONSE]", JSON.stringify(result));
   if (db && result?.data && Array.isArray(result.data)) {
     for (const item of result.data) {
-      if (item.status === "error" && item.details?.error === "DeviceNotRegistered") {
-        console.log(`[ExpoRaw] Removing unregistered token from DB: ${expoPushToken.slice(0, 25)}...`);
+      if (
+        item.status === "error" &&
+        item.details?.error === "DeviceNotRegistered"
+      ) {
+        console.log(
+          `[ExpoRaw] Removing unregistered token from DB: ${expoPushToken.slice(0, 25)}...`,
+        );
         const { sql } = await import("drizzle-orm");
-        await db.execute(sql`DELETE FROM push_token WHERE token = ${expoPushToken}`).catch(() => {});
+        await db
+          .execute(sql`DELETE FROM push_token WHERE token = ${expoPushToken}`)
+          .catch(() => {});
       }
     }
   }
@@ -438,7 +527,11 @@ async function sendWebPush(
     return;
   }
 
-  webpush.default.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
+  webpush.default.setVapidDetails(
+    vapidSubject,
+    vapidPublicKey,
+    vapidPrivateKey,
+  );
 
   const subscription = JSON.parse(subscriptionJson);
   const payload = JSON.stringify({
@@ -495,9 +588,7 @@ export const notificationRouter = createTRPCRouter({
   unregisterToken: protectedProcedure
     .input(z.object({ token: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await ctx.db
-        .delete(pushToken)
-        .where(eq(pushToken.token, input.token));
+      await ctx.db.delete(pushToken).where(eq(pushToken.token, input.token));
       return { ok: true };
     }),
 

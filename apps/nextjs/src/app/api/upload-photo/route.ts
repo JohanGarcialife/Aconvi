@@ -1,6 +1,7 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { existsSync, mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
-import { writeFileSync, existsSync, mkdirSync } from "fs";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 
 // Increase body size limit for this route to handle base64 photos
 export const maxDuration = 60;
@@ -44,9 +45,12 @@ function saveBase64Image(base64Data: string): string | null {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json() as { base64: string };
+    const body = (await req.json()) as { base64: string };
     if (!body.base64) {
-      return NextResponse.json({ error: "No base64 provided" }, { status: 400 });
+      return NextResponse.json(
+        { error: "No base64 provided" },
+        { status: 400 },
+      );
     }
 
     // Try to save to filesystem (works locally and on self-hosted servers)
@@ -63,13 +67,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ url: body.base64 });
     }
 
-    return NextResponse.json({ error: "Failed to save image" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to save image" },
+      { status: 500 },
+    );
   } catch (err) {
     console.error("[upload-photo] Error:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }
-
 
 // OPTIONS for CORS
 export async function OPTIONS() {

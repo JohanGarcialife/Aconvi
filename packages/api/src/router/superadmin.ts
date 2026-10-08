@@ -1,17 +1,32 @@
-import { count, eq, desc, inArray, gte, and } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray } from "drizzle-orm";
 import { z } from "zod";
 
-import { organization, member, user, incident, voteSession, communityDocument, commonAreaBooking, session } from "@acme/db/schema";
+import {
+  commonAreaBooking,
+  communityDocument,
+  incident,
+  member,
+  organization,
+  session,
+  user,
+  voteSession,
+} from "@acme/db/schema";
 
 import { createTRPCRouter, superAdminProcedure } from "../trpc";
 
 export const superadminRouter = createTRPCRouter({
   // ── Global Stats ────────────────────────────────────────────────────────
   getStats: superAdminProcedure.query(async ({ ctx }) => {
-    const [orgCountResult] = await ctx.db.select({ count: count() }).from(organization);
+    const [orgCountResult] = await ctx.db
+      .select({ count: count() })
+      .from(organization);
 
-    const members = await ctx.db.query.member.findMany({ columns: { role: true } });
-    const totalNeighbors = members.filter((m) => m.role.startsWith("vecino")).length;
+    const members = await ctx.db.query.member.findMany({
+      columns: { role: true },
+    });
+    const totalNeighbors = members.filter((m) =>
+      m.role.startsWith("vecino"),
+    ).length;
     const totalOwners = members.filter((m) => m.role === "owner").length;
 
     const [providerCountResult] = await ctx.db
@@ -71,14 +86,35 @@ export const superadminRouter = createTRPCRouter({
       const org = await ctx.db.query.organization.findFirst({
         where: eq(organization.id, input.orgId),
         with: {
-          members: { with: { user: { columns: { id: true, name: true, email: true, role: true, createdAt: true } } } },
+          members: {
+            with: {
+              user: {
+                columns: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  role: true,
+                  createdAt: true,
+                },
+              },
+            },
+          },
         },
       });
       if (!org) throw new Error("Comunidad no encontrada");
 
-      const [incidentCount] = await ctx.db.select({ count: count() }).from(incident).where(eq(incident.organizationId, input.orgId));
-      const [docCount] = await ctx.db.select({ count: count() }).from(communityDocument).where(eq(communityDocument.organizationId, input.orgId));
-      const [voteCount] = await ctx.db.select({ count: count() }).from(voteSession).where(eq(voteSession.organizationId, input.orgId));
+      const [incidentCount] = await ctx.db
+        .select({ count: count() })
+        .from(incident)
+        .where(eq(incident.organizationId, input.orgId));
+      const [docCount] = await ctx.db
+        .select({ count: count() })
+        .from(communityDocument)
+        .where(eq(communityDocument.organizationId, input.orgId));
+      const [voteCount] = await ctx.db
+        .select({ count: count() })
+        .from(voteSession)
+        .where(eq(voteSession.organizationId, input.orgId));
 
       return {
         org,
@@ -93,29 +129,50 @@ export const superadminRouter = createTRPCRouter({
 
   // ── Activity Feed (cross-tenant, most recent 60 actions) ────────────────
   getActivityFeed: superAdminProcedure.query(async ({ ctx }) => {
-    const [recentIncidents, recentDocs, recentVotes, recentBookings] = await Promise.all([
-      ctx.db.query.incident.findMany({
-        orderBy: desc(incident.createdAt),
-        limit: 15,
-        columns: { id: true, title: true, status: true, organizationId: true, createdAt: true },
-      }),
-      ctx.db.query.communityDocument.findMany({
-        orderBy: desc(communityDocument.createdAt),
-        limit: 15,
-        columns: { id: true, title: true, category: true, organizationId: true, createdAt: true },
-      }),
-      ctx.db.query.voteSession.findMany({
-        orderBy: desc(voteSession.createdAt),
-        limit: 15,
-        columns: { id: true, title: true, status: true, organizationId: true, createdAt: true },
-      }),
-      ctx.db.query.commonAreaBooking.findMany({
-        orderBy: desc(commonAreaBooking.createdAt),
-        limit: 15,
-        columns: { id: true, status: true, date: true, createdAt: true },
-        with: { commonArea: { columns: { name: true, organizationId: true } } },
-      }),
-    ]);
+    const [recentIncidents, recentDocs, recentVotes, recentBookings] =
+      await Promise.all([
+        ctx.db.query.incident.findMany({
+          orderBy: desc(incident.createdAt),
+          limit: 15,
+          columns: {
+            id: true,
+            title: true,
+            status: true,
+            organizationId: true,
+            createdAt: true,
+          },
+        }),
+        ctx.db.query.communityDocument.findMany({
+          orderBy: desc(communityDocument.createdAt),
+          limit: 15,
+          columns: {
+            id: true,
+            title: true,
+            category: true,
+            organizationId: true,
+            createdAt: true,
+          },
+        }),
+        ctx.db.query.voteSession.findMany({
+          orderBy: desc(voteSession.createdAt),
+          limit: 15,
+          columns: {
+            id: true,
+            title: true,
+            status: true,
+            organizationId: true,
+            createdAt: true,
+          },
+        }),
+        ctx.db.query.commonAreaBooking.findMany({
+          orderBy: desc(commonAreaBooking.createdAt),
+          limit: 15,
+          columns: { id: true, status: true, date: true, createdAt: true },
+          with: {
+            commonArea: { columns: { name: true, organizationId: true } },
+          },
+        }),
+      ]);
 
     const feed = [
       ...recentIncidents.map((i) => ({
@@ -150,20 +207,34 @@ export const superadminRouter = createTRPCRouter({
         orgId: b.commonArea?.organizationId ?? "",
         at: b.createdAt,
       })),
-    ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime()).slice(0, 60);
+    ]
+      .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
+      .slice(0, 60);
 
     return feed;
   }),
 
   // ── All Users (global directory) ────────────────────────────────────────
   getAllUsers: superAdminProcedure
-    .input(z.object({ limit: z.number().default(50), offset: z.number().default(0) }))
+    .input(
+      z.object({
+        limit: z.number().default(50),
+        offset: z.number().default(0),
+      }),
+    )
     .query(async ({ ctx, input }) => {
       const users = await ctx.db.query.user.findMany({
         orderBy: desc(user.createdAt),
         limit: input.limit,
         offset: input.offset,
-        columns: { id: true, name: true, email: true, role: true, createdAt: true, deviceActivatedAt: true },
+        columns: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          createdAt: true,
+          deviceActivatedAt: true,
+        },
       });
       const [total] = await ctx.db.select({ count: count() }).from(user);
       return { users, total: total?.count ?? 0 };
@@ -174,12 +245,27 @@ export const superadminRouter = createTRPCRouter({
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const [openIncidents, activeVotes, docsToday, activeSessions] = await Promise.all([
-      ctx.db.select({ count: count() }).from(incident).where(eq(incident.status, "RECIBIDA")),
-      ctx.db.select({ count: count() }).from(voteSession).where(eq(voteSession.status, "OPEN")),
-      ctx.db.select({ count: count() }).from(communityDocument).where(gte(communityDocument.createdAt, today)),
-      ctx.db.select({ count: count() }).from(session).where(gte(session.createdAt, new Date(Date.now() - 24 * 60 * 60 * 1000))),
-    ]);
+    const [openIncidents, activeVotes, docsToday, activeSessions] =
+      await Promise.all([
+        ctx.db
+          .select({ count: count() })
+          .from(incident)
+          .where(eq(incident.status, "RECIBIDA")),
+        ctx.db
+          .select({ count: count() })
+          .from(voteSession)
+          .where(eq(voteSession.status, "OPEN")),
+        ctx.db
+          .select({ count: count() })
+          .from(communityDocument)
+          .where(gte(communityDocument.createdAt, today)),
+        ctx.db
+          .select({ count: count() })
+          .from(session)
+          .where(
+            gte(session.createdAt, new Date(Date.now() - 24 * 60 * 60 * 1000)),
+          ),
+      ]);
 
     return {
       openIncidents: openIncidents[0]?.count ?? 0,

@@ -1,9 +1,19 @@
+import { useEffect, useRef } from "react";
 import { LogBox, useColorScheme } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { useEffect, useRef } from "react";
-import * as Notifications from "expo-notifications";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+
+import { queryClient } from "~/utils/api";
+import { usePushNotifications } from "~/utils/usePushNotifications";
+
+import "../styles.css";
+
+import { SocketProvider } from "~/components/SocketProvider";
 
 // Suppress transient query cancellation / network retry popups in Expo development
 LogBox.ignoreLogs([
@@ -13,17 +23,6 @@ LogBox.ignoreLogs([
   "mutation #",
 ]);
 
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
-import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
-
-import { queryClient } from "~/utils/api";
-import { usePushNotifications } from "~/utils/usePushNotifications";
-
-import "../styles.css";
-
-import { SocketProvider } from "~/components/SocketProvider";
-
 const asyncStoragePersister = createAsyncStoragePersister({
   storage: AsyncStorage,
   // Limit key size to avoid writing huge payloads that exceed Android SQLite CursorWindow (2MB)
@@ -31,21 +30,37 @@ const asyncStoragePersister = createAsyncStoragePersister({
     try {
       const str = JSON.stringify(data);
       if (str.length > 1_000_000) {
-        return JSON.stringify({ clientState: { queries: [], mutations: [] }, timestamp: Date.now(), buster: "" });
+        return JSON.stringify({
+          clientState: { queries: [], mutations: [] },
+          timestamp: Date.now(),
+          buster: "",
+        });
       }
       return str;
     } catch {
-      return JSON.stringify({ clientState: { queries: [], mutations: [] }, timestamp: Date.now(), buster: "" });
+      return JSON.stringify({
+        clientState: { queries: [], mutations: [] },
+        timestamp: Date.now(),
+        buster: "",
+      });
     }
   },
   deserialize: (str) => {
     try {
       if (!str || str.length > 1_500_000) {
-        return { clientState: { queries: [], mutations: [] }, timestamp: Date.now(), buster: "" };
+        return {
+          clientState: { queries: [], mutations: [] },
+          timestamp: Date.now(),
+          buster: "",
+        };
       }
       return JSON.parse(str);
     } catch {
-      return { clientState: { queries: [], mutations: [] }, timestamp: Date.now(), buster: "" };
+      return {
+        clientState: { queries: [], mutations: [] },
+        timestamp: Date.now(),
+        buster: "",
+      };
     }
   },
 });
@@ -72,7 +87,9 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
 
   // Handle notification tap & real-time foreground updates
   useEffect(() => {
-    const handleNotificationData = (data: Record<string, string> | undefined) => {
+    const handleNotificationData = (
+      data: Record<string, string> | undefined,
+    ) => {
       if (!data) return;
 
       // Always invalidate cache when interacting with a notification
@@ -97,7 +114,10 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
       // ── Votación concreta (nueva o cerrada) ───────────────────────────────────
       if (data?.type === "new_vote" || data?.type === "vote_closed") {
         if (data?.sessionId) {
-          router.push({ pathname: "/(vecino)/voting", params: { sessionId: data.sessionId } } as any);
+          router.push({
+            pathname: "/(vecino)/voting",
+            params: { sessionId: data.sessionId },
+          } as any);
         } else {
           router.push("/(vecino)/voting");
         }
@@ -117,7 +137,10 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
       }
 
       // ── Reserva / zona común ──────────────────────────────────────────────
-      if (data?.type === "booking_confirmed" || data?.type === "booking_cancelled") {
+      if (
+        data?.type === "booking_confirmed" ||
+        data?.type === "booking_cancelled"
+      ) {
         router.push("/(vecino)/common-areas");
         return;
       }
@@ -138,7 +161,10 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
     // Cold start notification check
     void Notifications.getLastNotificationResponseAsync().then((response) => {
       if (response) {
-        const data = response.notification.request.content.data as Record<string, string>;
+        const data = response.notification.request.content.data as Record<
+          string,
+          string
+        >;
         handleNotificationData(data);
       }
     });
@@ -149,10 +175,15 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
     });
 
     // Tap listener
-    const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
-      const data = response.notification.request.content.data as Record<string, string>;
-      handleNotificationData(data);
-    });
+    const responseSub = Notifications.addNotificationResponseReceivedListener(
+      (response) => {
+        const data = response.notification.request.content.data as Record<
+          string,
+          string
+        >;
+        handleNotificationData(data);
+      },
+    );
 
     return () => {
       receivedSub.remove();
@@ -181,9 +212,20 @@ export default function RootLayout() {
               if (query.state.status !== "success") return false;
               // Safely extract primary domain key string from tRPC query key array structure
               const rawKey = query.queryKey;
-              const firstPart = Array.isArray(rawKey?.[0]) ? rawKey[0][0] : rawKey?.[0];
+              const firstPart = Array.isArray(rawKey?.[0])
+                ? rawKey[0][0]
+                : rawKey?.[0];
               // Never dehydrate heavy query domains that contain photos, lists, or large payloads
-              if (typeof firstPart === "string" && ["incident", "document", "notice", "booking", "provider"].includes(firstPart)) {
+              if (
+                typeof firstPart === "string" &&
+                [
+                  "incident",
+                  "document",
+                  "notice",
+                  "booking",
+                  "provider",
+                ].includes(firstPart)
+              ) {
                 return false;
               }
               return true;

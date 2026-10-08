@@ -116,7 +116,9 @@ export const votingRouter = createTRPCRouter({
           items: {
             orderBy: (item, { asc }) => [asc(item.orderIndex)],
             with: {
-              budgetProposals: { orderBy: (bp, { asc }) => [asc(bp.displayOrder)] },
+              budgetProposals: {
+                orderBy: (bp, { asc }) => [asc(bp.displayOrder)],
+              },
             },
           },
           options: { orderBy: (opt, { asc }) => [asc(opt.displayOrder)] },
@@ -173,17 +175,32 @@ export const votingRouter = createTRPCRouter({
         let resultSummary: string | null = null;
         const isEffectivelyClosed =
           session.status === "CLOSED" ||
-          Boolean(session.closesAt && new Date(session.closesAt).getTime() < Date.now()) ||
-          Boolean(session.type === "JUNTA" && session.meetingDate && new Date(session.meetingDate).getTime() < Date.now()) ||
-          (!session.closesAt && !(session.type === "JUNTA" && session.meetingDate));
+          Boolean(
+            session.closesAt &&
+              new Date(session.closesAt).getTime() < Date.now(),
+          ) ||
+          Boolean(
+            session.type === "JUNTA" &&
+              session.meetingDate &&
+              new Date(session.meetingDate).getTime() < Date.now(),
+          ) ||
+          (!session.closesAt &&
+            !(session.type === "JUNTA" && session.meetingDate));
 
         if (isEffectivelyClosed) {
           const isApproveChoice = (c: any) => {
             const ch = (c.choice || "").toUpperCase();
-            if (ch === "APPROVE" || ch === "APRUEBO" || ch === "SI" || ch === "SÍ") return true;
+            if (
+              ch === "APPROVE" ||
+              ch === "APRUEBO" ||
+              ch === "SI" ||
+              ch === "SÍ"
+            )
+              return true;
             if (c.optionId && session.options) {
               const opt = session.options.find((o: any) => o.id === c.optionId);
-              if (opt && opt.label.toLowerCase().includes("aprueb")) return true;
+              if (opt && opt.label.toLowerCase().includes("aprueb"))
+                return true;
             }
             return false;
           };
@@ -193,17 +210,20 @@ export const votingRouter = createTRPCRouter({
             if (ch === "REJECT" || ch === "RECHAZO" || ch === "NO") return true;
             if (c.optionId && session.options) {
               const opt = session.options.find((o: any) => o.id === c.optionId);
-              if (opt && opt.label.toLowerCase().includes("rechaz")) return true;
+              if (opt && opt.label.toLowerCase().includes("rechaz"))
+                return true;
             }
             return false;
           };
 
           const isAbstainChoice = (c: any) => {
             const ch = (c.choice || "").toUpperCase();
-            if (ch === "ABSTAIN" || ch === "ABSTENGO" || ch === "BLANCO") return true;
+            if (ch === "ABSTAIN" || ch === "ABSTENGO" || ch === "BLANCO")
+              return true;
             if (c.optionId && session.options) {
               const opt = session.options.find((o: any) => o.id === c.optionId);
-              if (opt && opt.label.toLowerCase().includes("absten")) return true;
+              if (opt && opt.label.toLowerCase().includes("absten"))
+                return true;
             }
             return false;
           };
@@ -232,15 +252,18 @@ export const votingRouter = createTRPCRouter({
                 o.label.toLowerCase().includes("absten"),
               );
 
-              const optApp = (approveOpt?.weightedTotal && approveOpt.weightedTotal > 0)
-                ? approveOpt.weightedTotal
-                : (approveOpt?.voteCount ?? 0);
-              const optRej = (rejectOpt?.weightedTotal && rejectOpt.weightedTotal > 0)
-                ? rejectOpt.weightedTotal
-                : (rejectOpt?.voteCount ?? 0);
-              const optAbs = (abstainOpt?.weightedTotal && abstainOpt.weightedTotal > 0)
-                ? abstainOpt.weightedTotal
-                : (abstainOpt?.voteCount ?? 0);
+              const optApp =
+                approveOpt?.weightedTotal && approveOpt.weightedTotal > 0
+                  ? approveOpt.weightedTotal
+                  : (approveOpt?.voteCount ?? 0);
+              const optRej =
+                rejectOpt?.weightedTotal && rejectOpt.weightedTotal > 0
+                  ? rejectOpt.weightedTotal
+                  : (rejectOpt?.voteCount ?? 0);
+              const optAbs =
+                abstainOpt?.weightedTotal && abstainOpt.weightedTotal > 0
+                  ? abstainOpt.weightedTotal
+                  : (abstainOpt?.voteCount ?? 0);
 
               if (optApp + optRej + optAbs > 0) {
                 approveW = optApp;
@@ -295,7 +318,9 @@ export const votingRouter = createTRPCRouter({
                   ? `Aprobado con el ${pct} %`
                   : `Rechazado (${pct} % a favor)`;
             } else if (relevantItems.length > 0 && approvedCount > 0) {
-              const pct = Math.round((approvedCount / relevantItems.length) * 100);
+              const pct = Math.round(
+                (approvedCount / relevantItems.length) * 100,
+              );
               resultSummary =
                 pct >= 50
                   ? `Aprobado con el ${pct} %`
@@ -340,8 +365,12 @@ export const votingRouter = createTRPCRouter({
       const now = Date.now();
 
       return mapped.sort((a, b) => {
-        const isClosedA = a.status === "CLOSED" || (a.closesAt && new Date(a.closesAt).getTime() < now);
-        const isClosedB = b.status === "CLOSED" || (b.closesAt && new Date(b.closesAt).getTime() < now);
+        const isClosedA =
+          a.status === "CLOSED" ||
+          (a.closesAt && new Date(a.closesAt).getTime() < now);
+        const isClosedB =
+          b.status === "CLOSED" ||
+          (b.closesAt && new Date(b.closesAt).getTime() < now);
 
         // Abiertas siempre antes que cerradas
         if (!isClosedA && isClosedB) return -1;
@@ -369,12 +398,22 @@ export const votingRouter = createTRPCRouter({
 
           const prioDiff = (b.priority || 0) - (a.priority || 0);
           if (prioDiff !== 0) return prioDiff;
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          return (
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
         }
 
         // Si ambas cerradas: más reciente primero
-        const timeA = a.closedAt ? new Date(a.closedAt).getTime() : a.closesAt ? new Date(a.closesAt).getTime() : new Date(a.createdAt).getTime();
-        const timeB = b.closedAt ? new Date(b.closedAt).getTime() : b.closesAt ? new Date(b.closesAt).getTime() : new Date(b.createdAt).getTime();
+        const timeA = a.closedAt
+          ? new Date(a.closedAt).getTime()
+          : a.closesAt
+            ? new Date(a.closesAt).getTime()
+            : new Date(a.createdAt).getTime();
+        const timeB = b.closedAt
+          ? new Date(b.closedAt).getTime()
+          : b.closesAt
+            ? new Date(b.closesAt).getTime()
+            : new Date(b.createdAt).getTime();
         return timeB - timeA;
       });
     }),
@@ -389,7 +428,9 @@ export const votingRouter = createTRPCRouter({
           items: {
             orderBy: (item, { asc }) => [asc(item.orderIndex)],
             with: {
-              budgetProposals: { orderBy: (bp, { asc }) => [asc(bp.displayOrder)] },
+              budgetProposals: {
+                orderBy: (bp, { asc }) => [asc(bp.displayOrder)],
+              },
             },
           },
           options: { orderBy: (opt, { asc }) => [asc(opt.displayOrder)] },
@@ -587,7 +628,10 @@ export const votingRouter = createTRPCRouter({
               ON CONFLICT ("id") DO NOTHING;`,
         );
       } catch (authorErr) {
-        console.warn("[voting.create] Could not ensure author user:", authorErr);
+        console.warn(
+          "[voting.create] Could not ensure author user:",
+          authorErr,
+        );
       }
 
       const allProposals = input.budgetProposals ?? input.proposals ?? [];
@@ -610,9 +654,7 @@ export const votingRouter = createTRPCRouter({
 
       const rawBudget =
         input.budget ??
-        (allProposals.length === 1
-          ? allProposals[0]!.amount
-          : null); // Bug 2 fix: multiple proposals → no budget string, Home shows "N presupuestos"
+        (allProposals.length === 1 ? allProposals[0]!.amount : null); // Bug 2 fix: multiple proposals → no budget string, Home shows "N presupuestos"
       const derivedBudget = rawBudget ? formatEuro(rawBudget) : null;
 
       const [created] = await ctx.db
@@ -785,7 +827,10 @@ export const votingRouter = createTRPCRouter({
               ON CONFLICT ("id") DO NOTHING;`,
         );
       } catch (authorErr) {
-        console.warn("[voting.createMeeting] Could not ensure author user:", authorErr);
+        console.warn(
+          "[voting.createMeeting] Could not ensure author user:",
+          authorErr,
+        );
       }
 
       // Check open sessions count
@@ -974,7 +1019,10 @@ Fdo. La Administración de Fincas`;
           pinned: true,
         });
       } catch (noticeErr) {
-        console.warn("[voting.createMeeting] Notice insert warning:", noticeErr);
+        console.warn(
+          "[voting.createMeeting] Notice insert warning:",
+          noticeErr,
+        );
       }
 
       // 4. Real-time Events & Notifications
@@ -1069,9 +1117,15 @@ Fdo. La Administración de Fincas`;
       if (session.status !== "OPEN")
         throw new Error("Esta votación no está abierta");
       const effectiveClosesAt =
-        session.closesAt ?? (session.type === "JUNTA" ? session.meetingDate : null);
-      if (effectiveClosesAt && new Date(effectiveClosesAt).getTime() < Date.now())
-        throw new Error("El plazo para votar en esta convocatoria ha finalizado");
+        session.closesAt ??
+        (session.type === "JUNTA" ? session.meetingDate : null);
+      if (
+        effectiveClosesAt &&
+        new Date(effectiveClosesAt).getTime() < Date.now()
+      )
+        throw new Error(
+          "El plazo para votar en esta convocatoria ha finalizado",
+        );
 
       // 3. Validate user right to vote (check for debts unless override by AF)
       const memberRecord = await ctx.db.query.member.findFirst({
@@ -1267,8 +1321,7 @@ Fdo. La Administración de Fincas`;
               .update(voteOption)
               .set({
                 voteCount: (matchedOption.voteCount ?? 0) + 1,
-                weightedTotal:
-                  (matchedOption.weightedTotal ?? 0) + coefficient,
+                weightedTotal: (matchedOption.weightedTotal ?? 0) + coefficient,
               })
               .where(eq(voteOption.id, matchedOption.id));
           } catch (optErr) {
@@ -1315,7 +1368,9 @@ Fdo. La Administración de Fincas`;
           items: {
             orderBy: (i, { asc }) => [asc(i.orderIndex)],
             with: {
-              budgetProposals: { orderBy: (bp, { asc }) => [asc(bp.displayOrder)] },
+              budgetProposals: {
+                orderBy: (bp, { asc }) => [asc(bp.displayOrder)],
+              },
             },
           },
           casts: { with: { user: { columns: { id: true, name: true } } } },
@@ -1467,11 +1522,17 @@ Fdo. La Administración de Fincas`;
         console.warn("[voting.close] Could not ensure author user:", authorErr);
       }
 
-      if (session.type === "JUNTA" && session.items && session.items.length > 0) {
+      if (
+        session.type === "JUNTA" &&
+        session.items &&
+        session.items.length > 0
+      ) {
         for (const item of session.items) {
           if (item.autoGenerateOt) {
             try {
-              const itemCasts = session.casts.filter((c) => c.itemId === item.id);
+              const itemCasts = session.casts.filter(
+                (c) => c.itemId === item.id,
+              );
               const approveWeight = itemCasts
                 .filter((c) => c.choice === "APPROVE")
                 .reduce((s, c) => s + c.coefficient, 0);
@@ -1525,7 +1586,8 @@ Fdo. La Administración de Fincas`;
             .reduce((s, c) => s + c.coefficient, 0);
 
           if (approveWeight > rejectWeight) {
-            let assignedProviderId: string | null = session.otProviderId ?? null;
+            let assignedProviderId: string | null =
+              session.otProviderId ?? null;
             let winningCompanyName: string | null = null;
             let winningAmount: string | null = null;
 
@@ -1606,7 +1668,10 @@ Fdo. La Administración de Fincas`;
             );
           }
         } catch (otErr) {
-          console.warn("[voting.close] Auto-OT generation failed for session:", otErr);
+          console.warn(
+            "[voting.close] Auto-OT generation failed for session:",
+            otErr,
+          );
         }
       }
 

@@ -1,4 +1,5 @@
-import pg from 'pg';
+import pg from "pg";
+
 const { Client } = pg;
 
 async function main() {
@@ -8,7 +9,7 @@ async function main() {
   const queries = [
     `ALTER TABLE incident ADD COLUMN assigned_at timestamp with time zone`,
     `ALTER TABLE incident ADD COLUMN resolved_at timestamp with time zone`,
-    `ALTER TABLE incident ADD COLUMN rejected_at timestamp with time zone`
+    `ALTER TABLE incident ADD COLUMN rejected_at timestamp with time zone`,
   ];
 
   for (const q of queries) {

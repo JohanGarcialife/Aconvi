@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
+import { and, eq, isNotNull, lt } from "drizzle-orm";
+
+import { emitWebSocketEvent, sendPushToAFs, sendPushToUser } from "@acme/api";
 import { db } from "@acme/db/client";
 import { incident, incidentHistory } from "@acme/db/schema";
-import { eq, and, isNotNull, lt } from "drizzle-orm";
-import { emitWebSocketEvent, sendPushToAFs, sendPushToUser } from "@acme/api";
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -20,7 +21,7 @@ export async function GET(request: Request) {
       where: and(
         eq(incident.status, "AGENDADA"),
         isNotNull(incident.scheduledAt),
-        lt(incident.scheduledAt, threshold)
+        lt(incident.scheduledAt, threshold),
       ),
     });
 
@@ -45,7 +46,8 @@ export async function GET(request: Request) {
         action: "NO_SHOW",
         previousStatus: "AGENDADA",
         newStatus: "NO_PRESENTADA",
-        comment: "El proveedor acepto y agendo la intervencion pero no se presento en el plazo de 1 hora desde la hora programada.",
+        comment:
+          "El proveedor acepto y agendo la intervencion pero no se presento en el plazo de 1 hora desde la hora programada.",
       });
 
       // Push notification to all AFs of the org
@@ -76,6 +78,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: true, noShowCount });
   } catch (error) {
     console.error("[CRON NO-SHOW] Error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 },
+    );
   }
 }

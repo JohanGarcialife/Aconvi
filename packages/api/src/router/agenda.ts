@@ -1,7 +1,9 @@
-import { eq, and, desc, asc, gte, lte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lte } from "drizzle-orm";
 import { z } from "zod";
-import { agendaTask, voteSession, incident } from "@acme/db/schema";
-import { createTRPCRouter, tenantProcedure, protectedProcedure } from "../trpc";
+
+import { agendaTask, incident, voteSession } from "@acme/db/schema";
+
+import { createTRPCRouter, protectedProcedure, tenantProcedure } from "../trpc";
 
 export const AGENDA_CATEGORIES = [
   "MANTENIMIENTO",
@@ -11,7 +13,12 @@ export const AGENDA_CATEGORIES = [
   "OTRO",
 ] as const;
 
-export const AGENDA_RECURRENCES = ["NONE", "WEEKLY", "MONTHLY", "ANNUAL"] as const;
+export const AGENDA_RECURRENCES = [
+  "NONE",
+  "WEEKLY",
+  "MONTHLY",
+  "ANNUAL",
+] as const;
 
 export const agendaRouter = createTRPCRouter({
   // ── List all tasks for a community ───────────────────────────────────────────
@@ -25,7 +32,8 @@ export const agendaRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const conditions = [eq(agendaTask.organizationId, input.tenantId)];
       if (!input.showDone) conditions.push(eq(agendaTask.isDone, false));
-      if (input.category) conditions.push(eq(agendaTask.category, input.category));
+      if (input.category)
+        conditions.push(eq(agendaTask.category, input.category));
 
       return ctx.db.query.agendaTask.findMany({
         where: and(...conditions),
@@ -76,9 +84,7 @@ export const agendaRouter = createTRPCRouter({
 
         // Vote sessions closing this month
         ctx.db.query.voteSession.findMany({
-          where: and(
-            eq(voteSession.organizationId, tenantId),
-          ),
+          where: and(eq(voteSession.organizationId, tenantId)),
           columns: {
             id: true,
             title: true,
@@ -90,9 +96,7 @@ export const agendaRouter = createTRPCRouter({
 
         // Open incidents (created this month range) as reminders
         ctx.db.query.incident.findMany({
-          where: and(
-            eq(incident.organizationId, tenantId),
-          ),
+          where: and(eq(incident.organizationId, tenantId)),
           columns: {
             id: true,
             title: true,
@@ -224,6 +228,3 @@ export const agendaRouter = createTRPCRouter({
       return { ok: true };
     }),
 });
-
-
-

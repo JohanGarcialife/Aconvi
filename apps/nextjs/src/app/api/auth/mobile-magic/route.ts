@@ -1,4 +1,5 @@
-import { type NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 
 /**
  * Magic Link callback handler for Expo deep link.
@@ -12,7 +13,9 @@ export async function GET(req: NextRequest) {
   const token = searchParams.get("token");
 
   if (!token) {
-    return NextResponse.redirect(new URL("/login?error=missing_token", req.url));
+    return NextResponse.redirect(
+      new URL("/login?error=missing_token", req.url),
+    );
   }
 
   // Redirect to Expo deep link — the @better-auth/expo plugin will intercept this

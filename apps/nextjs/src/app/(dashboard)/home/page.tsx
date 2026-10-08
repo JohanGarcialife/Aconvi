@@ -1,21 +1,22 @@
 "use client";
 
-import { useTRPC } from "~/trpc/react";
-import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 import {
-  Building2,
+  AlertTriangle,
   Bell,
-  MessageSquare,
-  Trees,
-  FileText,
-  TrendingUp,
+  Building2,
   CheckCircle2,
   Clock,
-  AlertTriangle,
+  FileText,
+  MessageSquare,
+  Trees,
+  TrendingUp,
   UploadCloud,
   Vote,
 } from "lucide-react";
+
+import { useTRPC } from "~/trpc/react";
 
 const TENANT_ID = "org_aconvi_demo";
 
@@ -35,28 +36,37 @@ function StatCard({
   href?: string;
 }) {
   const colors: Record<string, string> = {
-    teal:   "bg-teal-50 text-teal-600 border-teal-100",
+    teal: "bg-teal-50 text-teal-600 border-teal-100",
     violet: "bg-violet-50 text-violet-600 border-violet-100",
-    amber:  "bg-amber-50 text-amber-600 border-amber-100",
-    red:    "bg-red-50 text-red-600 border-red-100",
-    green:  "bg-green-50 text-green-600 border-green-100",
-    slate:  "bg-slate-50 text-slate-600 border-slate-100",
+    amber: "bg-amber-50 text-amber-600 border-amber-100",
+    red: "bg-red-50 text-red-600 border-red-100",
+    green: "bg-green-50 text-green-600 border-green-100",
+    slate: "bg-slate-50 text-slate-600 border-slate-100",
   };
 
   const card = (
-    <div className="rounded-2xl border bg-white p-5 shadow-xs hover:shadow-md transition-shadow flex items-center gap-4">
-      <div className={`rounded-xl p-3 border ${colors[color]}`}>
+    <div className="flex items-center gap-4 rounded-2xl border bg-white p-5 shadow-xs transition-shadow hover:shadow-md">
+      <div className={`rounded-xl border p-3 ${colors[color]}`}>
         <Icon className="h-5 w-5" />
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{label}</p>
-        <p className="text-3xl font-bold tracking-tight leading-none mt-0.5">{value}</p>
-        {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
+      <div className="min-w-0 flex-1">
+        <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+          {label}
+        </p>
+        <p className="mt-0.5 text-3xl leading-none font-bold tracking-tight">
+          {value}
+        </p>
+        {sub && <p className="text-muted-foreground mt-1 text-xs">{sub}</p>}
       </div>
     </div>
   );
 
-  if (href) return <Link href={href} className="no-underline">{card}</Link>;
+  if (href)
+    return (
+      <Link href={href} className="no-underline">
+        {card}
+      </Link>
+    );
   return card;
 }
 
@@ -76,14 +86,18 @@ function QuickActionCard({
   return (
     <Link
       href={href}
-      className="group flex items-start gap-4 rounded-2xl border bg-white p-5 shadow-xs hover:shadow-md hover:border-primary/30 transition-all no-underline"
+      className="group hover:border-primary/30 flex items-start gap-4 rounded-2xl border bg-white p-5 no-underline shadow-xs transition-all hover:shadow-md"
     >
       <div className={`rounded-xl p-2.5 ${color} shrink-0`}>
         <Icon className="h-5 w-5" />
       </div>
       <div>
-        <p className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">{title}</p>
-        <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{desc}</p>
+        <p className="text-foreground group-hover:text-primary text-sm font-semibold transition-colors">
+          {title}
+        </p>
+        <p className="text-muted-foreground mt-0.5 text-xs leading-relaxed">
+          {desc}
+        </p>
       </div>
     </Link>
   );
@@ -101,21 +115,19 @@ export default function HomePage() {
     ...trpc.notice.all.queryOptions({ tenantId: TENANT_ID }),
     refetchInterval: 5000,
   });
-  const { data: communities } = useQuery(
-    trpc.community.all.queryOptions(),
-  );
+  const { data: communities } = useQuery(trpc.community.all.queryOptions());
 
-  const openIncidents = incidents?.filter(
-    (i: any) => !["RESUELTA", "RECHAZADA"].includes(i.status),
-  ).length ?? 0;
+  const openIncidents =
+    incidents?.filter((i: any) => !["RESUELTA", "RECHAZADA"].includes(i.status))
+      .length ?? 0;
 
-  const urgentIncidents = incidents?.filter(
-    (i: any) => i.priority === "ALTA" || i.priority === "URGENTE",
-  ).length ?? 0;
+  const urgentIncidents =
+    incidents?.filter(
+      (i: any) => i.priority === "ALTA" || i.priority === "URGENTE",
+    ).length ?? 0;
 
-  const resolvedIncidents = incidents?.filter(
-    (i: any) => i.status === "RESUELTA",
-  ).length ?? 0;
+  const resolvedIncidents =
+    incidents?.filter((i: any) => i.status === "RESUELTA").length ?? 0;
 
   const pinnedNotices = notices?.filter((n: any) => n.pinned).length ?? 0;
 
@@ -150,7 +162,9 @@ export default function HomePage() {
           icon={Bell}
           label="Incidencias activas"
           value={openIncidents}
-          sub={urgentIncidents > 0 ? `${urgentIncidents} urgentes` : "todo al día"}
+          sub={
+            urgentIncidents > 0 ? `${urgentIncidents} urgentes` : "todo al día"
+          }
           color={urgentIncidents > 0 ? "red" : "green"}
           href="/incidents"
         />
@@ -176,12 +190,15 @@ export default function HomePage() {
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Recent incidents */}
         <div className="rounded-2xl border bg-white p-6 shadow-xs">
-          <div className="flex items-center justify-between mb-5">
+          <div className="mb-5 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Bell className="h-4 w-4 text-primary" />
-              <h2 className="font-semibold text-base">Últimas incidencias</h2>
+              <Bell className="text-primary h-4 w-4" />
+              <h2 className="text-base font-semibold">Últimas incidencias</h2>
             </div>
-            <Link href="/incidents" className="text-xs text-primary font-medium hover:underline">
+            <Link
+              href="/incidents"
+              className="text-primary text-xs font-medium hover:underline"
+            >
               Ver todas →
             </Link>
           </div>
@@ -194,10 +211,13 @@ export default function HomePage() {
                   RESUELTA: "bg-green-100 text-green-700",
                   RECHAZADA: "bg-slate-100 text-slate-500",
                 };
-                const priorityMap: Record<string, { icon: React.ElementType; cls: string }> = {
-                  BAJA:    { icon: CheckCircle2, cls: "text-slate-400" },
-                  MEDIA:   { icon: Clock, cls: "text-amber-500" },
-                  ALTA:    { icon: AlertTriangle, cls: "text-orange-500" },
+                const priorityMap: Record<
+                  string,
+                  { icon: React.ElementType; cls: string }
+                > = {
+                  BAJA: { icon: CheckCircle2, cls: "text-slate-400" },
+                  MEDIA: { icon: Clock, cls: "text-amber-500" },
+                  ALTA: { icon: AlertTriangle, cls: "text-orange-500" },
                   URGENTE: { icon: AlertTriangle, cls: "text-red-500" },
                 };
                 const p = priorityMap[inc.priority] ?? priorityMap.MEDIA!;
@@ -207,38 +227,47 @@ export default function HomePage() {
                   <Link
                     key={inc.id}
                     href={`/incidents/${inc.id}`}
-                    className="flex items-start gap-3 rounded-xl border p-3 hover:bg-slate-50 transition-colors no-underline"
+                    className="flex items-start gap-3 rounded-xl border p-3 no-underline transition-colors hover:bg-slate-50"
                   >
-                    <PIcon className={`h-4 w-4 mt-0.5 shrink-0 ${p.cls}`} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate text-foreground">{inc.title}</p>
-                      <p className="text-xs text-muted-foreground">
+                    <PIcon className={`mt-0.5 h-4 w-4 shrink-0 ${p.cls}`} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-foreground truncate text-sm font-medium">
+                        {inc.title}
+                      </p>
+                      <p className="text-muted-foreground text-xs">
                         {new Date(inc.createdAt).toLocaleDateString("es-ES", {
                           day: "2-digit",
                           month: "short",
                         })}
                       </p>
                     </div>
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${statusColors[inc.status] ?? "bg-slate-100 text-slate-500"}`}>
+                    <span
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${statusColors[inc.status] ?? "bg-slate-100 text-slate-500"}`}
+                    >
                       {inc.status.replace("_", " ")}
                     </span>
                   </Link>
                 );
               })
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-8">Sin incidencias registradas</p>
+              <p className="text-muted-foreground py-8 text-center text-sm">
+                Sin incidencias registradas
+              </p>
             )}
           </div>
         </div>
 
         {/* Recent notices */}
         <div className="rounded-2xl border bg-white p-6 shadow-xs">
-          <div className="flex items-center justify-between mb-5">
+          <div className="mb-5 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <MessageSquare className="h-4 w-4 text-primary" />
-              <h2 className="font-semibold text-base">Tablón de comunicados</h2>
+              <MessageSquare className="text-primary h-4 w-4" />
+              <h2 className="text-base font-semibold">Tablón de comunicados</h2>
             </div>
-            <Link href="/communication" className="text-xs text-primary font-medium hover:underline">
+            <Link
+              href="/communication"
+              className="text-primary text-xs font-medium hover:underline"
+            >
               Ver todos →
             </Link>
           </div>
@@ -251,20 +280,33 @@ export default function HomePage() {
                   URGENTE: "bg-red-100 text-red-700",
                 };
                 return (
-                  <div key={n.id} className="flex items-start gap-3 rounded-xl border p-3">
-                    {n.pinned && <span className="text-amber-500 shrink-0 mt-0.5 text-xs">📌</span>}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{n.title}</p>
-                      <p className="text-xs text-muted-foreground line-clamp-1">{n.content}</p>
+                  <div
+                    key={n.id}
+                    className="flex items-start gap-3 rounded-xl border p-3"
+                  >
+                    {n.pinned && (
+                      <span className="mt-0.5 shrink-0 text-xs text-amber-500">
+                        📌
+                      </span>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{n.title}</p>
+                      <p className="text-muted-foreground line-clamp-1 text-xs">
+                        {n.content}
+                      </p>
                     </div>
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${typeColors[n.type] ?? "bg-slate-100 text-slate-500"}`}>
+                    <span
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${typeColors[n.type] ?? "bg-slate-100 text-slate-500"}`}
+                    >
                       {n.type}
                     </span>
                   </div>
                 );
               })
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-8">Sin comunicados publicados</p>
+              <p className="text-muted-foreground py-8 text-center text-sm">
+                Sin comunicados publicados
+              </p>
             )}
           </div>
         </div>
@@ -272,7 +314,7 @@ export default function HomePage() {
 
       {/* Quick Actions */}
       <div>
-        <h2 className="font-semibold text-base mb-4">Accesos rápidos</h2>
+        <h2 className="mb-4 text-base font-semibold">Accesos rápidos</h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <QuickActionCard
             icon={Building2}

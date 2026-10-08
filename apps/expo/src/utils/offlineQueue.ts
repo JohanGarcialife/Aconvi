@@ -57,7 +57,7 @@ async function getDb(): Promise<SQLite.SQLiteDatabase> {
 
 /** Enqueue a pending upload. Persists even if the app is killed. */
 export async function enqueueUpload(
-  payload: Omit<PendingUpload, "status" | "createdAt">
+  payload: Omit<PendingUpload, "status" | "createdAt">,
 ): Promise<void> {
   const db = await getDb();
   await db.runAsync(
@@ -72,7 +72,7 @@ export async function enqueueUpload(
       payload.tenantId,
       payload.providerId,
       Date.now(),
-    ]
+    ],
   );
 }
 
@@ -88,7 +88,9 @@ export async function getPendingUploads(): Promise<PendingUpload[]> {
     provider_id: string;
     status: string;
     created_at: number;
-  }>("SELECT * FROM pending_uploads WHERE status = 'pending' ORDER BY created_at ASC");
+  }>(
+    "SELECT * FROM pending_uploads WHERE status = 'pending' ORDER BY created_at ASC",
+  );
 
   return rows.map((r) => ({
     id: r.id,
@@ -106,7 +108,7 @@ export async function getPendingUploads(): Promise<PendingUpload[]> {
 export async function countPendingUploads(): Promise<number> {
   const db = await getDb();
   const row = await db.getFirstAsync<{ count: number }>(
-    "SELECT COUNT(*) as count FROM pending_uploads WHERE status = 'pending'"
+    "SELECT COUNT(*) as count FROM pending_uploads WHERE status = 'pending'",
   );
   return row?.count ?? 0;
 }
@@ -120,11 +122,16 @@ export async function markUploadDone(id: string): Promise<void> {
 /** Mark an upload as failed (retryable) */
 export async function markUploadFailed(id: string): Promise<void> {
   const db = await getDb();
-  await db.runAsync("UPDATE pending_uploads SET status = 'failed' WHERE id = ?", [id]);
+  await db.runAsync(
+    "UPDATE pending_uploads SET status = 'failed' WHERE id = ?",
+    [id],
+  );
 }
 
 /** Reset failed uploads back to pending so they can be retried */
 export async function resetFailed(): Promise<void> {
   const db = await getDb();
-  await db.runAsync("UPDATE pending_uploads SET status = 'pending' WHERE status = 'failed'");
+  await db.runAsync(
+    "UPDATE pending_uploads SET status = 'pending' WHERE status = 'failed'",
+  );
 }

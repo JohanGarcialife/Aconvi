@@ -79,9 +79,7 @@ export function VotingRightsDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button
-          className="flex items-center gap-1.5 rounded-xl bg-[#008075] px-4 py-2 text-sm font-bold text-white shadow-xs hover:bg-[#006e64]"
-        >
+        <Button className="flex items-center gap-1.5 rounded-xl bg-[#008075] px-4 py-2 text-sm font-bold text-white shadow-xs hover:bg-[#006e64]">
           <Users className="h-4 w-4" />
           Habilitar voto
         </Button>

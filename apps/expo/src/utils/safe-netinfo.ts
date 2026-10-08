@@ -4,7 +4,10 @@ try {
   // If the native module is missing or throws during evaluation, catch it
   NetInfo = require("@react-native-community/netinfo").default;
 } catch (e) {
-  console.warn("Failed to evaluate @react-native-community/netinfo, using mock fallback:", e);
+  console.warn(
+    "Failed to evaluate @react-native-community/netinfo, using mock fallback:",
+    e,
+  );
   NetInfo = {
     addEventListener: (callback: any) => {
       // Immediately notify listener of online state

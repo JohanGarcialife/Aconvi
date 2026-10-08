@@ -1,33 +1,37 @@
 "use client";
 
-import { UsersRound, ShieldAlert } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { useTRPC } from "~/trpc/react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { ShieldAlert, UsersRound } from "lucide-react";
+
+import { useTRPC } from "~/trpc/react";
 
 export default function SuperAdminAdministratorsPage() {
   const trpc = useTRPC();
-  const { data: admins, isLoading } = useQuery(trpc.superadmin.getAdministrators.queryOptions());
+  const { data: admins, isLoading } = useQuery(
+    trpc.superadmin.getAdministrators.queryOptions(),
+  );
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-            <UsersRound className="w-6 h-6 text-indigo-500" />
+          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-slate-900">
+            <UsersRound className="h-6 w-6 text-indigo-500" />
             Directorio de Administradores
           </h1>
-          <p className="text-slate-500 mt-1">
-            Usuarios con nivel de Administrador de Fincas, Agentes o SuperAdmins.
+          <p className="mt-1 text-slate-500">
+            Usuarios con nivel de Administrador de Fincas, Agentes o
+            SuperAdmins.
           </p>
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-medium">
+          <table className="w-full text-left text-sm">
+            <thead className="border-b border-slate-200 bg-slate-50 font-medium text-slate-600">
               <tr>
                 <th className="px-6 py-4">Usuario</th>
                 <th className="px-6 py-4">Contacto</th>
@@ -39,22 +43,31 @@ export default function SuperAdminAdministratorsPage() {
             <tbody className="divide-y divide-slate-200">
               {isLoading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-slate-400">
+                  <td
+                    colSpan={5}
+                    className="px-6 py-8 text-center text-slate-400"
+                  >
                     Cargando directorio...
                   </td>
                 </tr>
               ) : admins?.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-slate-400">
+                  <td
+                    colSpan={5}
+                    className="px-6 py-8 text-center text-slate-400"
+                  >
                     No hay administradores registrados aún.
                   </td>
                 </tr>
               ) : (
                 admins?.map((admin) => (
-                  <tr key={admin.id} className="hover:bg-slate-50 transition-colors">
+                  <tr
+                    key={admin.id}
+                    className="transition-colors hover:bg-slate-50"
+                  >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold shrink-0">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-100 font-bold text-indigo-600">
                           {admin.name?.charAt(0).toUpperCase() ?? "A"}
                         </div>
                         <div className="font-medium text-slate-900">
@@ -65,28 +78,34 @@ export default function SuperAdminAdministratorsPage() {
                     <td className="px-6 py-4 text-slate-500">
                       <div>{admin.email}</div>
                       {admin.phoneNumber && (
-                        <div className="text-xs text-slate-400 mt-0.5">{admin.phoneNumber}</div>
+                        <div className="mt-0.5 text-xs text-slate-400">
+                          {admin.phoneNumber}
+                        </div>
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 border
-                        ${
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${
                           admin.role === "SuperAdmin"
-                            ? "bg-purple-50 text-purple-700 border-purple-200"
+                            ? "border-purple-200 bg-purple-50 text-purple-700"
                             : admin.role === "AgenteAconvi"
-                            ? "bg-indigo-50 text-indigo-700 border-indigo-200"
-                            : "bg-emerald-50 text-emerald-700 border-emerald-200"
-                        }
-                      `}>
-                        {admin.role === "SuperAdmin" && <ShieldAlert className="w-3 h-3" />}
+                              ? "border-indigo-200 bg-indigo-50 text-indigo-700"
+                              : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                        } `}
+                      >
+                        {admin.role === "SuperAdmin" && (
+                          <ShieldAlert className="h-3 w-3" />
+                        )}
                         {admin.role}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-slate-500">
-                      {format(new Date(admin.createdAt), "d MMM yyyy", { locale: es })}
+                      {format(new Date(admin.createdAt), "d MMM yyyy", {
+                        locale: es,
+                      })}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button className="text-indigo-600 hover:text-indigo-800 font-medium text-sm transition-colors">
+                      <button className="text-sm font-medium text-indigo-600 transition-colors hover:text-indigo-800">
                         Editar
                       </button>
                     </td>

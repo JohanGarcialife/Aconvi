@@ -1,4 +1,5 @@
-import pg from 'pg';
+import pg from "pg";
+
 const { Client } = pg;
 
 async function main() {
@@ -6,7 +7,9 @@ async function main() {
   await client.connect();
 
   try {
-    await client.query("DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO public;");
+    await client.query(
+      "DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO public;",
+    );
     console.log("Database cleared successfully.");
   } catch (e) {
     console.error(e);

@@ -1,15 +1,24 @@
 "use client";
 
 import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { useTRPC } from "~/trpc/react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Button } from "@acme/ui/button";
-import { Input } from "@acme/ui/input";
-import { Label } from "@acme/ui/label";
-import { Textarea } from "@acme/ui/textarea";
+import {
+  BookOpen,
+  Calculator,
+  ExternalLink,
+  FileArchive,
+  FileSignature,
+  FileText,
+  FolderOpen,
+  Plus,
+  Scale,
+  Trash2,
+} from "lucide-react";
+
 import { Badge } from "@acme/ui/badge";
+import { Button } from "@acme/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -19,34 +28,60 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@acme/ui/dialog";
-import {
-  FileText,
-  Plus,
-  Trash2,
-  ExternalLink,
-  FileArchive,
-  Scale,
-  BookOpen,
-  FileSignature,
-  Calculator,
-  FolderOpen,
-} from "lucide-react";
+import { Input } from "@acme/ui/input";
+import { Label } from "@acme/ui/label";
+import { Textarea } from "@acme/ui/textarea";
+
+import { useTRPC } from "~/trpc/react";
 
 const TENANT_ID = "org_aconvi_demo";
 
 const CATEGORIES = [
-  { value: "ACTA", label: "Actas", icon: FileSignature, color: "text-blue-600 bg-blue-50 border-blue-100" },
-  { value: "ESTATUTO", label: "Estatutos", icon: Scale, color: "text-purple-600 bg-purple-50 border-purple-100" },
-  { value: "REGLAMENTO", label: "Reglamentos", icon: BookOpen, color: "text-amber-600 bg-amber-50 border-amber-100" },
-  { value: "CONTRATO", label: "Contratos", icon: FileArchive, color: "text-emerald-600 bg-emerald-50 border-emerald-100" },
-  { value: "PRESUPUESTO", label: "Presupuestos", icon: Calculator, color: "text-rose-600 bg-rose-50 border-rose-100" },
-  { value: "OTRO", label: "Otros", icon: FolderOpen, color: "text-muted-foreground bg-muted/30 border-border" },
+  {
+    value: "ACTA",
+    label: "Actas",
+    icon: FileSignature,
+    color: "text-blue-600 bg-blue-50 border-blue-100",
+  },
+  {
+    value: "ESTATUTO",
+    label: "Estatutos",
+    icon: Scale,
+    color: "text-purple-600 bg-purple-50 border-purple-100",
+  },
+  {
+    value: "REGLAMENTO",
+    label: "Reglamentos",
+    icon: BookOpen,
+    color: "text-amber-600 bg-amber-50 border-amber-100",
+  },
+  {
+    value: "CONTRATO",
+    label: "Contratos",
+    icon: FileArchive,
+    color: "text-emerald-600 bg-emerald-50 border-emerald-100",
+  },
+  {
+    value: "PRESUPUESTO",
+    label: "Presupuestos",
+    icon: Calculator,
+    color: "text-rose-600 bg-rose-50 border-rose-100",
+  },
+  {
+    value: "OTRO",
+    label: "Otros",
+    icon: FolderOpen,
+    color: "text-muted-foreground bg-muted/30 border-border",
+  },
 ] as const;
 
 type DocumentCategory = (typeof CATEGORIES)[number]["value"];
 
 function categoryMeta(cat: string) {
-  return CATEGORIES.find((c) => c.value === cat) ?? CATEGORIES[CATEGORIES.length - 1]!;
+  return (
+    CATEGORIES.find((c) => c.value === cat) ??
+    CATEGORIES[CATEGORIES.length - 1]!
+  );
 }
 
 // ─── Upload Document Dialog ───────────────────────────────────────────────────
@@ -87,7 +122,8 @@ function UploadDocumentDialog({ onSuccess }: { onSuccess: () => void }) {
         <DialogHeader>
           <DialogTitle>Añadir documento</DialogTitle>
           <DialogDescription>
-            Añade un enlace a un documento de la comunidad. Pega la URL de Google Drive, Dropbox u otro servicio.
+            Añade un enlace a un documento de la comunidad. Pega la URL de
+            Google Drive, Dropbox u otro servicio.
           </DialogDescription>
         </DialogHeader>
 
@@ -198,27 +234,29 @@ function DocumentCard({
   const Icon = meta.icon;
 
   return (
-    <div className="flex items-start gap-4 rounded-xl border bg-card p-4 shadow-xs hover:shadow-sm transition-shadow">
-      <div className={`rounded-xl border p-2.5 shrink-0 ${meta.color}`}>
+    <div className="bg-card flex items-start gap-4 rounded-xl border p-4 shadow-xs transition-shadow hover:shadow-sm">
+      <div className={`shrink-0 rounded-xl border p-2.5 ${meta.color}`}>
         <Icon className="h-5 w-5" />
       </div>
 
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <h3 className="font-semibold text-sm leading-tight truncate">{doc.title}</h3>
+            <h3 className="truncate text-sm leading-tight font-semibold">
+              {doc.title}
+            </h3>
             {doc.description && (
-              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+              <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">
                 {doc.description}
               </p>
             )}
           </div>
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex shrink-0 items-center gap-1">
             <a
               href={doc.fileUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              className="text-muted-foreground hover:text-foreground hover:bg-muted inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors"
               title="Abrir documento"
             >
               <ExternalLink className="h-3.5 w-3.5" />
@@ -226,7 +264,7 @@ function DocumentCard({
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+              className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-7 w-7"
               onClick={() => onDelete(doc.id)}
               title="Eliminar documento"
             >
@@ -235,12 +273,17 @@ function DocumentCard({
           </div>
         </div>
 
-        <div className="flex items-center gap-3 mt-2">
-          <Badge variant="outline" className={`text-xs border ${meta.color} font-medium`}>
+        <div className="mt-2 flex items-center gap-3">
+          <Badge
+            variant="outline"
+            className={`border text-xs ${meta.color} font-medium`}
+          >
             {meta.label}
           </Badge>
-          <span className="text-xs text-muted-foreground truncate">{doc.fileName}</span>
-          <span className="text-xs text-muted-foreground shrink-0">
+          <span className="text-muted-foreground truncate text-xs">
+            {doc.fileName}
+          </span>
+          <span className="text-muted-foreground shrink-0 text-xs">
             {format(new Date(doc.createdAt), "d MMM yyyy", { locale: es })}
           </span>
         </div>
@@ -289,7 +332,9 @@ export default function DocumentsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Gestión Documental</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Gestión Documental
+          </h1>
           <p className="text-muted-foreground mt-1 text-sm">
             Actas, estatutos, reglamentos y documentación de la comunidad.
           </p>
@@ -298,12 +343,16 @@ export default function DocumentsPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {CATEGORIES.map((cat) => {
-          const count = docs?.filter((d: any) => d.category === cat.value).length ?? 0;
+          const count =
+            docs?.filter((d: any) => d.category === cat.value).length ?? 0;
           return (
-            <div key={cat.value} className={`rounded-xl border p-3 ${cat.color}`}>
-              <div className="flex items-center gap-1.5 mb-1">
+            <div
+              key={cat.value}
+              className={`rounded-xl border p-3 ${cat.color}`}
+            >
+              <div className="mb-1 flex items-center gap-1.5">
                 <cat.icon className="h-3.5 w-3.5" />
                 <span className="text-xs font-medium">{cat.label}</span>
               </div>
@@ -314,12 +363,15 @@ export default function DocumentsPage() {
       </div>
 
       {/* Category Filter */}
-      <div className="flex gap-2 flex-wrap">
-        {[{ key: "ALL", label: "Todos", count: totalDocs }, ...CATEGORIES.map((c) => ({
-          key: c.value,
-          label: c.label,
-          count: docs?.filter((d: any) => d.category === c.value).length ?? 0,
-        }))].map(({ key, label, count }) => (
+      <div className="flex flex-wrap gap-2">
+        {[
+          { key: "ALL", label: "Todos", count: totalDocs },
+          ...CATEGORIES.map((c) => ({
+            key: c.value,
+            label: c.label,
+            count: docs?.filter((d: any) => d.category === c.value).length ?? 0,
+          })),
+        ].map(({ key, label, count }) => (
           <button
             key={key}
             onClick={() => setActiveCategory(key)}
@@ -330,9 +382,11 @@ export default function DocumentsPage() {
             }`}
           >
             {label}
-            <span className={`rounded-full px-1.5 py-0.5 text-xs font-bold ${
-              activeCategory === key ? "bg-white/20" : "bg-muted"
-            }`}>
+            <span
+              className={`rounded-full px-1.5 py-0.5 text-xs font-bold ${
+                activeCategory === key ? "bg-white/20" : "bg-muted"
+              }`}
+            >
               {count}
             </span>
           </button>
@@ -341,10 +395,12 @@ export default function DocumentsPage() {
 
       {/* Document List */}
       {isLoading ? (
-        <div className="text-muted-foreground text-sm">Cargando documentos...</div>
+        <div className="text-muted-foreground text-sm">
+          Cargando documentos...
+        </div>
       ) : docs?.length === 0 ? (
-        <div className="py-16 text-center border rounded-xl bg-muted/20">
-          <FileText className="mx-auto h-10 w-10 text-muted-foreground mb-3 opacity-40" />
+        <div className="bg-muted/20 rounded-xl border py-16 text-center">
+          <FileText className="text-muted-foreground mx-auto mb-3 h-10 w-10 opacity-40" />
           <p className="text-muted-foreground text-sm">
             No hay documentos en esta categoría. Sube el primer documento.
           </p>

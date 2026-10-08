@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { formatDistanceToNow } from "date-fns";
+import { es } from "date-fns/locale";
 import {
   AlertTriangle,
   Bell,
@@ -14,11 +17,9 @@ import {
   Search,
   Vote,
 } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
-import { es } from "date-fns/locale";
-import { useQuery } from "@tanstack/react-query";
 
 import { Input } from "@acme/ui/input";
+
 import { useTRPC } from "~/trpc/react";
 
 const TENANT_ID = "org_aconvi_demo";
@@ -102,8 +103,7 @@ export function DashboardTopHeader() {
     // Incidents
     if (Array.isArray(incidents)) {
       for (const inc of incidents) {
-        const isUrgent =
-          inc.priority === "ALTA" || inc.priority === "URGENTE";
+        const isUrgent = inc.priority === "ALTA" || inc.priority === "URGENTE";
         const isClosed = ["RESUELTA", "RECHAZADA"].includes(inc.status);
         if (!isClosed) {
           list.push({
@@ -148,9 +148,10 @@ export function DashboardTopHeader() {
             id: `vote-${v.id}`,
             type: "VOTING",
             title: v.title || "Votación activa",
-            subtitle: v.type === "JUNTA"
-              ? "Junta de propietarios con votación telemática activa"
-              : "Decisión abierta a votos de vecinos",
+            subtitle:
+              v.type === "JUNTA"
+                ? "Junta de propietarios con votación telemática activa"
+                : "Decisión abierta a votos de vecinos",
             timestamp: v.createdAt ? new Date(v.createdAt) : new Date(),
             href: "/votes",
             urgent: false,
@@ -166,7 +167,9 @@ export function DashboardTopHeader() {
           id: `not-${n.id}`,
           type: "NOTICE",
           title: n.title || "Nuevo comunicado",
-          subtitle: n.pinned ? "Comunicado fijado en el tablón" : "Publicado para vecinos",
+          subtitle: n.pinned
+            ? "Comunicado fijado en el tablón"
+            : "Publicado para vecinos",
           timestamp: n.createdAt ? new Date(n.createdAt) : new Date(),
           href: "/communication",
           urgent: false,
@@ -175,9 +178,7 @@ export function DashboardTopHeader() {
     }
 
     // Sort newest first
-    return list.sort(
-      (a, b) => b.timestamp.getTime() - a.timestamp.getTime(),
-    );
+    return list.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
   }, [incidents, votings, notices]);
 
   // Count items newer than lastSeenTs
@@ -225,12 +226,12 @@ export function DashboardTopHeader() {
       {/* Right controls: Search, Red-dot Bell, Avatar */}
       <div className="flex items-center gap-4">
         {/* Search */}
-        <div className="relative hidden md:block w-64">
-          <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
+        <div className="relative hidden w-64 md:block">
+          <Search className="absolute top-2.5 left-3 h-3.5 w-3.5 text-slate-400" />
           <Input
             type="text"
             placeholder="Buscar votación, incidencia..."
-            className="h-8.5 w-full rounded-md border-slate-200 bg-slate-50 pl-8.5 pr-4 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white"
+            className="h-8.5 w-full rounded-md border-slate-200 bg-slate-50 pr-4 pl-8.5 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white"
           />
         </div>
 
@@ -255,7 +256,7 @@ export function DashboardTopHeader() {
 
           {/* Dropdown Panel */}
           {isOpen && (
-            <div className="absolute right-0 top-11 z-50 w-80 sm:w-96 rounded-lg border border-slate-200/90 bg-white shadow-xl animate-in fade-in-0 zoom-in-95">
+            <div className="animate-in fade-in-0 zoom-in-95 absolute top-11 right-0 z-50 w-80 rounded-lg border border-slate-200/90 bg-white shadow-xl sm:w-96">
               {/* Header */}
               <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
                 <div className="flex items-center gap-2">
@@ -281,14 +282,14 @@ export function DashboardTopHeader() {
               </div>
 
               {/* List */}
-              <div className="max-h-96 overflow-y-auto divide-y divide-slate-100">
+              <div className="max-h-96 divide-y divide-slate-100 overflow-y-auto">
                 {notifications.length === 0 ? (
                   <div className="p-8 text-center">
-                    <CheckCircle2 className="mx-auto h-8 w-8 text-slate-300 mb-2" />
+                    <CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-slate-300" />
                     <p className="text-xs font-semibold text-slate-700">
                       Todo al día
                     </p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">
+                    <p className="mt-0.5 text-[11px] text-slate-400">
                       No hay notificaciones pendientes.
                     </p>
                   </div>
@@ -328,19 +329,19 @@ export function DashboardTopHeader() {
                         </div>
 
                         {/* Content */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-1 mb-0.5">
-                            <span className="text-xs font-bold text-slate-900 truncate">
+                        <div className="min-w-0 flex-1">
+                          <div className="mb-0.5 flex items-center justify-between gap-1">
+                            <span className="truncate text-xs font-bold text-slate-900">
                               {item.title}
                             </span>
                             {isNew && (
-                              <span className="h-1.5 w-1.5 rounded-full bg-[#EF4444] shrink-0" />
+                              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#EF4444]" />
                             )}
                           </div>
-                          <p className="text-[11px] text-slate-600 line-clamp-2">
+                          <p className="line-clamp-2 text-[11px] text-slate-600">
                             {item.subtitle}
                           </p>
-                          <span className="text-[10px] text-slate-400 mt-1 block">
+                          <span className="mt-1 block text-[10px] text-slate-400">
                             {formatDistanceToNow(item.timestamp, {
                               addSuffix: true,
                               locale: es,

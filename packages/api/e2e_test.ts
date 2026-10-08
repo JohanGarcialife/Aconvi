@@ -1,7 +1,9 @@
-import { appRouter } from "./src/root";
-import { db } from "@acme/db/client";
 import { eq } from "drizzle-orm";
-import { notice, agendaTask } from "@acme/db/schema";
+
+import { db } from "@acme/db/client";
+import { agendaTask, notice } from "@acme/db/schema";
+
+import { appRouter } from "./src/root";
 
 const DEMO_TENANT = "org_aconvi_demo";
 const DEMO_USER = "test-user-jluis-1776971864823"; // AF Admin user
@@ -14,7 +16,7 @@ async function runTests() {
   const ctx = {
     db,
     session: {
-      user: { id: DEMO_USER, email: "jluis.test@aconvi.app" }
+      user: { id: DEMO_USER, email: "jluis.test@aconvi.app" },
     },
     headers: new Headers(),
   };
@@ -26,7 +28,7 @@ async function runTests() {
     // TEST 1: Tablón Digital
     // ---------------------------------------------------------
     console.log("▶️ Test 1: Tablón Digital (Notice Router)");
-    
+
     // Crear aviso urgente fijado
     const newNotice = await caller.notice.create({
       tenantId: DEMO_TENANT,
@@ -41,11 +43,18 @@ async function runTests() {
     // Listar avisos y verificar ordenación (los pinned deben venir primero)
     const notices = await caller.notice.all({ tenantId: DEMO_TENANT });
     const isPinnedFirst = notices[0].pinned === true;
-    console.log("  ✅ Ordenación Pinned First:", isPinnedFirst ? "Pasa" : "Falla");
+    console.log(
+      "  ✅ Ordenación Pinned First:",
+      isPinnedFirst ? "Pasa" : "Falla",
+    );
     if (!isPinnedFirst) errors++;
 
     // Desfijar
-    await caller.notice.togglePin({ tenantId: DEMO_TENANT, id: newNotice.id, pinned: false });
+    await caller.notice.togglePin({
+      tenantId: DEMO_TENANT,
+      id: newNotice.id,
+      pinned: false,
+    });
     console.log("  ✅ Toggle Pin funciona");
 
     // Limpiar (Borrar aviso creado usando Drizzle directamente ya que no hay endpoint delete notice)
@@ -55,20 +64,23 @@ async function runTests() {
     // TEST 2: Agenda Inteligente
     // ---------------------------------------------------------
     console.log("\n▶️ Test 2: Agenda Inteligente (Agenda Router)");
-    
+
     // Crear tarea
     const newTask = await caller.agenda.create({
       tenantId: DEMO_TENANT,
       title: "E2E Task",
       category: "MANTENIMIENTO",
       dueDate: "2026-12-31",
-      recurrence: "NONE"
+      recurrence: "NONE",
     });
     console.log("  ✅ Tarea creada:", newTask.id);
 
     // Listar tareas
-    const tasks = await caller.agenda.all({ tenantId: DEMO_TENANT, showDone: false });
-    const taskFound = tasks.find(t => t.id === newTask.id);
+    const tasks = await caller.agenda.all({
+      tenantId: DEMO_TENANT,
+      showDone: false,
+    });
+    const taskFound = tasks.find((t) => t.id === newTask.id);
     console.log("  ✅ Tarea listada:", taskFound ? "Pasa" : "Falla");
     if (!taskFound) errors++;
 
@@ -76,17 +88,19 @@ async function runTests() {
     const calendar = await caller.agenda.getCalendarEvents({
       tenantId: DEMO_TENANT,
       year: 2026,
-      month: 12
+      month: 12,
     });
-    const calendarEvt = calendar.find(e => e.id === newTask.id);
-    console.log("  ✅ Evento devuelto en el Calendario:", calendarEvt ? "Pasa" : "Falla");
+    const calendarEvt = calendar.find((e) => e.id === newTask.id);
+    console.log(
+      "  ✅ Evento devuelto en el Calendario:",
+      calendarEvt ? "Pasa" : "Falla",
+    );
     if (!calendarEvt) errors++;
 
     // Marcar hecha y borrar
     await caller.agenda.done({ id: newTask.id });
     await caller.agenda.delete({ id: newTask.id });
     console.log("  ✅ Completar y borrar tarea funciona");
-
   } catch (error) {
     console.error("❌ E2E Error durante las pruebas:", error);
     errors++;

@@ -1,20 +1,20 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useTRPC } from "~/trpc/react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Home,
-  Building2,
   Bell,
   BellRing,
-  Vote,
-  MessageSquare,
-  Trees,
+  Building2,
   FileText,
+  Home,
+  MessageSquare,
   ShieldCheck,
+  Trees,
   UploadCloud,
+  Vote,
 } from "lucide-react";
 
 import {
@@ -23,13 +23,14 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarHeader,
 } from "@acme/ui/sidebar";
+
 import { useWebPush } from "~/hooks/useWebPush";
-import Image from "next/image";
+import { useTRPC } from "~/trpc/react";
 
 const items = [
   { title: "Inicio", url: "/home", icon: Home },
@@ -51,17 +52,20 @@ export function AppSidebar() {
     ...trpc.incident.all.queryOptions({ tenantId: "org_aconvi_demo" }),
     refetchInterval: 5000,
   });
-  
+
   // Show total incidents count in badge
   const totalCount = incidents?.length ?? 0;
 
-
-  const { permission, isRegistering, requestPermissionAndSubscribe } = useWebPush();
+  const { permission, isRegistering, requestPermissionAndSubscribe } =
+    useWebPush();
 
   return (
     <Sidebar className="border-r border-slate-200 bg-white">
-      <SidebarHeader className="px-4 py-3 border-b border-slate-100 flex items-center justify-center">
-        <Link href="/incidents" className="flex items-center justify-center w-full no-underline select-none">
+      <SidebarHeader className="flex items-center justify-center border-b border-slate-100 px-4 py-3">
+        <Link
+          href="/incidents"
+          className="flex w-full items-center justify-center no-underline select-none"
+        >
           <Image
             src="/logo.png"
             alt="Logo"
@@ -87,21 +91,23 @@ export function AppSidebar() {
                       isActive={isActive}
                       className={`h-10 rounded-md px-3 text-sm font-medium transition-all ${
                         isActive
-                          ? "bg-[#EAF5F2]! text-[#008075]! font-semibold hover:bg-[#E2F0ED]! hover:text-[#008075]!"
+                          ? "bg-[#EAF5F2]! font-semibold text-[#008075]! hover:bg-[#E2F0ED]! hover:text-[#008075]!"
                           : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                       }`}
                     >
                       <Link
                         href={item.url}
-                        className="flex justify-between items-center w-full"
+                        className="flex w-full items-center justify-between"
                       >
                         <div className="flex items-center gap-3">
-                          <item.icon className={`h-4 w-4 shrink-0 ${isActive ? "text-[#008075]" : "text-slate-500"}`} />
+                          <item.icon
+                            className={`h-4 w-4 shrink-0 ${isActive ? "text-[#008075]" : "text-slate-500"}`}
+                          />
                           <span>{item.title}</span>
                         </div>
                         {item.title === "Incidencias" && totalCount > 0 ? (
                           <span
-                            className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
                               isActive
                                 ? "bg-[#008075]/15 text-[#008075]"
                                 : "bg-slate-100 text-slate-600"
@@ -111,7 +117,7 @@ export function AppSidebar() {
                           </span>
                         ) : item.badge && item.title !== "Incidencias" ? (
                           <span
-                            className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
                               isActive
                                 ? "bg-[#008075]/15 text-[#008075]"
                                 : "bg-slate-100 text-slate-600"
@@ -130,16 +136,16 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="p-4 flex flex-col gap-3">
+      <SidebarFooter className="flex flex-col gap-3 p-4">
         {/* Notification Permission Button */}
         {permission !== "unsupported" && permission !== "granted" && (
           <button
             type="button"
             disabled={isRegistering || permission === "denied"}
             onClick={() => void requestPermissionAndSubscribe()}
-            className={`flex items-center gap-2 w-full rounded-xl border px-3 py-2.5 text-xs font-semibold transition-all ${
+            className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-semibold transition-all ${
               permission === "denied"
-                ? "border-red-200 bg-red-50 text-red-500 cursor-not-allowed"
+                ? "cursor-not-allowed border-red-200 bg-red-50 text-red-500"
                 : "border-primary/30 bg-primary/5 text-primary hover:bg-primary/10"
             }`}
           >
@@ -152,7 +158,7 @@ export function AppSidebar() {
           </button>
         )}
         {permission === "granted" && (
-          <div className="flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-700 font-medium">
+          <div className="flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-xs font-medium text-green-700">
             <Bell className="h-3.5 w-3.5 shrink-0" />
             Notificaciones activas
           </div>
@@ -160,8 +166,8 @@ export function AppSidebar() {
 
         {/* Branding Footer */}
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">
-          <div className="flex items-center gap-2 mb-1">
-            <ShieldCheck className="h-3.5 w-3.5 text-primary shrink-0" />
+          <div className="mb-1 flex items-center gap-2">
+            <ShieldCheck className="text-primary h-3.5 w-3.5 shrink-0" />
             <span className="font-semibold text-slate-700">
               Transparencia que te protege
             </span>

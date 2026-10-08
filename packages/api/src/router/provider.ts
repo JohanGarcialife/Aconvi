@@ -1,9 +1,14 @@
-import { eq, desc, sql } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { provider } from "@acme/db/schema";
 
-import { createTRPCRouter, publicProcedure, tenantProcedure, protectedProcedure } from "../trpc";
+import {
+  createTRPCRouter,
+  protectedProcedure,
+  publicProcedure,
+  tenantProcedure,
+} from "../trpc";
 
 export const providerRouter = createTRPCRouter({
   // Public — anyone with the orgId can list providers (read-only)
@@ -35,8 +40,14 @@ export const providerRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const { tenantId, ...data } = input;
-      const initials = data.avatarInitials ??
-        data.name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
+      const initials =
+        data.avatarInitials ??
+        data.name
+          .split(" ")
+          .map((w) => w[0])
+          .join("")
+          .toUpperCase()
+          .slice(0, 2);
       const [created] = await ctx.db
         .insert(provider)
         .values({ ...data, avatarInitials: initials, organizationId: tenantId })
@@ -56,15 +67,14 @@ export const providerRouter = createTRPCRouter({
       return found ?? null;
     }),
 
-  currentProvider: protectedProcedure
-    .query(async ({ ctx }) => {
-      const userEmail = ctx.session.user.email;
-      if (!userEmail) {
-        throw new Error("User has no email configured");
-      }
-      const foundProvider = await ctx.db.query.provider.findFirst({
-        where: eq(sql`lower(${provider.email})`, userEmail.toLowerCase()),
-      });
-      return foundProvider ?? null;
-    }),
+  currentProvider: protectedProcedure.query(async ({ ctx }) => {
+    const userEmail = ctx.session.user.email;
+    if (!userEmail) {
+      throw new Error("User has no email configured");
+    }
+    const foundProvider = await ctx.db.query.provider.findFirst({
+      where: eq(sql`lower(${provider.email})`, userEmail.toLowerCase()),
+    });
+    return foundProvider ?? null;
+  }),
 });

@@ -4,7 +4,10 @@ export async function emitWebSocketEvent(
   payload: any,
 ) {
   // Use WS_URL in production, fallback to localhost in development
-  const rawUrl = process.env.WS_INTERNAL_URL || process.env.NEXT_PUBLIC_WS_URL || "http://localhost:3001";
+  const rawUrl =
+    process.env.WS_INTERNAL_URL ||
+    process.env.NEXT_PUBLIC_WS_URL ||
+    "http://localhost:3001";
   let baseUrl = rawUrl;
   if (baseUrl.startsWith("ws://")) {
     baseUrl = "http://" + baseUrl.slice(5);
@@ -63,7 +66,9 @@ export async function emitWebSocketEvent(
     });
 
     if (!res.ok) {
-      console.warn(`[WS Util] Failed to emit event ${wsEvent}: ${res.status} ${res.statusText}`);
+      console.warn(
+        `[WS Util] Failed to emit event ${wsEvent}: ${res.status} ${res.statusText}`,
+      );
     }
   } catch (error) {
     console.error(`[WS Util] Error emitting event ${wsEvent}:`, error);

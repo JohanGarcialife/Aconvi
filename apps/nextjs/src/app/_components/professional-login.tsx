@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 
@@ -25,14 +25,23 @@ function Card({ children }: { children: React.ReactNode }) {
 
 function LogoArea({ centered = false }: { centered?: boolean }) {
   return (
-    <div style={{ padding: "32px 48px 0", textAlign: centered ? "center" : "left" }}>
+    <div
+      style={{
+        padding: "32px 48px 0",
+        textAlign: centered ? "center" : "left",
+      }}
+    >
       <Image
         src="/logo.png"
         alt="Aconvi"
         width={120}
         height={34}
         priority
-        style={{ objectFit: "contain", objectPosition: centered ? "center" : "left", display: "inline-block" }}
+        style={{
+          objectFit: "contain",
+          objectPosition: centered ? "center" : "left",
+          display: "inline-block",
+        }}
       />
     </div>
   );
@@ -53,14 +62,25 @@ function FooterArea() {
       <span style={{ fontSize: "12px", color: "#9ca3af" }}>
         © Aconvi. Todos los derechos reservados.
       </span>
-      <a href="#" style={{ fontSize: "12px", color: "#00BDA5", textDecoration: "none" }}>
+      <a
+        href="#"
+        style={{ fontSize: "12px", color: "#00BDA5", textDecoration: "none" }}
+      >
         Ayuda
       </a>
     </div>
   );
 }
 
-type LoginStatus = "idle" | "loading" | "awaiting_push" | "approved" | "error" | "user_not_found" | "activation" | "activating";
+type LoginStatus =
+  | "idle"
+  | "loading"
+  | "awaiting_push"
+  | "approved"
+  | "error"
+  | "user_not_found"
+  | "activation"
+  | "activating";
 
 export function ProfessionalLogin() {
   const router = useRouter();
@@ -76,14 +96,19 @@ export function ProfessionalLogin() {
     try {
       const res = await fetch(`/api/auth/check-push?requestId=${reqId}`);
       if (!res.ok) return;
-      const data = await res.json() as { status: string; sessionToken?: string };
+      const data = (await res.json()) as {
+        status: string;
+        sessionToken?: string;
+      };
       if (data.status === "approved" && data.sessionToken) {
         setStatus("approved");
         // Redirect to the set-session endpoint — it sets the cookie server-side and redirects
         window.location.href = `/api/auth/set-session?token=${data.sessionToken}`;
       } else if (data.status === "expired") {
         setStatus("error");
-        setErrorMessage("La solicitud de acceso ha expirado. Intenta de nuevo.");
+        setErrorMessage(
+          "La solicitud de acceso ha expirado. Intenta de nuevo.",
+        );
       }
     } catch {
       // Silent fail — keep polling
@@ -95,7 +120,9 @@ export function ProfessionalLogin() {
     // Poll every 2 seconds for up to 2 minutes (60 polls)
     if (pollCount >= 60) {
       setStatus("error");
-      setErrorMessage("No se recibió respuesta del dispositivo. Inténtalo de nuevo.");
+      setErrorMessage(
+        "No se recibió respuesta del dispositivo. Inténtalo de nuevo.",
+      );
       return;
     }
     const timer = setTimeout(() => {
@@ -122,7 +149,12 @@ export function ProfessionalLogin() {
         body: JSON.stringify({ username: trimmed }),
       });
 
-      const data = await res.json() as { ok: boolean; requestId?: string; error?: string; code?: string };
+      const data = (await res.json()) as {
+        ok: boolean;
+        requestId?: string;
+        error?: string;
+        code?: string;
+      };
 
       if (!res.ok || !data.ok) {
         if (data.code === "USER_NOT_FOUND") {
@@ -134,7 +166,9 @@ export function ProfessionalLogin() {
           setErrorMessage("");
         } else {
           setStatus("error");
-          setErrorMessage(data.error ?? "No se pudo iniciar la solicitud de acceso.");
+          setErrorMessage(
+            data.error ?? "No se pudo iniciar la solicitud de acceso.",
+          );
         }
         return;
       }
@@ -157,12 +191,22 @@ export function ProfessionalLogin() {
       const res = await fetch("/api/auth/activate-with-pin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: username.trim().toLowerCase(), pin: pin.trim() }),
+        body: JSON.stringify({
+          username: username.trim().toLowerCase(),
+          pin: pin.trim(),
+        }),
       });
-      const data = await res.json() as { ok: boolean; sessionToken?: string; error?: string; code?: string };
+      const data = (await res.json()) as {
+        ok: boolean;
+        sessionToken?: string;
+        error?: string;
+        code?: string;
+      };
       if (!res.ok || !data.ok) {
         setStatus("activation");
-        setErrorMessage(data.error ?? "PIN incorrecto. Verifica e intenta de nuevo.");
+        setErrorMessage(
+          data.error ?? "PIN incorrecto. Verifica e intenta de nuevo.",
+        );
         return;
       }
       // Set session server-side via redirect — the endpoint handles Set-Cookie properly
@@ -179,22 +223,82 @@ export function ProfessionalLogin() {
     return (
       <Card>
         <LogoArea centered />
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px" }}>
-          <div style={{ width: "64px", height: "64px", borderRadius: "50%", background: "rgba(0,189,165,0.12)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "20px" }}>
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "40px",
+          }}
+        >
+          <div
+            style={{
+              width: "64px",
+              height: "64px",
+              borderRadius: "50%",
+              background: "rgba(0,189,165,0.12)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              marginBottom: "20px",
+            }}
+          >
             <span style={{ fontSize: "28px" }}>🔑</span>
           </div>
-          <h2 style={{ fontSize: "20px", fontWeight: 700, color: "#0F1B2B", margin: "0 0 8px", textAlign: "center" }}>
+          <h2
+            style={{
+              fontSize: "20px",
+              fontWeight: 700,
+              color: "#0F1B2B",
+              margin: "0 0 8px",
+              textAlign: "center",
+            }}
+          >
             Activación de cuenta
           </h2>
-          <p style={{ color: "#6b7280", fontSize: "14px", textAlign: "center", maxWidth: "320px", marginBottom: "24px", lineHeight: 1.5 }}>
-            Introduce el <strong>PIN de activación</strong> que te entregó Aconvi. Solo puede usarse una vez.
+          <p
+            style={{
+              color: "#6b7280",
+              fontSize: "14px",
+              textAlign: "center",
+              maxWidth: "320px",
+              marginBottom: "24px",
+              lineHeight: 1.5,
+            }}
+          >
+            Introduce el <strong>PIN de activación</strong> que te entregó
+            Aconvi. Solo puede usarse una vez.
           </p>
           {errorMessage && (
-            <div style={{ background: "#fef2f2", color: "#991b1b", border: "1px solid #fca5a5", borderRadius: "8px", padding: "10px 16px", fontSize: "14px", marginBottom: "16px", width: "100%", maxWidth: "320px", textAlign: "center" }}>
+            <div
+              style={{
+                background: "#fef2f2",
+                color: "#991b1b",
+                border: "1px solid #fca5a5",
+                borderRadius: "8px",
+                padding: "10px 16px",
+                fontSize: "14px",
+                marginBottom: "16px",
+                width: "100%",
+                maxWidth: "320px",
+                textAlign: "center",
+              }}
+            >
               {errorMessage}
             </div>
           )}
-          <form onSubmit={handleActivateWithPin} style={{ width: "100%", maxWidth: "320px", display: "flex", flexDirection: "column", gap: "12px" }}>
+          <form
+            onSubmit={handleActivateWithPin}
+            style={{
+              width: "100%",
+              maxWidth: "320px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "12px",
+            }}
+          >
             <input
               type="text"
               inputMode="numeric"
@@ -221,14 +325,20 @@ export function ProfessionalLogin() {
               type="submit"
               disabled={status === "activating" || pin.length < 4}
               style={{
-                background: status === "activating" || pin.length < 4 ? "#9ca3af" : "#00BDA5",
+                background:
+                  status === "activating" || pin.length < 4
+                    ? "#9ca3af"
+                    : "#00BDA5",
                 color: "#fff",
                 border: "none",
                 borderRadius: "12px",
                 padding: "14px",
                 fontSize: "16px",
                 fontWeight: 700,
-                cursor: status === "activating" || pin.length < 4 ? "not-allowed" : "pointer",
+                cursor:
+                  status === "activating" || pin.length < 4
+                    ? "not-allowed"
+                    : "pointer",
                 transition: "background 0.2s",
               }}
             >
@@ -236,8 +346,20 @@ export function ProfessionalLogin() {
             </button>
           </form>
           <button
-            onClick={() => { setStatus("idle"); setPin(""); setErrorMessage(""); }}
-            style={{ marginTop: "16px", background: "transparent", color: "#00BDA5", border: "none", cursor: "pointer", fontWeight: 600, fontSize: "14px" }}
+            onClick={() => {
+              setStatus("idle");
+              setPin("");
+              setErrorMessage("");
+            }}
+            style={{
+              marginTop: "16px",
+              background: "transparent",
+              color: "#00BDA5",
+              border: "none",
+              cursor: "pointer",
+              fontWeight: 600,
+              fontSize: "14px",
+            }}
           >
             ← Volver
           </button>
@@ -277,13 +399,31 @@ export function ProfessionalLogin() {
               animation: "pulse 2s infinite",
             }}
           >
-            <span style={{ fontSize: "32px" }}>{status === "approved" ? "✅" : "📲"}</span>
+            <span style={{ fontSize: "32px" }}>
+              {status === "approved" ? "✅" : "📲"}
+            </span>
           </div>
 
-          <h2 style={{ fontSize: "20px", fontWeight: 700, color: "#0F1B2B", margin: "0 0 8px" }}>
-            {status === "approved" ? "Acceso aprobado" : "Aprobar desde tu móvil"}
+          <h2
+            style={{
+              fontSize: "20px",
+              fontWeight: 700,
+              color: "#0F1B2B",
+              margin: "0 0 8px",
+            }}
+          >
+            {status === "approved"
+              ? "Acceso aprobado"
+              : "Aprobar desde tu móvil"}
           </h2>
-          <p style={{ color: "#6b7280", fontSize: "15px", marginBottom: "24px", maxWidth: "360px" }}>
+          <p
+            style={{
+              color: "#6b7280",
+              fontSize: "15px",
+              marginBottom: "24px",
+              maxWidth: "360px",
+            }}
+          >
             {status === "approved"
               ? "Redirigiendo a tu panel..."
               : `Hemos enviado una notificación push a tu dispositivo registrado. Ábrela y confirma el acceso para continuar.`}
@@ -301,16 +441,26 @@ export function ProfessionalLogin() {
                       height: 8,
                       borderRadius: "50%",
                       background: "#00BDA5",
-                      opacity: (pollCount % 3) === i ? 1 : 0.3,
+                      opacity: pollCount % 3 === i ? 1 : 0.3,
                       transition: "opacity 0.4s",
                     }}
                   />
                 ))}
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px", alignItems: "center" }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "10px",
+                  alignItems: "center",
+                }}
+              >
                 <button
                   type="button"
-                  onClick={() => { setStatus("activation"); setErrorMessage(""); }}
+                  onClick={() => {
+                    setStatus("activation");
+                    setErrorMessage("");
+                  }}
                   style={{
                     background: "rgba(0,189,165,0.08)",
                     color: "#027580",
@@ -326,7 +476,11 @@ export function ProfessionalLogin() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setStatus("idle"); setRequestId(null); setPollCount(0); }}
+                  onClick={() => {
+                    setStatus("idle");
+                    setRequestId(null);
+                    setPollCount(0);
+                  }}
                   style={{
                     background: "transparent",
                     color: "#6b7280",
@@ -372,8 +526,16 @@ export function ProfessionalLogin() {
         >
           Acceso Corporativo
         </h1>
-        <p style={{ color: "#6b7280", fontSize: "14px", marginBottom: "24px", textAlign: "center" }}>
-          Introduce tu usuario corporativo para recibir la notificación de acceso.
+        <p
+          style={{
+            color: "#6b7280",
+            fontSize: "14px",
+            marginBottom: "24px",
+            textAlign: "center",
+          }}
+        >
+          Introduce tu usuario corporativo para recibir la notificación de
+          acceso.
         </p>
 
         <form
@@ -440,7 +602,8 @@ export function ProfessionalLogin() {
               onBlur={(e) => (e.target.style.borderColor = "#d1d5db")}
             />
             <p style={{ fontSize: "12px", color: "#9ca3af", marginTop: "6px" }}>
-              Formato: nombre.apellido &nbsp;·&nbsp; El acceso es gestionado por Aconvi.
+              Formato: nombre.apellido &nbsp;·&nbsp; El acceso es gestionado por
+              Aconvi.
             </p>
           </div>
 
@@ -467,13 +630,18 @@ export function ProfessionalLogin() {
           >
             {status === "loading" ? (
               <>
-                <span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⟳</span>
-                {" "}Verificando...
+                <span
+                  style={{
+                    display: "inline-block",
+                    animation: "spin 1s linear infinite",
+                  }}
+                >
+                  ⟳
+                </span>{" "}
+                Verificando...
               </>
             ) : (
-              <>
-                📲 Solicitar acceso
-              </>
+              <>📲 Solicitar acceso</>
             )}
           </button>
         </form>

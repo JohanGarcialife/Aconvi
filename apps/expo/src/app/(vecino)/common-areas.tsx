@@ -1,19 +1,20 @@
+import { useState } from "react";
 import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
   ActivityIndicator,
-  Modal,
-  TextInput,
+  Alert,
   FlatList,
   KeyboardAvoidingView,
+  Modal,
   Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+
 import { api, queryClient } from "~/utils/api";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -24,7 +25,20 @@ const TENANT_ID = "org_aconvi_demo"; // TODO: replace with session context
 function getNext14Days(): { label: string; value: string; dayLabel: string }[] {
   const days = [];
   const dayNames = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-  const monthNames = ["En", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+  const monthNames = [
+    "En",
+    "Feb",
+    "Mar",
+    "Abr",
+    "May",
+    "Jun",
+    "Jul",
+    "Ago",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dic",
+  ];
   for (let i = 0; i < 14; i++) {
     const d = new Date();
     d.setDate(d.getDate() + i);
@@ -34,7 +48,7 @@ function getNext14Days(): { label: string; value: string; dayLabel: string }[] {
     days.push({
       value: `${yyyy}-${mm}-${dd}`,
       label: `${dd} ${monthNames[d.getMonth()]}`,
-      dayLabel: i === 0 ? "Hoy" : dayNames[d.getDay()] ?? "",
+      dayLabel: i === 0 ? "Hoy" : (dayNames[d.getDay()] ?? ""),
     });
   }
   return days;
@@ -43,15 +57,13 @@ function getNext14Days(): { label: string; value: string; dayLabel: string }[] {
 const DAYS = getNext14Days();
 
 // ─── Area Card ────────────────────────────────────────────────────────────────
-function AreaCard({
-  area,
-  onPress,
-}: {
-  area: any;
-  onPress: () => void;
-}) {
+function AreaCard({ area, onPress }: { area: any; onPress: () => void }) {
   return (
-    <TouchableOpacity style={styles.areaCard} onPress={onPress} activeOpacity={0.75}>
+    <TouchableOpacity
+      style={styles.areaCard}
+      onPress={onPress}
+      activeOpacity={0.75}
+    >
       <View style={styles.areaIconContainer}>
         <Text style={styles.areaEmoji}>{area.icon}</Text>
       </View>
@@ -100,9 +112,16 @@ function BookingModal({
   const bookMutation = useMutation({
     ...api.commonArea.book.mutationOptions(),
     onSuccess: () => {
-      void queryClient.invalidateQueries(api.commonArea.availability.queryFilter());
-      void queryClient.invalidateQueries(api.commonArea.myBookings.queryFilter());
-      Alert.alert("✅ Reserva confirmada", `Has reservado ${area?.name} a las ${selectedSlot}`);
+      void queryClient.invalidateQueries(
+        api.commonArea.availability.queryFilter(),
+      );
+      void queryClient.invalidateQueries(
+        api.commonArea.myBookings.queryFilter(),
+      );
+      Alert.alert(
+        "✅ Reserva confirmada",
+        `Has reservado ${area?.name} a las ${selectedSlot}`,
+      );
       setSelectedSlot(null);
       setNotes("");
       onClose();
@@ -132,111 +151,117 @@ function BookingModal({
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "padding"}
       >
-      <View style={styles.modalContainer}>
-        {/* Header */}
-        <View style={styles.modalHeader}>
-          <TouchableOpacity onPress={onClose} style={styles.modalClose}>
-            <Text style={styles.modalCloseText}>Cerrar</Text>
-          </TouchableOpacity>
-          <Text style={styles.modalTitle}>
-            {area?.icon} {area?.name}
-          </Text>
-          <View style={{ width: 60 }} />
-        </View>
-
-        <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
-          <View style={styles.modalBody}>
-            {/* Date chip */}
-            <View style={styles.dateChip}>
-              <Text style={styles.dateChipText}>
-                📅 {DAYS.find((d) => d.value === selectedDate)?.dayLabel},{" "}
-                {DAYS.find((d) => d.value === selectedDate)?.label}
-              </Text>
-            </View>
-
-            {/* Rules */}
-            {area?.rules ? (
-              <View style={styles.rulesBox}>
-                <Text style={styles.rulesTitle}>📋 Reglamento</Text>
-                <Text style={styles.rulesText}>{area.rules}</Text>
-              </View>
-            ) : null}
-
-            {/* Slots */}
-            <Text style={styles.sectionLabel}>Selecciona un horario</Text>
-            {isLoading ? (
-              <ActivityIndicator color={PRIMARY} style={{ marginTop: 24 }} />
-            ) : (
-              <View style={styles.slotsGrid}>
-                {(data as any)?.slots.map(({ time, available, booking }: any) => (
-                  <TouchableOpacity
-                    key={time}
-                    disabled={!available}
-                    onPress={() => setSelectedSlot(time === selectedSlot ? null : time)}
-                    style={[
-                      styles.slotChip,
-                      !available && styles.slotChipBooked,
-                      time === selectedSlot && styles.slotChipSelected,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.slotTime,
-                        !available && styles.slotTimeBooked,
-                        time === selectedSlot && styles.slotTimeSelected,
-                      ]}
-                    >
-                      {time}
-                    </Text>
-                    {!available && (
-                      <Text style={styles.slotBookedLabel}>
-                        {booking?.user?.name ? booking.user.name.split(" ")[0] : "Reservado"}
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-
-            {/* Notes */}
-            {selectedSlot && (
-              <View style={{ marginTop: 20 }}>
-                <Text style={styles.sectionLabel}>Nota (opcional)</Text>
-                <TextInput
-                  style={styles.notesInput}
-                  placeholder="Ej: Cumpleaños, reunión vecinal..."
-                  value={notes}
-                  onChangeText={setNotes}
-                  multiline
-                  maxLength={200}
-                />
-              </View>
-            )}
-          </View>
-        </ScrollView>
-
-        {/* CTA */}
-        {selectedSlot && (
-          <View style={styles.modalFooter}>
-            <TouchableOpacity
-              style={[
-                styles.confirmButton,
-                bookMutation.isPending && { opacity: 0.7 },
-              ]}
-              onPress={handleConfirm}
-              disabled={bookMutation.isPending}
-            >
-              {bookMutation.isPending ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.confirmButtonText}>
-                  Confirmar reserva · {selectedSlot}
-                </Text>
-              )}
+        <View style={styles.modalContainer}>
+          {/* Header */}
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={onClose} style={styles.modalClose}>
+              <Text style={styles.modalCloseText}>Cerrar</Text>
             </TouchableOpacity>
+            <Text style={styles.modalTitle}>
+              {area?.icon} {area?.name}
+            </Text>
+            <View style={{ width: 60 }} />
           </View>
-        )}
-      </View>
+
+          <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+            <View style={styles.modalBody}>
+              {/* Date chip */}
+              <View style={styles.dateChip}>
+                <Text style={styles.dateChipText}>
+                  📅 {DAYS.find((d) => d.value === selectedDate)?.dayLabel},{" "}
+                  {DAYS.find((d) => d.value === selectedDate)?.label}
+                </Text>
+              </View>
+
+              {/* Rules */}
+              {area?.rules ? (
+                <View style={styles.rulesBox}>
+                  <Text style={styles.rulesTitle}>📋 Reglamento</Text>
+                  <Text style={styles.rulesText}>{area.rules}</Text>
+                </View>
+              ) : null}
+
+              {/* Slots */}
+              <Text style={styles.sectionLabel}>Selecciona un horario</Text>
+              {isLoading ? (
+                <ActivityIndicator color={PRIMARY} style={{ marginTop: 24 }} />
+              ) : (
+                <View style={styles.slotsGrid}>
+                  {(data as any)?.slots.map(
+                    ({ time, available, booking }: any) => (
+                      <TouchableOpacity
+                        key={time}
+                        disabled={!available}
+                        onPress={() =>
+                          setSelectedSlot(time === selectedSlot ? null : time)
+                        }
+                        style={[
+                          styles.slotChip,
+                          !available && styles.slotChipBooked,
+                          time === selectedSlot && styles.slotChipSelected,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.slotTime,
+                            !available && styles.slotTimeBooked,
+                            time === selectedSlot && styles.slotTimeSelected,
+                          ]}
+                        >
+                          {time}
+                        </Text>
+                        {!available && (
+                          <Text style={styles.slotBookedLabel}>
+                            {booking?.user?.name
+                              ? booking.user.name.split(" ")[0]
+                              : "Reservado"}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    ),
+                  )}
+                </View>
+              )}
+
+              {/* Notes */}
+              {selectedSlot && (
+                <View style={{ marginTop: 20 }}>
+                  <Text style={styles.sectionLabel}>Nota (opcional)</Text>
+                  <TextInput
+                    style={styles.notesInput}
+                    placeholder="Ej: Cumpleaños, reunión vecinal..."
+                    value={notes}
+                    onChangeText={setNotes}
+                    multiline
+                    maxLength={200}
+                  />
+                </View>
+              )}
+            </View>
+          </ScrollView>
+
+          {/* CTA */}
+          {selectedSlot && (
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={[
+                  styles.confirmButton,
+                  bookMutation.isPending && { opacity: 0.7 },
+                ]}
+                onPress={handleConfirm}
+                disabled={bookMutation.isPending}
+              >
+                {bookMutation.isPending ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.confirmButtonText}>
+                    Confirmar reserva · {selectedSlot}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -244,37 +269,41 @@ function BookingModal({
 
 // ─── My Bookings Tab ──────────────────────────────────────────────────────────
 function MyBookings() {
-  const { data: bookings, isLoading } = useQuery(api.commonArea.myBookings.queryOptions());
+  const { data: bookings, isLoading } = useQuery(
+    api.commonArea.myBookings.queryOptions(),
+  );
 
   const cancelMutation = useMutation({
     ...api.commonArea.cancel.mutationOptions(),
-    onSuccess: () => void queryClient.invalidateQueries(api.commonArea.myBookings.queryFilter()),
+    onSuccess: () =>
+      void queryClient.invalidateQueries(
+        api.commonArea.myBookings.queryFilter(),
+      ),
     onError: (e: any) => Alert.alert("Error", e.message),
   });
 
   const handleCancel = (bookingId: string, area: string, time: string) => {
-    Alert.alert(
-      "Cancelar reserva",
-      `¿Cancelar ${area} a las ${time}?`,
-      [
-        { text: "No", style: "cancel" },
-        {
-          text: "Sí, cancelar",
-          style: "destructive",
-          onPress: () => cancelMutation.mutate({ bookingId } as any),
-        },
-      ],
-    );
+    Alert.alert("Cancelar reserva", `¿Cancelar ${area} a las ${time}?`, [
+      { text: "No", style: "cancel" },
+      {
+        text: "Sí, cancelar",
+        style: "destructive",
+        onPress: () => cancelMutation.mutate({ bookingId } as any),
+      },
+    ]);
   };
 
-  if (isLoading) return <ActivityIndicator color={PRIMARY} style={{ marginTop: 40 }} />;
+  if (isLoading)
+    return <ActivityIndicator color={PRIMARY} style={{ marginTop: 40 }} />;
 
   if (!(bookings as any[])?.length) {
     return (
       <View style={styles.emptyState}>
         <Text style={styles.emptyEmoji}>📅</Text>
         <Text style={styles.emptyTitle}>Sin reservas</Text>
-        <Text style={styles.emptySubtitle}>Tus próximas reservas aparecerán aquí.</Text>
+        <Text style={styles.emptySubtitle}>
+          Tus próximas reservas aparecerán aquí.
+        </Text>
       </View>
     );
   }
@@ -286,7 +315,9 @@ function MyBookings() {
       contentContainerStyle={{ padding: 16, gap: 10 }}
       renderItem={({ item: b }) => (
         <View style={styles.myBookingCard}>
-          <Text style={styles.myBookingEmoji}>{b.commonArea?.icon ?? "🏠"}</Text>
+          <Text style={styles.myBookingEmoji}>
+            {b.commonArea?.icon ?? "🏠"}
+          </Text>
           <View style={{ flex: 1 }}>
             <Text style={styles.myBookingName}>{b.commonArea?.name}</Text>
             <Text style={styles.myBookingTime}>
@@ -294,7 +325,9 @@ function MyBookings() {
             </Text>
           </View>
           <TouchableOpacity
-            onPress={() => handleCancel(b.id, b.commonArea?.name ?? "", b.startTime)}
+            onPress={() =>
+              handleCancel(b.id, b.commonArea?.name ?? "", b.startTime)
+            }
           >
             <Text style={styles.cancelLink}>Cancelar</Text>
           </TouchableOpacity>
@@ -311,9 +344,11 @@ export default function CommonAreasScreen() {
   const [selectedArea, setSelectedArea] = useState<any>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
-  const { data: areas, isLoading } = useQuery(api.commonArea.all.queryOptions({
-    tenantId: TENANT_ID,
-  }));
+  const { data: areas, isLoading } = useQuery(
+    api.commonArea.all.queryOptions({
+      tenantId: TENANT_ID,
+    }),
+  );
 
   const openArea = (area: any) => {
     setSelectedArea(area);
@@ -325,7 +360,9 @@ export default function CommonAreasScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Zonas Comunes</Text>
-        <Text style={styles.headerSubtitle}>Reserva espacios de tu comunidad</Text>
+        <Text style={styles.headerSubtitle}>
+          Reserva espacios de tu comunidad
+        </Text>
       </View>
 
       {/* Tabs */}
@@ -336,7 +373,12 @@ export default function CommonAreasScreen() {
             onPress={() => setActiveTab(t)}
             style={[styles.tabItem, activeTab === t && styles.tabItemActive]}
           >
-            <Text style={[styles.tabLabel, activeTab === t && styles.tabLabelActive]}>
+            <Text
+              style={[
+                styles.tabLabel,
+                activeTab === t && styles.tabLabelActive,
+              ]}
+            >
               {t === "areas" ? "🏢 Zonas" : "📋 Mis Reservas"}
             </Text>
           </TouchableOpacity>
@@ -393,9 +435,16 @@ export default function CommonAreasScreen() {
               </Text>
             </View>
           ) : (
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 12 }}>
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={{ padding: 16, gap: 12 }}
+            >
               {(areas as any[]).map((area: any) => (
-                <AreaCard key={area.id} area={area} onPress={() => openArea(area)} />
+                <AreaCard
+                  key={area.id}
+                  area={area}
+                  onPress={() => openArea(area)}
+                />
               ))}
             </ScrollView>
           )}
@@ -453,9 +502,19 @@ const styles = StyleSheet.create({
     minWidth: 56,
   },
   dayChipActive: { backgroundColor: PRIMARY },
-  dayChipTop: { fontSize: 10, fontWeight: "700", color: "#94a3b8", textTransform: "uppercase" },
+  dayChipTop: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#94a3b8",
+    textTransform: "uppercase",
+  },
   dayChipTopActive: { color: "rgba(255,255,255,0.8)" },
-  dayChipBottom: { fontSize: 13, fontWeight: "700", color: "#334155", marginTop: 2 },
+  dayChipBottom: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#334155",
+    marginTop: 2,
+  },
   dayChipBottomActive: { color: "#fff" },
 
   areaCard: {
@@ -521,10 +580,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#fef3c7",
   },
-  rulesTitle: { fontSize: 13, fontWeight: "700", color: "#92400e", marginBottom: 6 },
+  rulesTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#92400e",
+    marginBottom: 6,
+  },
   rulesText: { fontSize: 12, color: "#78350f", lineHeight: 18 },
 
-  sectionLabel: { fontSize: 14, fontWeight: "700", color: "#0f172a", marginBottom: 12 },
+  sectionLabel: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#0f172a",
+    marginBottom: 12,
+  },
 
   slotsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   slotChip: {
@@ -590,8 +659,23 @@ const styles = StyleSheet.create({
   cancelLink: { fontSize: 13, color: "#ef4444", fontWeight: "600" },
 
   // Empty
-  emptyState: { flex: 1, alignItems: "center", justifyContent: "center", padding: 40 },
+  emptyState: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 40,
+  },
   emptyEmoji: { fontSize: 52, marginBottom: 16 },
-  emptyTitle: { fontSize: 18, fontWeight: "700", color: "#0f172a", marginBottom: 8 },
-  emptySubtitle: { fontSize: 14, color: "#64748b", textAlign: "center", lineHeight: 20 },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#0f172a",
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: "#64748b",
+    textAlign: "center",
+    lineHeight: 20,
+  },
 });

@@ -10,12 +10,15 @@ try {
     requestMediaLibraryPermissionsAsync: () =>
       Promise.resolve({ granted: true, status: "granted", canAskAgain: true }),
     launchCameraAsync: () => Promise.resolve({ canceled: true, assets: [] }),
-    launchImageLibraryAsync: () => Promise.resolve({ canceled: true, assets: [] }),
+    launchImageLibraryAsync: () =>
+      Promise.resolve({ canceled: true, assets: [] }),
   };
 }
 
-export const requestCameraPermissionsAsync = ImagePicker.requestCameraPermissionsAsync;
-export const requestMediaLibraryPermissionsAsync = ImagePicker.requestMediaLibraryPermissionsAsync;
+export const requestCameraPermissionsAsync =
+  ImagePicker.requestCameraPermissionsAsync;
+export const requestMediaLibraryPermissionsAsync =
+  ImagePicker.requestMediaLibraryPermissionsAsync;
 export const launchCameraAsync = ImagePicker.launchCameraAsync;
 export const launchImageLibraryAsync = ImagePicker.launchImageLibraryAsync;
 

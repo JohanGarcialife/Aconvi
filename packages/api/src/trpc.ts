@@ -7,12 +7,6 @@
  * The pieces you will need to use are documented accordingly near the end
  */
 import { initTRPC, TRPCError } from "@trpc/server";
-import superjson from "superjson";
-import { z, ZodError } from "zod/v4";
-
-import type { Auth } from "@acme/auth";
-import { db } from "@acme/db/client";
-
 /**
  * 1. CONTEXT
  *
@@ -27,16 +21,24 @@ import { db } from "@acme/db/client";
  */
 
 import { eq } from "drizzle-orm";
-import { user as userSchema, session as sessionSchema } from "@acme/db/schema";
+import superjson from "superjson";
+import { z, ZodError } from "zod/v4";
+
+import type { Auth } from "@acme/auth";
+import { db } from "@acme/db/client";
+import { session as sessionSchema, user as userSchema } from "@acme/db/schema";
 
 export const createTRPCContext = async (opts: {
   headers: Headers;
   auth: Auth;
 }) => {
   const authApi = opts.auth.api;
-  const authHeader = opts.headers.get("authorization") || opts.headers.get("Authorization") || "";
+  const authHeader =
+    opts.headers.get("authorization") ||
+    opts.headers.get("Authorization") ||
+    "";
   console.log("[createTRPCContext] trpc headers Authorization:", authHeader);
-  
+
   let sessionResult = await authApi.getSession({
     headers: opts.headers,
   });
@@ -66,11 +68,19 @@ export const createTRPCContext = async (opts: {
         }
       }
     } catch (err) {
-      console.error("[createTRPCContext] Failed to manual resolve session:", err);
+      console.error(
+        "[createTRPCContext] Failed to manual resolve session:",
+        err,
+      );
     }
   }
 
-  console.log("[createTRPCContext] resolved session user:", sessionResult?.user?.id, "role:", sessionResult?.user?.role);
+  console.log(
+    "[createTRPCContext] resolved session user:",
+    sessionResult?.user?.id,
+    "role:",
+    sessionResult?.user?.role,
+  );
   return {
     authApi: authApi as any,
     session: sessionResult as {
@@ -191,7 +201,7 @@ export const tenantProcedure = protectedProcedure
       where: (table, { eq, and }) =>
         and(
           eq(table.userId, ctx.session.user.id),
-          eq(table.organizationId, input.tenantId)
+          eq(table.organizationId, input.tenantId),
         ),
     });
 
@@ -212,8 +222,6 @@ export const tenantProcedure = protectedProcedure
       },
     });
   });
-
-
 
 /**
  * SuperAdmin (SaaS) protected procedure

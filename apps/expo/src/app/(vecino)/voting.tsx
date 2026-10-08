@@ -20,7 +20,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
 import { api, queryClient } from "~/utils/api";
-import { useVotedSessions, markSessionAsVoted } from "~/utils/voting-tracker";
+import { markSessionAsVoted, useVotedSessions } from "~/utils/voting-tracker";
 
 const TENANT_ID = "org_aconvi_demo";
 
@@ -129,7 +129,9 @@ export default function VotingScreen() {
       !s ||
         s.status === "CLOSED" ||
         (s.closesAt && new Date(s.closesAt).getTime() < Date.now()) ||
-        (s.type === "JUNTA" && s.meetingDate && new Date(s.meetingDate).getTime() < Date.now()),
+        (s.type === "JUNTA" &&
+          s.meetingDate &&
+          new Date(s.meetingDate).getTime() < Date.now()),
     );
 
   const isVotedSession = (session: any) =>
@@ -184,12 +186,7 @@ export default function VotingScreen() {
       ) {
         setStep("VOTE");
       }
-    }, [
-      refetch,
-      activeSession,
-      isSessionVoted,
-      justVotedSessionId,
-    ]),
+    }, [refetch, activeSession, isSessionVoted, justVotedSessionId]),
   );
 
   useEffect(() => {
@@ -651,7 +648,9 @@ export default function VotingScreen() {
                       {item.title}
                     </Text>
                     {item.budget ? (
-                      <Text style={styles.votedItemBudget}>{formatEuro(item.budget)}</Text>
+                      <Text style={styles.votedItemBudget}>
+                        {formatEuro(item.budget)}
+                      </Text>
                     ) : null}
 
                     {chosenProp && (
@@ -682,7 +681,8 @@ export default function VotingScreen() {
                             marginTop: 2,
                           }}
                         >
-                          {chosenProp.companyName} — {formatEuro(chosenProp.amount)}
+                          {chosenProp.companyName} —{" "}
+                          {formatEuro(chosenProp.amount)}
                         </Text>
                       </View>
                     )}
@@ -726,7 +726,9 @@ export default function VotingScreen() {
                     {item.title}
                   </Text>
                   {item.budget ? (
-                    <Text style={styles.votedItemBudget}>{formatEuro(item.budget)}</Text>
+                    <Text style={styles.votedItemBudget}>
+                      {formatEuro(item.budget)}
+                    </Text>
                   ) : null}
                 </View>
               ))}
@@ -841,7 +843,9 @@ export default function VotingScreen() {
                       {item.title}
                     </Text>
                     {item.budget ? (
-                      <Text style={styles.modalItemBudget}>{formatEuro(item.budget)}</Text>
+                      <Text style={styles.modalItemBudget}>
+                        {formatEuro(item.budget)}
+                      </Text>
                     ) : null}
 
                     {chosenProp && (
@@ -872,7 +876,8 @@ export default function VotingScreen() {
                             marginTop: 2,
                           }}
                         >
-                          {chosenProp.companyName} — {formatEuro(chosenProp.amount)}
+                          {chosenProp.companyName} —{" "}
+                          {formatEuro(chosenProp.amount)}
                         </Text>
                       </View>
                     )}
@@ -976,13 +981,17 @@ export default function VotingScreen() {
                   <View style={{ flex: 1, marginLeft: 10 }}>
                     <Text style={styles.juntaItemTitle}>{item.title}</Text>
                     <Text style={styles.juntaItemTypeLabel}>
-                      {hasProposals ? "Votación con opciones" : "Votación simple"}
+                      {hasProposals
+                        ? "Votación con opciones"
+                        : "Votación simple"}
                     </Text>
                   </View>
                 </View>
 
                 {item.budget ? (
-                  <Text style={styles.juntaItemBudget}>{formatEuro(item.budget)}</Text>
+                  <Text style={styles.juntaItemBudget}>
+                    {formatEuro(item.budget)}
+                  </Text>
                 ) : null}
 
                 {/* Proposals radio cards for multi-option items */}
@@ -1010,7 +1019,8 @@ export default function VotingScreen() {
                           <View
                             style={[
                               styles.juntaProposalRadioOuter,
-                              isSelected && styles.juntaProposalRadioOuterSelected,
+                              isSelected &&
+                                styles.juntaProposalRadioOuterSelected,
                             ]}
                           >
                             {isSelected && (
@@ -1063,7 +1073,11 @@ export default function VotingScreen() {
                         ]}
                         onPress={() => {
                           // Bug 3 fix: block APPROVE if hasProposals and no proposal selected
-                          if (hasProposals && opt.key === "APPROVE" && !selectedProposals[item.id]) {
+                          if (
+                            hasProposals &&
+                            opt.key === "APPROVE" &&
+                            !selectedProposals[item.id]
+                          ) {
                             Alert.alert(
                               "Selecciona un presupuesto",
                               "Debes seleccionar una de las opciones antes de votar a favor.",
@@ -1130,9 +1144,7 @@ export default function VotingScreen() {
             disabled={!allAnswered}
             activeOpacity={0.85}
           >
-            <Text style={styles.juntaSubmitBtnText}>
-              Enviar mis votos
-            </Text>
+            <Text style={styles.juntaSubmitBtnText}>Enviar mis votos</Text>
             {!allAnswered && <Feather name="lock" size={16} color="#FFFFFF" />}
           </TouchableOpacity>
         </ScrollView>
@@ -1172,7 +1184,8 @@ export default function VotingScreen() {
         "dic.",
       ];
       const day = d.getDate();
-      const monthStr = months[d.getMonth()] || format(d, "MMM.", { locale: es });
+      const monthStr =
+        months[d.getMonth()] || format(d, "MMM.", { locale: es });
       const hours = String(d.getHours()).padStart(2, "0");
       const minutes = String(d.getMinutes()).padStart(2, "0");
       return `Cierra el ${day} ${monthStr} a las ${hours}:${minutes}`;
@@ -1262,7 +1275,9 @@ export default function VotingScreen() {
                     <Text style={styles.multiCardCompany}>
                       {prop.companyName}
                     </Text>
-                    <Text style={styles.multiCardAmount}>{formatEuro(prop.amount)}</Text>
+                    <Text style={styles.multiCardAmount}>
+                      {formatEuro(prop.amount)}
+                    </Text>
                   </View>
 
                   <View style={styles.multiCardSecondRow}>
@@ -1286,9 +1301,7 @@ export default function VotingScreen() {
                     }}
                     activeOpacity={0.7}
                   >
-                    <Text style={styles.multiCardPdfText}>
-                      Ver presupuesto
-                    </Text>
+                    <Text style={styles.multiCardPdfText}>Ver presupuesto</Text>
                     <Feather name="chevron-right" size={16} color="#008075" />
                   </TouchableOpacity>
                 </View>
@@ -1350,7 +1363,10 @@ export default function VotingScreen() {
                 onPress={() => {
                   handleSelectChoice("__single__", "REJECT");
                   // Bug 3 fix: deselect proposal when switching away from APPROVE
-                  setSelectedProposals((prev) => ({ ...prev, ["__single__"]: undefined as any }));
+                  setSelectedProposals((prev) => ({
+                    ...prev,
+                    ["__single__"]: undefined as any,
+                  }));
                 }}
               >
                 <Feather
@@ -1381,7 +1397,10 @@ export default function VotingScreen() {
                 onPress={() => {
                   handleSelectChoice("__single__", "ABSTAIN");
                   // Bug 3 fix: deselect proposal when switching away from APPROVE
-                  setSelectedProposals((prev) => ({ ...prev, ["__single__"]: undefined as any }));
+                  setSelectedProposals((prev) => ({
+                    ...prev,
+                    ["__single__"]: undefined as any,
+                  }));
                 }}
               >
                 <Ionicons
@@ -1455,7 +1474,8 @@ export default function VotingScreen() {
 
         {/* Gran Tarjeta Central de Importe y Documento */}
         {(() => {
-          const singleAmount = singleProposals[0]?.amount || activeSession.budget;
+          const singleAmount =
+            singleProposals[0]?.amount || activeSession.budget;
           const hasAmount = !!singleAmount;
           return (
             <View style={styles.singleBigCard}>
@@ -1649,9 +1669,7 @@ export default function VotingScreen() {
             style={[
               styles.mainConfirmVoteBtn,
               {
-                backgroundColor: choices["__single__"]
-                  ? "#008075"
-                  : "#CBD5E1",
+                backgroundColor: choices["__single__"] ? "#008075" : "#CBD5E1",
               },
             ]}
             onPress={handleOpenConfirmModal}

@@ -1,4 +1,5 @@
-import pg from 'pg';
+import pg from "pg";
+
 const { Client } = pg;
 
 async function main() {
@@ -7,7 +8,7 @@ async function main() {
   });
 
   await client.connect();
-  console.log('Connected. Running user auth columns migration...\n');
+  console.log("Connected. Running user auth columns migration...\n");
 
   const alterations = [
     // phone_number / phone_number_verified (better-auth phone plugin)
@@ -50,29 +51,35 @@ async function main() {
   // Allow email to be NULL (some users log in only with corporate_username)
   try {
     await client.query(`ALTER TABLE "user" ALTER COLUMN "email" DROP NOT NULL`);
-    console.log('  ✅  email NOT NULL constraint removed (nullable for corporate-only users)');
+    console.log(
+      "  ✅  email NOT NULL constraint removed (nullable for corporate-only users)",
+    );
     success++;
   } catch (err) {
     // Already nullable — OK
-    console.log('  ⏭️   email already nullable — skipping');
+    console.log("  ⏭️   email already nullable — skipping");
     skipped++;
   }
 
   // Allow name to have a default
   try {
-    await client.query(`ALTER TABLE "user" ALTER COLUMN "name" SET DEFAULT 'Vecino'`);
-    console.log('  ✅  name default set to Vecino');
+    await client.query(
+      `ALTER TABLE "user" ALTER COLUMN "name" SET DEFAULT 'Vecino'`,
+    );
+    console.log("  ✅  name default set to Vecino");
     success++;
   } catch (err) {
     console.warn(`  ⚠️  name default: ${err.message}`);
     skipped++;
   }
 
-  console.log(`\nDone. ${success} applied, ${skipped} skipped/already existed.`);
+  console.log(
+    `\nDone. ${success} applied, ${skipped} skipped/already existed.`,
+  );
   await client.end();
 }
 
 main().catch((err) => {
-  console.error('Migration failed:', err);
+  console.error("Migration failed:", err);
   process.exit(1);
 });

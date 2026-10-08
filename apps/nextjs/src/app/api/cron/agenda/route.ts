@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
+import { and, eq, gt, lt } from "drizzle-orm";
+
+import { sendPushToUser } from "@acme/api";
 import { db } from "@acme/db/client";
 import { agendaTask } from "@acme/db/schema";
-import { eq, and, gt, lt } from "drizzle-orm";
-import { sendPushToUser } from "@acme/api";
 
 export async function GET(request: Request) {
   // 1. Verify cron secret to prevent unauthorized execution
   const authHeader = request.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
-  
+
   if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -23,7 +24,7 @@ export async function GET(request: Request) {
     const expiringTasks = await db.query.agendaTask.findMany({
       where: and(
         eq(agendaTask.isDone, false),
-        eq(agendaTask.dueDate, tomorrowStr)
+        eq(agendaTask.dueDate, tomorrowStr),
       ),
     });
 
@@ -41,13 +42,16 @@ export async function GET(request: Request) {
       }
     }
 
-    return NextResponse.json({ 
-      ok: true, 
+    return NextResponse.json({
+      ok: true,
       tasksProcessed: expiringTasks.length,
-      notificationsSent: sentCount
+      notificationsSent: sentCount,
     });
   } catch (error) {
     console.error("[CRON AGENDA] Error processing reminders:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 },
+    );
   }
 }

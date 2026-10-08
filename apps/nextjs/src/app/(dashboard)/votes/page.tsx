@@ -93,7 +93,8 @@ function ResultBar({
   totalWeighted: number;
   color: string;
 }) {
-  const pct = totalWeighted > 0 ? Math.round((weighted / totalWeighted) * 100) : 0;
+  const pct =
+    totalWeighted > 0 ? Math.round((weighted / totalWeighted) * 100) : 0;
   return (
     <div className="space-y-1">
       <div className="flex justify-between text-xs font-semibold text-slate-700">
@@ -167,13 +168,13 @@ function SessionDetailModal({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl rounded-lg">
+      <DialogContent className="max-h-[90vh] overflow-y-auto rounded-lg sm:max-w-2xl">
         <DialogHeader>
-          <div className="flex flex-wrap items-center gap-2 mb-1">
-            <span className="px-2 py-0.5 rounded bg-slate-100 text-[11px] font-medium text-slate-700">
+          <div className="mb-1 flex flex-wrap items-center gap-2">
+            <span className="rounded bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">
               {isJunta ? "Junta Extraordinaria" : "Votación sin junta"}
             </span>
-            <span className="px-2 py-0.5 rounded bg-emerald-50 text-[11px] font-semibold text-emerald-800 border border-emerald-200">
+            <span className="rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
               {session.status === "CLOSED" ? "Cerrada" : "En curso"}
             </span>
           </div>
@@ -181,7 +182,7 @@ function SessionDetailModal({
             {session.title}
           </DialogTitle>
           {session.description && (
-            <DialogDescription className="text-slate-600 mt-1 text-xs">
+            <DialogDescription className="mt-1 text-xs text-slate-600">
               {session.description}
             </DialogDescription>
           )}
@@ -190,7 +191,7 @@ function SessionDetailModal({
         <div className="space-y-4 py-2">
           {session.resultSummary && (
             <div className="rounded-md border border-emerald-200 bg-emerald-50/80 p-3 text-center">
-              <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block mb-0.5">
+              <span className="mb-0.5 block text-[11px] font-bold tracking-wider text-emerald-800 uppercase">
                 Resultado Oficial
               </span>
               <span className="text-base font-extrabold text-emerald-900">
@@ -201,28 +202,37 @@ function SessionDetailModal({
 
           {/* Breakdown if single */}
           {!isJunta && (
-            <div className="rounded-md border border-slate-200 bg-slate-50/50 p-4 space-y-3">
-              <span className="text-xs font-bold text-slate-700 block">
+            <div className="space-y-3 rounded-md border border-slate-200 bg-slate-50/50 p-4">
+              <span className="block text-xs font-bold text-slate-700">
                 Escrutinio por coeficiente de propiedad:
               </span>
               <div className="space-y-2">
                 <ResultBar
                   label="Apruebo"
-                  count={session.casts?.filter((c: any) => c.choice === "APPROVE").length ?? 0}
+                  count={
+                    session.casts?.filter((c: any) => c.choice === "APPROVE")
+                      .length ?? 0
+                  }
                   weighted={approveWeight}
                   totalWeighted={totalWeight}
                   color="bg-emerald-500"
                 />
                 <ResultBar
                   label="Rechazo"
-                  count={session.casts?.filter((c: any) => c.choice === "REJECT").length ?? 0}
+                  count={
+                    session.casts?.filter((c: any) => c.choice === "REJECT")
+                      .length ?? 0
+                  }
                   weighted={rejectWeight}
                   totalWeighted={totalWeight}
                   color="bg-rose-500"
                 />
                 <ResultBar
                   label="Me abstengo"
-                  count={session.casts?.filter((c: any) => c.choice === "ABSTAIN").length ?? 0}
+                  count={
+                    session.casts?.filter((c: any) => c.choice === "ABSTAIN")
+                      .length ?? 0
+                  }
                   weighted={abstainWeight}
                   totalWeighted={totalWeight}
                   color="bg-slate-400"
@@ -234,22 +244,28 @@ function SessionDetailModal({
           {/* Presupuestos presentados */}
           {session.budgetProposals && session.budgetProposals.length > 0 && (
             <div className="rounded-md border border-slate-200 bg-slate-50/50 p-4">
-              <span className="text-xs font-bold text-slate-700 block mb-2">
+              <span className="mb-2 block text-xs font-bold text-slate-700">
                 Presupuestos presentados ({session.budgetProposals.length}):
               </span>
               <div className="space-y-2">
                 {session.budgetProposals.map((bp: any) => (
                   <div
                     key={bp.id}
-                    className="flex items-center justify-between p-2.5 rounded border bg-white text-xs"
+                    className="flex items-center justify-between rounded border bg-white p-2.5 text-xs"
                   >
                     <div>
-                      <span className="font-bold text-slate-900 block">{bp.companyName}</span>
+                      <span className="block font-bold text-slate-900">
+                        {bp.companyName}
+                      </span>
                       {bp.description && (
-                        <span className="text-slate-500 text-[11px]">{bp.description}</span>
+                        <span className="text-[11px] text-slate-500">
+                          {bp.description}
+                        </span>
                       )}
                     </div>
-                    <span className="font-extrabold text-slate-900">{bp.amount}</span>
+                    <span className="font-extrabold text-slate-900">
+                      {bp.amount}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -259,21 +275,23 @@ function SessionDetailModal({
           {/* Agenda items if Junta */}
           {isJunta && session.items && session.items.length > 0 && (
             <div className="rounded-md border border-slate-200 bg-slate-50/50 p-4">
-              <span className="text-xs font-bold text-slate-700 block mb-2">
+              <span className="mb-2 block text-xs font-bold text-slate-700">
                 Puntos del orden del día ({session.items.length}):
               </span>
               <div className="space-y-2">
                 {session.items.map((item: any, idx: number) => (
                   <div
                     key={item.id}
-                    className="p-2.5 rounded border bg-white text-xs space-y-1"
+                    className="space-y-1 rounded border bg-white p-2.5 text-xs"
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-slate-900">
                         {idx + 1}. {item.title}
                       </span>
                       {item.budget && (
-                        <span className="font-semibold text-slate-700">{item.budget}</span>
+                        <span className="font-semibold text-slate-700">
+                          {item.budget}
+                        </span>
                       )}
                     </div>
                   </div>
@@ -283,14 +301,14 @@ function SessionDetailModal({
           )}
         </div>
 
-        <DialogFooter className="flex items-center justify-between sm:justify-between w-full">
+        <DialogFooter className="flex w-full items-center justify-between sm:justify-between">
           <div>
             {session.minute && (
               <button
                 type="button"
                 onClick={downloadPdf}
                 disabled={isDownloading}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+                className="inline-flex items-center gap-1.5 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100"
               >
                 <Download className="h-3.5 w-3.5" />
                 {isDownloading ? "Generando..." : "Descargar Acta Oficial"}
@@ -305,7 +323,7 @@ function SessionDetailModal({
                   onClose();
                   onFinalizeActa(session.id);
                 }}
-                className="px-3 py-1.5 rounded-md bg-[#008075] hover:bg-[#006e64] text-white text-xs font-bold"
+                className="rounded-md bg-[#008075] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#006e64]"
               >
                 Finalizar acta
               </button>
@@ -313,7 +331,7 @@ function SessionDetailModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 rounded-md border border-slate-200 bg-white text-slate-700 text-xs font-medium hover:bg-slate-50"
+              className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
             >
               Cerrar
             </button>
@@ -356,9 +374,7 @@ function VotesListView({
 
   const pendingClosureSessions = sessions.filter(
     (s: any) =>
-      s.status === "OPEN" &&
-      s.closesAt &&
-      new Date(s.closesAt).getTime() < now,
+      s.status === "OPEN" && s.closesAt && new Date(s.closesAt).getTime() < now,
   );
 
   const scheduledSessions = sessions.filter(
@@ -368,26 +384,25 @@ function VotesListView({
   );
 
   const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
-  const allClosedSessions = sessions.filter(
-    (s: any) => s.status === "CLOSED",
-  );
+  const allClosedSessions = sessions.filter((s: any) => s.status === "CLOSED");
   const recentClosedSessions = allClosedSessions.filter(
     (s: any) =>
-      new Date(s.closedAt || s.closesAt || s.createdAt).getTime() >= sevenDaysAgo,
+      new Date(s.closedAt || s.closesAt || s.createdAt).getTime() >=
+      sevenDaysAgo,
   );
 
   return (
     <div className="space-y-6">
       {/* ── 3 KPI Cards ── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {/* Card 1: Votaciones Activas */}
-        <div className="flex items-center justify-between p-4 bg-white rounded-lg border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-all">
+        <div className="flex items-center justify-between rounded-lg border border-slate-200/80 bg-white p-4 shadow-2xs transition-all hover:border-slate-300">
           <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-md bg-[#EAF5F2] flex items-center justify-center text-[#008075]">
-              <Users className="w-5 h-5" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#EAF5F2] text-[#008075]">
+              <Users className="h-5 w-5" />
             </div>
             <div>
-              <div className="text-xl font-black text-slate-900 leading-none mb-1">
+              <div className="mb-1 text-xl leading-none font-black text-slate-900">
                 {openSessions.length}
               </div>
               <div className="text-xs font-medium text-slate-500">
@@ -395,17 +410,17 @@ function VotesListView({
               </div>
             </div>
           </div>
-          <ChevronRight className="w-4 h-4 text-slate-400" />
+          <ChevronRight className="h-4 w-4 text-slate-400" />
         </div>
 
         {/* Card 2: Pendiente de cierre */}
-        <div className="flex items-center justify-between p-4 bg-white rounded-lg border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-all">
+        <div className="flex items-center justify-between rounded-lg border border-slate-200/80 bg-white p-4 shadow-2xs transition-all hover:border-slate-300">
           <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-md bg-[#E8F1F5] flex items-center justify-center text-[#1E6075]">
-              <FileText className="w-5 h-5" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-[#E8F1F5] text-[#1E6075]">
+              <FileText className="h-5 w-5" />
             </div>
             <div>
-              <div className="text-xl font-black text-slate-900 leading-none mb-1">
+              <div className="mb-1 text-xl leading-none font-black text-slate-900">
                 {pendingClosureSessions.length}
               </div>
               <div className="text-xs font-medium text-slate-500">
@@ -413,17 +428,17 @@ function VotesListView({
               </div>
             </div>
           </div>
-          <ChevronRight className="w-4 h-4 text-slate-400" />
+          <ChevronRight className="h-4 w-4 text-slate-400" />
         </div>
 
         {/* Card 3: Cerradas este mes */}
-        <div className="flex items-center justify-between p-4 bg-white rounded-lg border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-all">
+        <div className="flex items-center justify-between rounded-lg border border-slate-200/80 bg-white p-4 shadow-2xs transition-all hover:border-slate-300">
           <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-md bg-slate-100 flex items-center justify-center text-slate-700">
-              <CheckCircle2 className="w-5 h-5" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-slate-100 text-slate-700">
+              <CheckCircle2 className="h-5 w-5" />
             </div>
             <div>
-              <div className="text-xl font-black text-slate-900 leading-none mb-1">
+              <div className="mb-1 text-xl leading-none font-black text-slate-900">
                 {recentClosedSessions.length}
               </div>
               <div className="text-xs font-medium text-slate-500">
@@ -431,12 +446,12 @@ function VotesListView({
               </div>
             </div>
           </div>
-          <ChevronRight className="w-4 h-4 text-slate-400" />
+          <ChevronRight className="h-4 w-4 text-slate-400" />
         </div>
       </div>
 
       {isLoading ? (
-        <div className="p-8 text-center text-xs text-slate-500 bg-white rounded-lg border">
+        <div className="rounded-lg border bg-white p-8 text-center text-xs text-slate-500">
           Cargando votaciones...
         </div>
       ) : (
@@ -445,61 +460,74 @@ function VotesListView({
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[#008075]" />
+                <span className="h-2 w-2 rounded-full bg-[#008075]" />
                 <h2 className="text-sm font-bold text-slate-900">En curso</h2>
               </div>
               <span className="text-xs font-medium text-slate-400">
-                {openSessions.length} {openSessions.length === 1 ? "votación activa" : "votaciones activas"}
+                {openSessions.length}{" "}
+                {openSessions.length === 1
+                  ? "votación activa"
+                  : "votaciones activas"}
               </span>
             </div>
 
             {openSessions.length === 0 ? (
-              <div className="p-6 text-center text-xs text-slate-400 bg-white rounded-lg border border-dashed border-slate-200">
+              <div className="rounded-lg border border-dashed border-slate-200 bg-white p-6 text-center text-xs text-slate-400">
                 No hay votaciones activas en este momento.
               </div>
             ) : (
               <div className="space-y-2.5">
-                {(expanded.has("open") ? openSessions : openSessions.slice(0, 3)).map((session: any) => {
+                {(expanded.has("open")
+                  ? openSessions
+                  : openSessions.slice(0, 3)
+                ).map((session: any) => {
                   const isJunta = session.type === "JUNTA";
                   const totalVoters = 50;
                   const votesCount = session.casts?.length ?? 0;
-                  const pct = Math.min(100, Math.round((votesCount / totalVoters) * 100));
+                  const pct = Math.min(
+                    100,
+                    Math.round((votesCount / totalVoters) * 100),
+                  );
                   const pendingVoters = Math.max(0, totalVoters - votesCount);
 
                   return (
                     <div
                       key={session.id}
-                      className="bg-white rounded-lg border border-slate-200/80 p-4 shadow-2xs hover:border-slate-300 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
+                      className="flex flex-col justify-between gap-4 rounded-lg border border-slate-200/80 bg-white p-4 shadow-2xs transition-all hover:border-slate-300 md:flex-row md:items-center"
                     >
                       {/* Left: icon & title */}
-                      <div className="flex items-start gap-3 flex-1 min-w-0">
-                        <div className="w-9 h-9 rounded-md bg-[#EAF5F2] flex items-center justify-center text-[#008075] shrink-0 mt-0.5">
+                      <div className="flex min-w-0 flex-1 items-start gap-3">
+                        <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[#EAF5F2] text-[#008075]">
                           {isJunta ? (
-                            <Users className="w-4 h-4" />
+                            <Users className="h-4 w-4" />
                           ) : (
-                            <FileText className="w-4 h-4" />
+                            <FileText className="h-4 w-4" />
                           )}
                         </div>
                         <div className="min-w-0">
-                          <h3 className="text-sm font-bold text-slate-900 truncate">
+                          <h3 className="truncate text-sm font-bold text-slate-900">
                             {session.title}
                           </h3>
-                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                            <span className="inline-block px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-medium text-slate-600">
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                            <span className="inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
                               {isJunta ? "Extraordinaria" : "Ordinaria"}
                             </span>
-                            <span className="inline-block px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-medium text-slate-600">
+                            <span className="inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
                               Mayoría simple
                             </span>
                           </div>
                           {session.closesAt && (
-                            <div className="flex items-center gap-1 mt-1.5 text-[11px] text-slate-500">
-                              <Calendar className="w-3 h-3 text-slate-400" />
+                            <div className="mt-1.5 flex items-center gap-1 text-[11px] text-slate-500">
+                              <Calendar className="h-3 w-3 text-slate-400" />
                               <span>
                                 Cierra el{" "}
-                                {format(new Date(session.closesAt), "d 'de' MMMM · HH:mm", {
-                                  locale: es,
-                                })}
+                                {format(
+                                  new Date(session.closesAt),
+                                  "d 'de' MMMM · HH:mm",
+                                  {
+                                    locale: es,
+                                  },
+                                )}
                               </span>
                             </div>
                           )}
@@ -507,40 +535,42 @@ function VotesListView({
                       </div>
 
                       {/* Middle: Progress */}
-                      <div className="w-full md:w-64 shrink-0 space-y-1">
+                      <div className="w-full shrink-0 space-y-1 md:w-64">
                         <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-slate-500 font-medium">Participación</span>
+                          <span className="font-medium text-slate-500">
+                            Participación
+                          </span>
                           <span className="font-bold text-slate-800">
                             {votesCount} de {totalVoters} ({pct}%)
                           </span>
                         </div>
-                        <div className="w-full h-1.5 rounded bg-slate-100 overflow-hidden">
+                        <div className="h-1.5 w-full overflow-hidden rounded bg-slate-100">
                           <div
-                            className="h-full bg-[#008075] rounded transition-all"
+                            className="h-full rounded bg-[#008075] transition-all"
                             style={{ width: `${Math.max(5, pct)}%` }}
                           />
                         </div>
-                        <div className="flex items-center justify-between text-[10px] text-slate-500 pt-0.5">
+                        <div className="flex items-center justify-between pt-0.5 text-[10px] text-slate-500">
                           <div className="flex items-center gap-1">
-                            <Users className="w-3 h-3 text-slate-400" />
+                            <Users className="h-3 w-3 text-slate-400" />
                             <span>{pendingVoters} sin votar</span>
                           </div>
-                          <div className="flex items-center gap-1 text-[#008075] font-semibold">
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#008075]" />
+                          <div className="flex items-center gap-1 font-semibold text-[#008075]">
+                            <span className="h-1.5 w-1.5 rounded-full bg-[#008075]" />
                             <span>Mayoría alcanzable</span>
                           </div>
                         </div>
                       </div>
 
                       {/* Right: Action */}
-                      <div className="shrink-0 flex items-center">
+                      <div className="flex shrink-0 items-center">
                         <button
                           type="button"
                           onClick={() => onOpenDetail(session)}
-                          className="flex items-center gap-1 px-3 py-1.5 rounded-md bg-[#EAF5F2] text-[#008075] text-xs font-bold hover:bg-[#DDF0EC] transition-colors"
+                          className="flex items-center gap-1 rounded-md bg-[#EAF5F2] px-3 py-1.5 text-xs font-bold text-[#008075] transition-colors hover:bg-[#DDF0EC]"
                         >
                           Ver votación
-                          <ChevronRight className="w-3 h-3" />
+                          <ChevronRight className="h-3 w-3" />
                         </button>
                       </div>
                     </div>
@@ -550,7 +580,7 @@ function VotesListView({
                   <button
                     type="button"
                     onClick={() => toggleExpand("open")}
-                    className="w-full py-2 text-center text-xs font-bold text-[#008075] hover:bg-[#EAF5F2] rounded-md transition-colors"
+                    className="w-full rounded-md py-2 text-center text-xs font-bold text-[#008075] transition-colors hover:bg-[#EAF5F2]"
                   >
                     Ver todas ({openSessions.length})
                   </button>
@@ -563,37 +593,46 @@ function VotesListView({
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-slate-400" />
-                <h2 className="text-sm font-bold text-slate-900">Pendientes de cierre</h2>
+                <span className="h-2 w-2 rounded-full bg-slate-400" />
+                <h2 className="text-sm font-bold text-slate-900">
+                  Pendientes de cierre
+                </h2>
               </div>
               <span className="text-xs font-medium text-slate-400">
                 {pendingClosureSessions.length}{" "}
-                {pendingClosureSessions.length === 1 ? "votación" : "votaciones"}
+                {pendingClosureSessions.length === 1
+                  ? "votación"
+                  : "votaciones"}
               </span>
             </div>
 
             {pendingClosureSessions.length === 0 ? (
-              <div className="p-4 text-center text-xs text-slate-400 bg-white rounded-lg border border-dashed border-slate-200">
+              <div className="rounded-lg border border-dashed border-slate-200 bg-white p-4 text-center text-xs text-slate-400">
                 No hay votaciones pendientes de cierre.
               </div>
             ) : (
               <div className="space-y-2.5">
-                {(expanded.has("pending") ? pendingClosureSessions : pendingClosureSessions.slice(0, 3)).map((session: any) => (
+                {(expanded.has("pending")
+                  ? pendingClosureSessions
+                  : pendingClosureSessions.slice(0, 3)
+                ).map((session: any) => (
                   <div
                     key={session.id}
-                    className="bg-white rounded-lg border border-slate-200/80 p-4 shadow-2xs hover:border-slate-300 transition-all flex flex-col md:flex-row md:items-center justify-between gap-3"
+                    className="flex flex-col justify-between gap-3 rounded-lg border border-slate-200/80 bg-white p-4 shadow-2xs transition-all hover:border-slate-300 md:flex-row md:items-center"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-md bg-[#E8F1F5] flex items-center justify-center text-[#1E6075] shrink-0">
-                        <FileText className="w-4 h-4" />
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[#E8F1F5] text-[#1E6075]">
+                        <FileText className="h-4 w-4" />
                       </div>
                       <div>
-                        <h3 className="text-sm font-bold text-slate-900">{session.title}</h3>
-                        <div className="flex items-center gap-1.5 mt-1">
-                          <span className="inline-block px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-medium text-slate-600">
+                        <h3 className="text-sm font-bold text-slate-900">
+                          {session.title}
+                        </h3>
+                        <div className="mt-1 flex items-center gap-1.5">
+                          <span className="inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
                             Ordinaria
                           </span>
-                          <span className="inline-block px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-medium text-slate-600">
+                          <span className="inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
                             Mayoría simple
                           </span>
                         </div>
@@ -601,30 +640,31 @@ function VotesListView({
                     </div>
 
                     <div className="flex items-center gap-2.5">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-50 text-emerald-700 text-[11px] font-semibold">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                         Acta pendiente de cierre
                       </span>
                       <button
                         type="button"
                         onClick={() => onFinalizeActa(session.id)}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-md bg-slate-100 text-slate-800 text-xs font-bold hover:bg-slate-200 transition-colors"
+                        className="flex items-center gap-1 rounded-md bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-800 transition-colors hover:bg-slate-200"
                       >
                         Finalizar acta
-                        <ChevronRight className="w-3 h-3" />
+                        <ChevronRight className="h-3 w-3" />
                       </button>
                     </div>
                   </div>
                 ))}
-                {pendingClosureSessions.length > 3 && !expanded.has("pending") && (
-                  <button
-                    type="button"
-                    onClick={() => toggleExpand("pending")}
-                    className="w-full py-2 text-center text-xs font-bold text-[#008075] hover:bg-[#EAF5F2] rounded-md transition-colors"
-                  >
-                    Ver todas ({pendingClosureSessions.length})
-                  </button>
-                )}
+                {pendingClosureSessions.length > 3 &&
+                  !expanded.has("pending") && (
+                    <button
+                      type="button"
+                      onClick={() => toggleExpand("pending")}
+                      className="w-full rounded-md py-2 text-center text-xs font-bold text-[#008075] transition-colors hover:bg-[#EAF5F2]"
+                    >
+                      Ver todas ({pendingClosureSessions.length})
+                    </button>
+                  )}
               </div>
             )}
           </div>
@@ -633,8 +673,10 @@ function VotesListView({
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-slate-400" />
-                <h2 className="text-sm font-bold text-slate-900">Programadas</h2>
+                <span className="h-2 w-2 rounded-full bg-slate-400" />
+                <h2 className="text-sm font-bold text-slate-900">
+                  Programadas
+                </h2>
               </div>
               <span className="text-xs font-medium text-slate-400">
                 {scheduledSessions.length}{" "}
@@ -643,27 +685,32 @@ function VotesListView({
             </div>
 
             {scheduledSessions.length === 0 ? (
-              <div className="p-4 text-center text-xs text-slate-400 bg-white rounded-lg border border-dashed border-slate-200">
+              <div className="rounded-lg border border-dashed border-slate-200 bg-white p-4 text-center text-xs text-slate-400">
                 No hay votaciones programadas para próximas fechas.
               </div>
             ) : (
               <div className="space-y-2.5">
-                {(expanded.has("scheduled") ? scheduledSessions : scheduledSessions.slice(0, 3)).map((session: any) => (
+                {(expanded.has("scheduled")
+                  ? scheduledSessions
+                  : scheduledSessions.slice(0, 3)
+                ).map((session: any) => (
                   <div
                     key={session.id}
-                    className="bg-white rounded-lg border border-slate-200/80 p-4 shadow-2xs hover:border-slate-300 transition-all flex flex-col md:flex-row md:items-center justify-between gap-3"
+                    className="flex flex-col justify-between gap-3 rounded-lg border border-slate-200/80 bg-white p-4 shadow-2xs transition-all hover:border-slate-300 md:flex-row md:items-center"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-md bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
-                        <Calendar className="w-4 h-4" />
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-600">
+                        <Calendar className="h-4 w-4" />
                       </div>
                       <div>
-                        <h3 className="text-sm font-bold text-slate-900">{session.title}</h3>
-                        <div className="flex items-center gap-1.5 mt-1">
-                          <span className="inline-block px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-medium text-slate-600">
+                        <h3 className="text-sm font-bold text-slate-900">
+                          {session.title}
+                        </h3>
+                        <div className="mt-1 flex items-center gap-1.5">
+                          <span className="inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
                             Ordinaria
                           </span>
-                          <span className="inline-block px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-medium text-slate-600">
+                          <span className="inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
                             Mayoría simple
                           </span>
                         </div>
@@ -671,17 +718,17 @@ function VotesListView({
                     </div>
 
                     <div className="flex items-center gap-2.5">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-100 text-slate-700 text-[11px] font-semibold">
-                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                      <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                        <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
                         Programada
                       </span>
                       <button
                         type="button"
                         onClick={() => onOpenDetail(session)}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-md bg-slate-100 text-slate-800 text-xs font-bold hover:bg-slate-200 transition-colors"
+                        className="flex items-center gap-1 rounded-md bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-800 transition-colors hover:bg-slate-200"
                       >
                         Ver detalles
-                        <ChevronRight className="w-3 h-3" />
+                        <ChevronRight className="h-3 w-3" />
                       </button>
                     </div>
                   </div>
@@ -690,7 +737,7 @@ function VotesListView({
                   <button
                     type="button"
                     onClick={() => toggleExpand("scheduled")}
-                    className="w-full py-2 text-center text-xs font-bold text-[#008075] hover:bg-[#EAF5F2] rounded-md transition-colors"
+                    className="w-full rounded-md py-2 text-center text-xs font-bold text-[#008075] transition-colors hover:bg-[#EAF5F2]"
                   >
                     Ver todas ({scheduledSessions.length})
                   </button>
@@ -703,8 +750,10 @@ function VotesListView({
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-slate-400" />
-                <h2 className="text-sm font-bold text-slate-900">Cerradas recientemente</h2>
+                <span className="h-2 w-2 rounded-full bg-slate-400" />
+                <h2 className="text-sm font-bold text-slate-900">
+                  Cerradas recientemente
+                </h2>
               </div>
               <span className="text-xs font-medium text-slate-400">
                 {recentClosedSessions.length} en los últimos 7 días
@@ -712,30 +761,38 @@ function VotesListView({
             </div>
 
             {recentClosedSessions.length === 0 ? (
-              <div className="p-4 text-center text-xs text-slate-400 bg-white rounded-lg border border-dashed border-slate-200">
+              <div className="rounded-lg border border-dashed border-slate-200 bg-white p-4 text-center text-xs text-slate-400">
                 No hay votaciones cerradas en los últimos 7 días.
               </div>
             ) : (
               <div className="space-y-2.5">
-                {(expanded.has("closed") ? recentClosedSessions : recentClosedSessions.slice(0, 3)).map((session: any) => {
-                  const summary = session.resultSummary || "Aprobada · 78% participación";
-                  const isApproved = !summary.toLowerCase().includes("rechazad");
+                {(expanded.has("closed")
+                  ? recentClosedSessions
+                  : recentClosedSessions.slice(0, 3)
+                ).map((session: any) => {
+                  const summary =
+                    session.resultSummary || "Aprobada · 78% participación";
+                  const isApproved = !summary
+                    .toLowerCase()
+                    .includes("rechazad");
                   return (
                     <div
                       key={session.id}
-                      className="bg-white rounded-lg border border-slate-200/80 p-4 shadow-2xs hover:border-slate-300 transition-all flex flex-col md:flex-row md:items-center justify-between gap-3"
+                      className="flex flex-col justify-between gap-3 rounded-lg border border-slate-200/80 bg-white p-4 shadow-2xs transition-all hover:border-slate-300 md:flex-row md:items-center"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-md bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
-                          <CheckCircle2 className="w-4 h-4" />
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-600">
+                          <CheckCircle2 className="h-4 w-4" />
                         </div>
                         <div>
-                          <h3 className="text-sm font-bold text-slate-900">{session.title}</h3>
-                          <div className="flex items-center gap-1.5 mt-1">
-                            <span className="inline-block px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-medium text-slate-600">
+                          <h3 className="text-sm font-bold text-slate-900">
+                            {session.title}
+                          </h3>
+                          <div className="mt-1 flex items-center gap-1.5">
+                            <span className="inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
                               Ordinaria
                             </span>
-                            <span className="inline-block px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-medium text-slate-600">
+                            <span className="inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
                               Mayoría simple
                             </span>
                           </div>
@@ -744,14 +801,14 @@ function VotesListView({
 
                       <div className="flex items-center gap-2.5">
                         <span
-                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-semibold ${
+                          className={`inline-flex items-center gap-1 rounded px-2.5 py-1 text-[11px] font-semibold ${
                             isApproved
                               ? "bg-emerald-50 text-emerald-700"
                               : "bg-rose-50 text-rose-700"
                           }`}
                         >
                           <span
-                            className={`w-1.5 h-1.5 rounded-full ${
+                            className={`h-1.5 w-1.5 rounded-full ${
                               isApproved ? "bg-emerald-500" : "bg-rose-500"
                             }`}
                           />
@@ -760,10 +817,10 @@ function VotesListView({
                         <button
                           type="button"
                           onClick={() => onOpenDetail(session)}
-                          className="flex items-center gap-1 px-3 py-1.5 rounded-md bg-slate-100 text-slate-800 text-xs font-bold hover:bg-slate-200 transition-colors"
+                          className="flex items-center gap-1 rounded-md bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-800 transition-colors hover:bg-slate-200"
                         >
                           Ver acta
-                          <ChevronRight className="w-3 h-3" />
+                          <ChevronRight className="h-3 w-3" />
                         </button>
                       </div>
                     </div>
@@ -773,7 +830,7 @@ function VotesListView({
                   <button
                     type="button"
                     onClick={() => toggleExpand("closed")}
-                    className="w-full py-2 text-center text-xs font-bold text-[#008075] hover:bg-[#EAF5F2] rounded-md transition-colors"
+                    className="w-full rounded-md py-2 text-center text-xs font-bold text-[#008075] transition-colors hover:bg-[#EAF5F2]"
                   >
                     Ver todas ({recentClosedSessions.length})
                   </button>
@@ -784,7 +841,7 @@ function VotesListView({
               <button
                 type="button"
                 onClick={() => toggleExpand("history")}
-                className="w-full mt-2 py-2 text-center text-xs font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-md transition-colors border border-dashed border-slate-200"
+                className="mt-2 w-full rounded-md border border-dashed border-slate-200 py-2 text-center text-xs font-medium text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700"
               >
                 {expanded.has("history")
                   ? "Ocultar historial"
@@ -792,32 +849,52 @@ function VotesListView({
               </button>
             )}
             {expanded.has("history") && (
-              <div className="space-y-2.5 mt-2">
+              <div className="mt-2 space-y-2.5">
                 {allClosedSessions
-                  .filter((s: any) => new Date(s.closedAt || s.closesAt || s.createdAt).getTime() < sevenDaysAgo)
+                  .filter(
+                    (s: any) =>
+                      new Date(
+                        s.closedAt || s.closesAt || s.createdAt,
+                      ).getTime() < sevenDaysAgo,
+                  )
                   .map((session: any) => {
                     const summary = session.resultSummary || "Cerrada";
-                    const isApproved = !summary.toLowerCase().includes("rechazad");
+                    const isApproved = !summary
+                      .toLowerCase()
+                      .includes("rechazad");
                     return (
                       <div
                         key={session.id}
-                        className="bg-white rounded-lg border border-slate-200/80 p-4 shadow-2xs hover:border-slate-300 transition-all flex flex-col md:flex-row md:items-center justify-between gap-3 opacity-80"
+                        className="flex flex-col justify-between gap-3 rounded-lg border border-slate-200/80 bg-white p-4 opacity-80 shadow-2xs transition-all hover:border-slate-300 md:flex-row md:items-center"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-md bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
-                            <CheckCircle2 className="w-4 h-4" />
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-600">
+                            <CheckCircle2 className="h-4 w-4" />
                           </div>
                           <div>
-                            <h3 className="text-sm font-bold text-slate-900">{session.title}</h3>
-                            <div className="text-[10px] text-slate-400 mt-0.5">
-                              Cerrada el {format(new Date(session.closedAt || session.closesAt || session.createdAt), "d 'de' MMMM yyyy", { locale: es })}
+                            <h3 className="text-sm font-bold text-slate-900">
+                              {session.title}
+                            </h3>
+                            <div className="mt-0.5 text-[10px] text-slate-400">
+                              Cerrada el{" "}
+                              {format(
+                                new Date(
+                                  session.closedAt ||
+                                    session.closesAt ||
+                                    session.createdAt,
+                                ),
+                                "d 'de' MMMM yyyy",
+                                { locale: es },
+                              )}
                             </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-2.5">
                           <span
-                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-semibold ${
-                              isApproved ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
+                            className={`inline-flex items-center gap-1 rounded px-2.5 py-1 text-[11px] font-semibold ${
+                              isApproved
+                                ? "bg-emerald-50 text-emerald-700"
+                                : "bg-rose-50 text-rose-700"
                             }`}
                           >
                             {summary}
@@ -825,10 +902,10 @@ function VotesListView({
                           <button
                             type="button"
                             onClick={() => onOpenDetail(session)}
-                            className="flex items-center gap-1 px-3 py-1.5 rounded-md bg-slate-100 text-slate-800 text-xs font-bold hover:bg-slate-200 transition-colors"
+                            className="flex items-center gap-1 rounded-md bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-800 transition-colors hover:bg-slate-200"
                           >
                             Ver acta
-                            <ChevronRight className="w-3 h-3" />
+                            <ChevronRight className="h-3 w-3" />
                           </button>
                         </div>
                       </div>
@@ -884,7 +961,9 @@ function VotingRightsView({ onBack }: { onBack: () => void }) {
   };
 
   const handleRemoveException = (debtorId: string) => {
-    if (confirm("¿Deseas retirar la excepción de voto para este propietario?")) {
+    if (
+      confirm("¿Deseas retirar la excepción de voto para este propietario?")
+    ) {
       overrideMutation.mutate({
         tenantId: TENANT_ID,
         userId: debtorId,
@@ -895,20 +974,19 @@ function VotingRightsView({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="space-y-5">
-
       {/* Debtors List Card */}
       <div className="space-y-2.5">
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+          <h3 className="text-xs font-bold tracking-wider text-slate-900 uppercase">
             Propietarios con recibos pendientes
           </h3>
-          <span className="text-xs text-slate-400 font-medium">
+          <span className="text-xs font-medium text-slate-400">
             {neighborList.length} propietarios
           </span>
         </div>
 
         {neighborList.length === 0 ? (
-          <div className="p-6 text-center text-xs text-slate-500 bg-white rounded-lg border border-dashed">
+          <div className="rounded-lg border border-dashed bg-white p-6 text-center text-xs text-slate-500">
             No hay propietarios con recibos pendientes registrados.
           </div>
         ) : (
@@ -925,31 +1003,41 @@ function VotingRightsView({ onBack }: { onBack: () => void }) {
               return (
                 <div
                   key={item.id}
-                  className="bg-white rounded-lg border border-slate-200/80 p-4 shadow-2xs transition-all"
+                  className="rounded-lg border border-slate-200/80 bg-white p-4 shadow-2xs transition-all"
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                     {/* Left: Avatar + Name */}
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-md bg-[#EAF5F2] flex items-center justify-center text-[#008075] font-black text-xs shrink-0">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[#EAF5F2] text-xs font-black text-[#008075]">
                         {initials}
                       </div>
                       <div>
                         <div className="text-sm font-bold text-slate-900">
                           {item.name}
                         </div>
-                        <div className="text-xs text-slate-500 mt-0.5">
-                          Deuda pendiente: <span className="font-semibold text-rose-600">{item.totalDebt ? `${item.totalDebt.toFixed(2)} €` : "Pendiente"}</span>
-                          {item.coefficient ? <span className="text-slate-400 ml-1.5">· Coef. {item.coefficient}%</span> : null}
+                        <div className="mt-0.5 text-xs text-slate-500">
+                          Deuda pendiente:{" "}
+                          <span className="font-semibold text-rose-600">
+                            {item.totalDebt
+                              ? `${item.totalDebt.toFixed(2)} €`
+                              : "Pendiente"}
+                          </span>
+                          {item.coefficient ? (
+                            <span className="ml-1.5 text-slate-400">
+                              · Coef. {item.coefficient}%
+                            </span>
+                          ) : null}
                         </div>
                       </div>
                     </div>
 
                     {/* Right: Badge + Button */}
-                    <div className="flex items-center gap-2.5 shrink-0">
+                    <div className="flex shrink-0 items-center gap-2.5">
                       {item.votingOverride ? (
                         <>
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded bg-emerald-50 text-emerald-700 text-xs font-semibold">
-                            Voto habilitado · {item.votingOverrideReason || "Resolución judicial"}
+                          <span className="inline-flex items-center rounded bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+                            Voto habilitado ·{" "}
+                            {item.votingOverrideReason || "Resolución judicial"}
                           </span>
                           <button
                             type="button"
@@ -961,14 +1049,14 @@ function VotingRightsView({ onBack }: { onBack: () => void }) {
                                 setExpandedId(item.id);
                               }
                             }}
-                            className="px-2.5 py-1 rounded-md border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                            className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
                           >
                             Editar
                           </button>
                         </>
                       ) : (
                         <>
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded bg-slate-100 text-slate-600 text-xs font-semibold">
+                          <span className="inline-flex items-center rounded bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
                             Sin derecho a voto
                           </span>
                           <button
@@ -982,7 +1070,7 @@ function VotingRightsView({ onBack }: { onBack: () => void }) {
                                 setExpandedId(item.id);
                               }
                             }}
-                            className={`flex items-center gap-1 px-3 py-1 rounded-md text-xs font-bold transition-all ${
+                            className={`flex items-center gap-1 rounded-md px-3 py-1 text-xs font-bold transition-all ${
                               isExpanded
                                 ? "bg-[#008075] text-white"
                                 : "border border-slate-200 bg-white text-slate-800 hover:bg-slate-50"
@@ -990,9 +1078,9 @@ function VotingRightsView({ onBack }: { onBack: () => void }) {
                           >
                             Habilitar voto
                             {isExpanded ? (
-                              <ChevronUp className="w-3 h-3" />
+                              <ChevronUp className="h-3 w-3" />
                             ) : (
-                              <ChevronDown className="w-3 h-3" />
+                              <ChevronDown className="h-3 w-3" />
                             )}
                           </button>
                         </>
@@ -1002,14 +1090,17 @@ function VotingRightsView({ onBack }: { onBack: () => void }) {
 
                   {/* Inline Exception Creator Form */}
                   {isExpanded && (
-                    <div className="mt-3.5 pt-3.5 border-t border-slate-100 space-y-3">
+                    <div className="mt-3.5 space-y-3 border-t border-slate-100 pt-3.5">
                       <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
-                        <Users className="w-3.5 h-3.5 text-[#008075]" />
+                        <Users className="h-3.5 w-3.5 text-[#008075]" />
                         <span>Crear excepción de voto</span>
                       </div>
 
                       <div className="space-y-1">
-                        <Label htmlFor={`reason-${item.id}`} className="text-[11px] font-semibold text-slate-700">
+                        <Label
+                          htmlFor={`reason-${item.id}`}
+                          className="text-[11px] font-semibold text-slate-700"
+                        >
                           Motivo de la excepción *
                         </Label>
                         <Input
@@ -1017,12 +1108,15 @@ function VotingRightsView({ onBack }: { onBack: () => void }) {
                           placeholder="Ej. Impugnación o proceso judicial en curso."
                           value={reason}
                           onChange={(e) => setReason(e.target.value)}
-                          className="text-xs h-8.5 bg-slate-50/50 rounded-md"
+                          className="h-8.5 rounded-md bg-slate-50/50 text-xs"
                         />
                       </div>
 
                       <div className="space-y-1">
-                        <Label htmlFor={`note-${item.id}`} className="text-[11px] font-semibold text-slate-700">
+                        <Label
+                          htmlFor={`note-${item.id}`}
+                          className="text-[11px] font-semibold text-slate-700"
+                        >
                           Nota interna (opcional)
                         </Label>
                         <Textarea
@@ -1031,14 +1125,17 @@ function VotingRightsView({ onBack }: { onBack: () => void }) {
                           value={internalNote}
                           onChange={(e) => setInternalNote(e.target.value)}
                           rows={2}
-                          className="text-xs bg-slate-50/50 resize-none rounded-md"
+                          className="resize-none rounded-md bg-slate-50/50 text-xs"
                         />
                       </div>
 
                       {/* Info Alert */}
-                      <div className="flex items-center gap-2 p-2.5 rounded-md bg-sky-50 text-sky-800 text-xs font-medium border border-sky-100">
-                        <Info className="w-3.5 h-3.5 text-sky-600 shrink-0" />
-                        <span>La excepción se mantiene en futuras votaciones hasta que se elimine.</span>
+                      <div className="flex items-center gap-2 rounded-md border border-sky-100 bg-sky-50 p-2.5 text-xs font-medium text-sky-800">
+                        <Info className="h-3.5 w-3.5 shrink-0 text-sky-600" />
+                        <span>
+                          La excepción se mantiene en futuras votaciones hasta
+                          que se elimine.
+                        </span>
                       </div>
 
                       <div className="flex items-center justify-end gap-2 pt-1">
@@ -1046,7 +1143,7 @@ function VotingRightsView({ onBack }: { onBack: () => void }) {
                           <button
                             type="button"
                             onClick={() => handleRemoveException(item.id)}
-                            className="px-3 py-1.5 rounded-md text-xs font-bold text-red-600 hover:bg-red-50 transition-colors mr-auto"
+                            className="mr-auto rounded-md px-3 py-1.5 text-xs font-bold text-red-600 transition-colors hover:bg-red-50"
                           >
                             Eliminar excepción
                           </button>
@@ -1054,7 +1151,7 @@ function VotingRightsView({ onBack }: { onBack: () => void }) {
                         <button
                           type="button"
                           onClick={() => setExpandedId(null)}
-                          className="px-3 py-1.5 rounded-md border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+                          className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50"
                         >
                           Cancelar
                         </button>
@@ -1062,9 +1159,11 @@ function VotingRightsView({ onBack }: { onBack: () => void }) {
                           type="button"
                           onClick={() => handleConfirmException(item.id)}
                           disabled={overrideMutation.isPending}
-                          className="px-3.5 py-1.5 rounded-md bg-[#008075] text-xs font-bold text-white hover:bg-[#006e64] transition-colors"
+                          className="rounded-md bg-[#008075] px-3.5 py-1.5 text-xs font-bold text-white transition-colors hover:bg-[#006e64]"
                         >
-                          {overrideMutation.isPending ? "Guardando..." : "Confirmar excepción"}
+                          {overrideMutation.isPending
+                            ? "Guardando..."
+                            : "Confirmar excepción"}
                         </button>
                       </div>
                     </div>
@@ -1145,24 +1244,26 @@ function ScheduleVoteModal({
   const isJunta = type === "JUNTA";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-in fade-in-0">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-100 p-6 space-y-5 relative animate-in zoom-in-95">
+    <div className="animate-in fade-in-0 fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs">
+      <div className="animate-in zoom-in-95 relative w-full max-w-md space-y-5 rounded-2xl border border-slate-100 bg-white p-6 shadow-2xl">
         {/* Header */}
         <div className="flex items-start justify-between pr-8">
           <div>
-            <h2 className="text-xl font-black text-slate-900 tracking-tight">
+            <h2 className="text-xl font-black tracking-tight text-slate-900">
               {isJunta ? "Programar junta" : "Programar votación"}
             </h2>
-            <p className="text-xs text-slate-500 mt-1">
-              {isJunta ? "Elige cuándo se celebrará la junta." : "Elige cuándo se abrirá la votación."}
+            <p className="mt-1 text-xs text-slate-500">
+              {isJunta
+                ? "Elige cuándo se celebrará la junta."
+                : "Elige cuándo se abrirá la votación."}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="absolute top-5 right-5 w-8 h-8 rounded-full bg-slate-100 text-slate-400 hover:text-slate-700 hover:bg-slate-200 flex items-center justify-center transition-colors"
+            className="absolute top-5 right-5 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-700"
           >
-            <X className="w-4 h-4" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
@@ -1170,21 +1271,21 @@ function ScheduleVoteModal({
           {/* Campo Fecha */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-slate-700">Fecha</label>
-            <div className="relative border border-slate-200/90 rounded-xl p-3 flex items-center justify-between bg-white hover:border-slate-300 transition-colors">
+            <div className="relative flex items-center justify-between rounded-xl border border-slate-200/90 bg-white p-3 transition-colors hover:border-slate-300">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
-                  <Calendar className="w-4 h-4" />
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+                  <Calendar className="h-4 w-4" />
                 </div>
                 <span className="text-sm font-semibold text-slate-800">
                   {formattedDateText}
                 </span>
               </div>
-              <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+              <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
               <input
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                 required
               />
             </div>
@@ -1193,21 +1294,21 @@ function ScheduleVoteModal({
           {/* Campo Hora */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-slate-700">Hora</label>
-            <div className="relative border border-slate-200/90 rounded-xl p-3 flex items-center justify-between bg-white hover:border-slate-300 transition-colors">
+            <div className="relative flex items-center justify-between rounded-xl border border-slate-200/90 bg-white p-3 transition-colors hover:border-slate-300">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
-                  <Clock className="w-4 h-4" />
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+                  <Clock className="h-4 w-4" />
                 </div>
                 <span className="text-sm font-semibold text-slate-800">
                   {selectedTime || "23:45"}
                 </span>
               </div>
-              <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+              <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
               <input
                 type="time"
                 value={selectedTime}
                 onChange={(e) => setSelectedTime(e.target.value)}
-                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                 required
               />
             </div>
@@ -1215,35 +1316,43 @@ function ScheduleVoteModal({
 
           {/* Zona horaria */}
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700">Zona horaria</label>
-            <div className="border border-slate-200/90 rounded-xl p-3 flex items-center justify-between bg-white">
+            <label className="text-xs font-bold text-slate-700">
+              Zona horaria
+            </label>
+            <div className="flex items-center justify-between rounded-xl border border-slate-200/90 bg-white p-3">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600 shrink-0">
-                  <Globe className="w-4 h-4" />
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+                  <Globe className="h-4 w-4" />
                 </div>
                 <span className="text-sm font-semibold text-slate-800">
                   España • Europe/Madrid
                 </span>
               </div>
-              <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+              <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
             </div>
           </div>
 
           {/* Banner informativo */}
-          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start gap-3">
-            <div className="w-6 h-6 rounded-full bg-slate-600 text-white flex items-center justify-center shrink-0 mt-0.5">
-              <Info className="w-3.5 h-3.5" />
+          <div className="flex items-start gap-3 rounded-xl border border-slate-200/80 bg-slate-50 p-3.5">
+            <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-600 text-white">
+              <Info className="h-3.5 w-3.5" />
             </div>
-            <div className="text-xs text-slate-600 leading-relaxed">
-              <div>{isJunta ? "La junta se programará para" : "La votación se programará para"}</div>
-              <div className="font-extrabold text-slate-900 mt-0.5">{previewString}.</div>
+            <div className="text-xs leading-relaxed text-slate-600">
+              <div>
+                {isJunta
+                  ? "La junta se programará para"
+                  : "La votación se programará para"}
+              </div>
+              <div className="mt-0.5 font-extrabold text-slate-900">
+                {previewString}.
+              </div>
             </div>
           </div>
 
           {/* Botón Guardar */}
           <button
             type="submit"
-            className="w-full py-3 bg-[#008075] hover:bg-[#006e64] text-white font-bold rounded-xl text-sm transition-colors shadow-2xs mt-2"
+            className="mt-2 w-full rounded-xl bg-[#008075] py-3 text-sm font-bold text-white shadow-2xs transition-colors hover:bg-[#006e64]"
           >
             {isJunta ? "Programar junta" : "Programar votación"}
           </button>
@@ -1268,7 +1377,9 @@ function CreateSingleVoteView({
   const [description, setDescription] = useState("");
   const [budget, setBudget] = useState("");
   const [closesAt, setClosesAt] = useState("");
-  const [activationType, setActivationType] = useState<"now" | "schedule">("now");
+  const [activationType, setActivationType] = useState<"now" | "schedule">(
+    "now",
+  );
   const [scheduledDate, setScheduledDate] = useState("");
   const [scheduledTime, setScheduledTime] = useState("");
   const [showScheduleModal, setShowScheduleModal] = useState(false);
@@ -1317,8 +1428,9 @@ function CreateSingleVoteView({
       alert("Introduce la empresa/opción y el importe.");
       return;
     }
-    const matched = (providers as any[] ?? []).find(
-      (p: any) => p.name.toLowerCase().trim() === propCompany.toLowerCase().trim(),
+    const matched = ((providers as any[]) ?? []).find(
+      (p: any) =>
+        p.name.toLowerCase().trim() === propCompany.toLowerCase().trim(),
     );
     setProposals([
       ...proposals,
@@ -1327,7 +1439,9 @@ function CreateSingleVoteView({
         amount: formatEuro(propAmount.trim()),
         providerId: propProviderId || matched?.id || undefined,
         fileName: propFile || undefined,
-        fileUrl: propFile ? "https://example.com/" + encodeURIComponent(propFile) : undefined,
+        fileUrl: propFile
+          ? "https://example.com/" + encodeURIComponent(propFile)
+          : undefined,
       },
     ]);
     setPropCompany("");
@@ -1355,15 +1469,18 @@ function CreateSingleVoteView({
 
     const finalProposals = [...proposals];
     if (isAddingProposal && propCompany.trim() && propAmount.trim()) {
-      const matched = (providers as any[] ?? []).find(
-        (p: any) => p.name.toLowerCase().trim() === propCompany.toLowerCase().trim(),
+      const matched = ((providers as any[]) ?? []).find(
+        (p: any) =>
+          p.name.toLowerCase().trim() === propCompany.toLowerCase().trim(),
       );
       finalProposals.push({
         companyName: propCompany.trim(),
         amount: formatEuro(propAmount.trim()),
         providerId: propProviderId || matched?.id || undefined,
         fileName: propFile || undefined,
-        fileUrl: propFile ? "https://example.com/" + encodeURIComponent(propFile) : undefined,
+        fileUrl: propFile
+          ? "https://example.com/" + encodeURIComponent(propFile)
+          : undefined,
       });
     }
 
@@ -1375,7 +1492,9 @@ function CreateSingleVoteView({
     const safeClosesAt = d.toISOString();
     const scheduledIso =
       activationType === "schedule" && scheduledDate
-        ? new Date(`${scheduledDate}T${scheduledTime || "09:00"}:00`).toISOString()
+        ? new Date(
+            `${scheduledDate}T${scheduledTime || "09:00"}:00`,
+          ).toISOString()
         : undefined;
 
     createMutation.mutate({
@@ -1404,7 +1523,7 @@ function CreateSingleVoteView({
     <div className="space-y-5">
       {/* Subtitle & Manage Rights link */}
       <div className="flex items-center gap-2 text-xs text-slate-500">
-        <Users className="w-3.5 h-3.5 text-slate-400" />
+        <Users className="h-3.5 w-3.5 text-slate-400" />
         <span>3 propietarios sin derecho a voto · </span>
         <button
           type="button"
@@ -1416,9 +1535,9 @@ function CreateSingleVoteView({
       </div>
 
       {/* Step 1: ¿Qué quieres que voten los propietarios? */}
-      <div className="bg-white rounded-lg border border-slate-200/80 p-5 shadow-2xs space-y-3.5">
+      <div className="space-y-3.5 rounded-lg border border-slate-200/80 bg-white p-5 shadow-2xs">
         <div className="flex items-center gap-2.5">
-          <div className="w-6 h-6 rounded-md bg-[#008075] text-white flex items-center justify-center text-xs font-black">
+          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[#008075] text-xs font-black text-white">
             1
           </div>
           <h3 className="text-sm font-bold text-slate-900">
@@ -1428,7 +1547,10 @@ function CreateSingleVoteView({
 
         <div className="space-y-3 pl-8.5">
           <div className="space-y-1">
-            <Label htmlFor="single-title" className="text-xs font-semibold text-slate-700">
+            <Label
+              htmlFor="single-title"
+              className="text-xs font-semibold text-slate-700"
+            >
               Título del tema *
             </Label>
             <Input
@@ -1436,12 +1558,15 @@ function CreateSingleVoteView({
               placeholder="Ej: Reparación del ascensor"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="text-xs h-9 rounded-md"
+              className="h-9 rounded-md text-xs"
             />
           </div>
 
           <div className="space-y-1">
-            <Label htmlFor="single-desc" className="text-xs font-semibold text-slate-700">
+            <Label
+              htmlFor="single-desc"
+              className="text-xs font-semibold text-slate-700"
+            >
               Descripción (opcional)
             </Label>
             <Textarea
@@ -1450,12 +1575,15 @@ function CreateSingleVoteView({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
-              className="text-xs resize-none rounded-md"
+              className="resize-none rounded-md text-xs"
             />
           </div>
 
           <div className="space-y-1">
-            <Label htmlFor="single-budget" className="text-xs font-semibold text-slate-700">
+            <Label
+              htmlFor="single-budget"
+              className="text-xs font-semibold text-slate-700"
+            >
               Importe (opcional)
             </Label>
             <Input
@@ -1463,7 +1591,7 @@ function CreateSingleVoteView({
               placeholder="Ej: 2.500 €"
               value={budget}
               onChange={(e) => setBudget(e.target.value)}
-              className="text-xs h-9 rounded-md"
+              className="h-9 rounded-md text-xs"
             />
             <p className="text-[10px] text-slate-400">
               Si se introduce, se mostrará en la tarjeta de votación del vecino.
@@ -1473,16 +1601,19 @@ function CreateSingleVoteView({
       </div>
 
       {/* Step 2: ¿Qué opciones tienen? */}
-      <div className="bg-white rounded-lg border border-slate-200/80 p-5 shadow-2xs space-y-3.5">
+      <div className="space-y-3.5 rounded-lg border border-slate-200/80 bg-white p-5 shadow-2xs">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-6 h-6 rounded-md bg-[#008075] text-white flex items-center justify-center text-xs font-black">
+            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[#008075] text-xs font-black text-white">
               2
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900">¿Qué opciones tienen?</h3>
+              <h3 className="text-sm font-bold text-slate-900">
+                ¿Qué opciones tienen?
+              </h3>
               <p className="text-xs text-slate-500">
-                Añade las opciones que quieras que los propietarios puedan comparar.
+                Añade las opciones que quieras que los propietarios puedan
+                comparar.
               </p>
             </div>
           </div>
@@ -1491,9 +1622,9 @@ function CreateSingleVoteView({
             <button
               type="button"
               onClick={() => setIsAddingProposal(true)}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-md border border-[#008075] text-[#008075] text-xs font-bold hover:bg-[#EAF5F2] transition-colors"
+              className="flex items-center gap-1 rounded-md border border-[#008075] px-3 py-1.5 text-xs font-bold text-[#008075] transition-colors hover:bg-[#EAF5F2]"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="h-3.5 w-3.5" />
               Añadir propuesta
             </button>
           )}
@@ -1502,9 +1633,9 @@ function CreateSingleVoteView({
         <div className="space-y-3 pl-8.5">
           {/* Active Proposal Subform */}
           {isAddingProposal && (
-            <div className="rounded-md border border-emerald-200 bg-[#EAF5F2]/40 p-3.5 space-y-3">
+            <div className="space-y-3 rounded-md border border-emerald-200 bg-[#EAF5F2]/40 p-3.5">
               <div className="flex items-center gap-2">
-                <span className="w-4 h-4 rounded bg-[#008075] text-white flex items-center justify-center text-[10px] font-bold">
+                <span className="flex h-4 w-4 items-center justify-center rounded bg-[#008075] text-[10px] font-bold text-white">
                   {proposals.length + 1}
                 </span>
                 <span className="text-xs font-bold text-slate-900">
@@ -1512,8 +1643,8 @@ function CreateSingleVoteView({
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                <div className="space-y-1 relative">
+              <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
+                <div className="relative space-y-1">
                   <Label className="text-[11px] font-semibold text-slate-700">
                     Empresa / Opción *
                   </Label>
@@ -1523,7 +1654,7 @@ function CreateSingleVoteView({
                     onChange={(e) => {
                       setPropCompany(e.target.value);
                       setShowProviderDropdown(true);
-                      const exact = (providers as any[] ?? []).find(
+                      const exact = ((providers as any[]) ?? []).find(
                         (p: any) =>
                           p.name.toLowerCase().trim() ===
                           e.target.value.toLowerCase().trim(),
@@ -1531,18 +1662,20 @@ function CreateSingleVoteView({
                       setPropProviderId(exact ? exact.id : null);
                     }}
                     onFocus={() => setShowProviderDropdown(true)}
-                    className="text-xs h-8.5 bg-white rounded-md"
+                    className="h-8.5 rounded-md bg-white text-xs"
                   />
-                  {showProviderDropdown && propCompany.trim().length > 0 && (
+                  {showProviderDropdown &&
+                    propCompany.trim().length > 0 &&
                     (() => {
-                      const filtered = (providers as any[] ?? []).filter((p: any) =>
-                        p.name
-                          .toLowerCase()
-                          .includes(propCompany.toLowerCase().trim()),
+                      const filtered = ((providers as any[]) ?? []).filter(
+                        (p: any) =>
+                          p.name
+                            .toLowerCase()
+                            .includes(propCompany.toLowerCase().trim()),
                       );
                       if (filtered.length === 0) return null;
                       return (
-                        <div className="absolute top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg z-30 py-1">
+                        <div className="absolute top-full right-0 left-0 z-30 mt-1 max-h-40 overflow-y-auto rounded-md border border-slate-200 bg-white py-1 shadow-lg">
                           {filtered.map((p: any) => (
                             <button
                               key={p.id}
@@ -1553,13 +1686,13 @@ function CreateSingleVoteView({
                                 setPropProviderId(p.id);
                                 setShowProviderDropdown(false);
                               }}
-                              className="w-full text-left px-3 py-1.5 text-xs hover:bg-[#EAF5F2] flex items-center justify-between transition-colors"
+                              className="flex w-full items-center justify-between px-3 py-1.5 text-left text-xs transition-colors hover:bg-[#EAF5F2]"
                             >
                               <span className="font-semibold text-slate-800">
                                 {p.name}
                               </span>
                               {p.speciality && (
-                                <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                                <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-400">
                                   {p.speciality}
                                 </span>
                               )}
@@ -1567,8 +1700,7 @@ function CreateSingleVoteView({
                           ))}
                         </div>
                       );
-                    })()
-                  )}
+                    })()}
                 </div>
                 <div className="space-y-1">
                   <Label className="text-[11px] font-semibold text-slate-700">
@@ -1578,17 +1710,17 @@ function CreateSingleVoteView({
                     placeholder="Ej. 2.500,00 €"
                     value={propAmount}
                     onChange={(e) => setPropAmount(e.target.value)}
-                    className="text-xs h-8.5 bg-white rounded-md"
+                    className="h-8.5 rounded-md bg-white text-xs"
                   />
                 </div>
               </div>
 
               {/* Upload Drop Area */}
-              <div className="rounded-md border-2 border-dashed border-slate-200 bg-white p-2.5 text-center cursor-pointer hover:border-[#008075] transition-colors">
+              <div className="cursor-pointer rounded-md border-2 border-dashed border-slate-200 bg-white p-2.5 text-center transition-colors hover:border-[#008075]">
                 {propFile ? (
                   <div className="flex items-center justify-between px-2 text-xs">
-                    <div className="flex items-center gap-2 text-slate-800 font-medium">
-                      <span className="p-0.5 rounded bg-rose-50 text-rose-600 font-bold text-[10px]">
+                    <div className="flex items-center gap-2 font-medium text-slate-800">
+                      <span className="rounded bg-rose-50 p-0.5 text-[10px] font-bold text-rose-600">
                         PDF
                       </span>
                       <span>{propFile}</span>
@@ -1598,17 +1730,19 @@ function CreateSingleVoteView({
                       onClick={() => setPropFile(null)}
                       className="text-slate-400 hover:text-slate-600"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <X className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 ) : (
                   <button
                     type="button"
                     onClick={() => setPropFile("Presupuesto_adjunto.pdf")}
-                    className="flex flex-col items-center justify-center w-full py-1 text-xs text-slate-500"
+                    className="flex w-full flex-col items-center justify-center py-1 text-xs text-slate-500"
                   >
-                    <Upload className="w-4 h-4 text-slate-400 mb-1" />
-                    <span>Arrastrar archivo aquí o hacer clic para seleccionar</span>
+                    <Upload className="mb-1 h-4 w-4 text-slate-400" />
+                    <span>
+                      Arrastrar archivo aquí o hacer clic para seleccionar
+                    </span>
                   </button>
                 )}
               </div>
@@ -1617,14 +1751,14 @@ function CreateSingleVoteView({
                 <button
                   type="button"
                   onClick={() => setIsAddingProposal(false)}
-                  className="px-3 py-1 rounded-md border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50"
+                  className="rounded-md border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-700 hover:bg-slate-50"
                 >
                   Cancelar
                 </button>
                 <button
                   type="button"
                   onClick={handleSaveProposal}
-                  className="px-3 py-1 rounded-md bg-[#008075] text-xs font-bold text-white hover:bg-[#006e64]"
+                  className="rounded-md bg-[#008075] px-3 py-1 text-xs font-bold text-white hover:bg-[#006e64]"
                 >
                   Guardar propuesta
                 </button>
@@ -1634,36 +1768,42 @@ function CreateSingleVoteView({
 
           {/* Proposals list or empty state */}
           {proposals.length === 0 && !isAddingProposal ? (
-            <div className="p-4 text-center text-xs text-slate-400 bg-slate-50 rounded-md border border-dashed border-slate-200">
-              No hay opciones o propuestas añadidas todavía. Pulsa en &quot;Añadir propuesta&quot; para definir las alternativas de voto.
+            <div className="rounded-md border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-xs text-slate-400">
+              No hay opciones o propuestas añadidas todavía. Pulsa en
+              &quot;Añadir propuesta&quot; para definir las alternativas de
+              voto.
             </div>
           ) : (
             <div className="space-y-2">
               {proposals.map((p, idx) => (
                 <div
                   key={idx}
-                  className="flex items-center justify-between p-2.5 rounded-md border border-slate-200 bg-white text-xs shadow-2xs"
+                  className="flex items-center justify-between rounded-md border border-slate-200 bg-white p-2.5 text-xs shadow-2xs"
                 >
                   <div className="flex items-center gap-2.5">
-                    <span className="w-5 h-5 rounded bg-slate-100 text-slate-600 flex items-center justify-center text-[10px] font-bold">
+                    <span className="flex h-5 w-5 items-center justify-center rounded bg-slate-100 text-[10px] font-bold text-slate-600">
                       {idx + 1}
                     </span>
-                    <span className="font-bold text-slate-900">{p.companyName}</span>
+                    <span className="font-bold text-slate-900">
+                      {p.companyName}
+                    </span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="font-extrabold text-slate-800">{p.amount}</span>
+                    <span className="font-extrabold text-slate-800">
+                      {p.amount}
+                    </span>
                     {p.fileName && (
                       <span className="inline-flex items-center gap-1 text-[11px] text-slate-400">
-                        <Paperclip className="w-3 h-3" />
+                        <Paperclip className="h-3 w-3" />
                         {p.fileName}
                       </span>
                     )}
                     <button
                       type="button"
                       onClick={() => handleRemoveProposal(idx)}
-                      className="p-1 text-slate-400 hover:text-red-500 transition-colors"
+                      className="p-1 text-slate-400 transition-colors hover:text-red-500"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </div>
@@ -1674,26 +1814,31 @@ function CreateSingleVoteView({
       </div>
 
       {/* Step 3: ¿Hasta cuándo pueden votar? */}
-      <div className="bg-white rounded-lg border border-slate-200/80 p-5 shadow-2xs space-y-3.5">
+      <div className="space-y-3.5 rounded-lg border border-slate-200/80 bg-white p-5 shadow-2xs">
         <div className="flex items-center gap-2.5">
-          <div className="w-6 h-6 rounded-md bg-[#008075] text-white flex items-center justify-center text-xs font-black">
+          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[#008075] text-xs font-black text-white">
             3
           </div>
-          <h3 className="text-sm font-bold text-slate-900">¿Hasta cuándo pueden votar?</h3>
+          <h3 className="text-sm font-bold text-slate-900">
+            ¿Hasta cuándo pueden votar?
+          </h3>
         </div>
 
-        <div className="space-y-1 pl-8.5 max-w-sm">
-          <Label htmlFor="single-closes" className="text-xs font-semibold text-slate-700">
+        <div className="max-w-sm space-y-1 pl-8.5">
+          <Label
+            htmlFor="single-closes"
+            className="text-xs font-semibold text-slate-700"
+          >
             Cierre de la votación *
           </Label>
           <div className="relative">
-            <Calendar className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+            <Calendar className="absolute top-2.5 left-2.5 h-3.5 w-3.5 text-slate-400" />
             <Input
               id="single-closes"
               type="datetime-local"
               value={closesAt}
               onChange={(e) => setClosesAt(e.target.value)}
-              className="text-xs h-9 pl-8.5 rounded-md cursor-pointer"
+              className="h-9 cursor-pointer rounded-md pl-8.5 text-xs"
               required
             />
           </div>
@@ -1701,13 +1846,15 @@ function CreateSingleVoteView({
       </div>
 
       {/* Step 4: Documentación (opcional) */}
-      <div className="bg-white rounded-lg border border-slate-200/80 p-5 shadow-2xs space-y-3.5">
+      <div className="space-y-3.5 rounded-lg border border-slate-200/80 bg-white p-5 shadow-2xs">
         <div className="flex items-center gap-2.5">
-          <div className="w-6 h-6 rounded-md bg-[#008075] text-white flex items-center justify-center text-xs font-black">
+          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[#008075] text-xs font-black text-white">
             4
           </div>
           <div>
-            <h3 className="text-sm font-bold text-slate-900">Documentación (opcional)</h3>
+            <h3 className="text-sm font-bold text-slate-900">
+              Documentación (opcional)
+            </h3>
             <p className="text-xs text-slate-500">
               Añade documentos que los propietarios puedan consultar.
             </p>
@@ -1715,9 +1862,9 @@ function CreateSingleVoteView({
         </div>
 
         <div className="pl-8.5">
-          <div className="rounded-md border-2 border-dashed border-slate-200 bg-slate-50/50 p-3.5 text-center cursor-pointer hover:border-[#008075] transition-colors">
+          <div className="cursor-pointer rounded-md border-2 border-dashed border-slate-200 bg-slate-50/50 p-3.5 text-center transition-colors hover:border-[#008075]">
             <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
-              <Upload className="w-4 h-4 text-slate-400" />
+              <Upload className="h-4 w-4 text-slate-400" />
               <span>Arrastrar archivo aquí o hacer clic para seleccionar</span>
             </div>
           </div>
@@ -1725,30 +1872,30 @@ function CreateSingleVoteView({
       </div>
 
       {/* Auto-OT Generation */}
-      <div className="bg-white rounded-lg border border-slate-200/80 p-4 shadow-2xs space-y-3">
-        <label className="flex items-center gap-2.5 cursor-pointer">
+      <div className="space-y-3 rounded-lg border border-slate-200/80 bg-white p-4 shadow-2xs">
+        <label className="flex cursor-pointer items-center gap-2.5">
           <input
             type="checkbox"
             checked={autoGenerateOt}
             onChange={(e) => setAutoGenerateOt(e.target.checked)}
-            className="w-4 h-4 rounded border-slate-300 text-[#008075] focus:ring-[#008075]"
+            className="h-4 w-4 rounded border-slate-300 text-[#008075] focus:ring-[#008075]"
           />
           <span className="text-xs font-bold text-slate-800">
             Generar orden de trabajo si se aprueba
           </span>
         </label>
         {autoGenerateOt && (
-          <div className="pl-6.5 space-y-1.5">
+          <div className="space-y-1.5 pl-6.5">
             <label className="text-[11px] font-medium text-slate-500">
               Proveedor asignado (opcional)
             </label>
             <select
               value={otProviderId}
               onChange={(e) => setOtProviderId(e.target.value)}
-              className="w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#008075]"
+              className="w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-800 focus:ring-1 focus:ring-[#008075] focus:outline-none"
             >
               <option value="">Sin asignar</option>
-              {(providers as any[] ?? []).map((p: any) => (
+              {((providers as any[]) ?? []).map((p: any) => (
                 <option key={p.id} value={p.id}>
                   {p.name} {p.speciality ? `(${p.speciality})` : ""}
                 </option>
@@ -1759,25 +1906,27 @@ function CreateSingleVoteView({
       </div>
 
       {/* "¿Cuándo quieres que se active?" */}
-      <div className="bg-white rounded-lg border border-slate-200/80 p-5 shadow-2xs space-y-3">
-        <h3 className="text-sm font-bold text-slate-900">¿Cuándo quieres que se active?</h3>
+      <div className="space-y-3 rounded-lg border border-slate-200/80 bg-white p-5 shadow-2xs">
+        <h3 className="text-sm font-bold text-slate-900">
+          ¿Cuándo quieres que se active?
+        </h3>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
           {/* Card 1: Ahora */}
           <div
             onClick={() => setActivationType("now")}
-            className={`flex items-start gap-2.5 p-3.5 rounded-md border-2 cursor-pointer transition-all ${
+            className={`flex cursor-pointer items-start gap-2.5 rounded-md border-2 p-3.5 transition-all ${
               activationType === "now"
                 ? "border-[#008075] bg-[#EAF5F2]/30"
                 : "border-slate-200 bg-white hover:border-slate-300"
             }`}
           >
-            <div className="w-7 h-7 rounded-md bg-[#EAF5F2] flex items-center justify-center text-[#008075] shrink-0">
-              <Zap className="w-3.5 h-3.5" />
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[#EAF5F2] text-[#008075]">
+              <Zap className="h-3.5 w-3.5" />
             </div>
             <div>
               <div className="text-xs font-bold text-slate-900">Ahora</div>
-              <div className="text-[11px] text-slate-500 mt-0.5">
+              <div className="mt-0.5 text-[11px] text-slate-500">
                 Se activará y se abrirá la votación en cuanto confirmes.
               </div>
             </div>
@@ -1789,32 +1938,40 @@ function CreateSingleVoteView({
               setActivationType("schedule");
               setShowScheduleModal(true);
             }}
-            className={`flex items-start gap-2.5 p-3.5 rounded-md border-2 cursor-pointer transition-all ${
+            className={`flex cursor-pointer items-start gap-2.5 rounded-md border-2 p-3.5 transition-all ${
               activationType === "schedule"
                 ? "border-[#008075] bg-[#EAF5F2]/30"
                 : "border-slate-200 bg-white hover:border-slate-300"
             }`}
           >
-            <div className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${
-              activationType === "schedule" ? "bg-[#008075] text-white" : "bg-slate-100 text-slate-600"
-            }`}>
-              <Calendar className="w-3.5 h-3.5" />
+            <div
+              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${
+                activationType === "schedule"
+                  ? "bg-[#008075] text-white"
+                  : "bg-slate-100 text-slate-600"
+              }`}
+            >
+              <Calendar className="h-3.5 w-3.5" />
             </div>
-            <div className="flex-1 min-w-0">
+            <div className="min-w-0 flex-1">
               {activationType === "schedule" && scheduledDate ? (
                 <>
-                  <div className="text-xs font-bold text-[#008075]">La votación se programará para</div>
-                  <div className="text-xs font-black text-slate-900 mt-0.5">
+                  <div className="text-xs font-bold text-[#008075]">
+                    La votación se programará para
+                  </div>
+                  <div className="mt-0.5 text-xs font-black text-slate-900">
                     {formatScheduledDisplay(scheduledDate, scheduledTime)}
                   </div>
-                  <div className="text-[10px] text-slate-400 mt-0.5 underline">
+                  <div className="mt-0.5 text-[10px] text-slate-400 underline">
                     Pulsar para cambiar fecha
                   </div>
                 </>
               ) : (
                 <>
-                  <div className="text-xs font-bold text-slate-900">Programar para más tarde</div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">
+                  <div className="text-xs font-bold text-slate-900">
+                    Programar para más tarde
+                  </div>
+                  <div className="mt-0.5 text-[11px] text-slate-500">
                     Se activará en la fecha y hora que elijas.
                   </div>
                 </>
@@ -1843,7 +2000,7 @@ function CreateSingleVoteView({
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 rounded-md border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+          className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50"
         >
           Cancelar
         </button>
@@ -1851,9 +2008,9 @@ function CreateSingleVoteView({
           type="button"
           onClick={handlePublish}
           disabled={createMutation.isPending}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-[#008075] text-xs font-bold text-white hover:bg-[#006e64] transition-colors shadow-2xs"
+          className="flex items-center gap-1.5 rounded-md bg-[#008075] px-4 py-2 text-xs font-bold text-white shadow-2xs transition-colors hover:bg-[#006e64]"
         >
-          <Check className="w-3.5 h-3.5" />
+          <Check className="h-3.5 w-3.5" />
           {createMutation.isPending
             ? "Guardando..."
             : activationType === "schedule"
@@ -1883,7 +2040,9 @@ function CreateMeetingView({
   const [secondCallDate, setSecondCallDate] = useState("");
   const [secondCallTime, setSecondCallTime] = useState("");
   const [closesAt, setClosesAt] = useState("");
-  const [activationType, setActivationType] = useState<"now" | "schedule">("now");
+  const [activationType, setActivationType] = useState<"now" | "schedule">(
+    "now",
+  );
   const [scheduledDate, setScheduledDate] = useState("");
   const [scheduledTime, setScheduledTime] = useState("");
   const [showScheduleModal, setShowScheduleModal] = useState(false);
@@ -1896,7 +2055,13 @@ function CreateMeetingView({
       onlineVotingEnabled: boolean;
       autoGenerateOt: boolean;
       otProviderId?: string;
-      proposals: Array<{ companyName: string; amount: string; fileUrl?: string; fileName?: string; providerId?: string }>;
+      proposals: Array<{
+        companyName: string;
+        amount: string;
+        fileUrl?: string;
+        fileName?: string;
+        providerId?: string;
+      }>;
     }>
   >([]);
 
@@ -1904,8 +2069,11 @@ function CreateMeetingView({
   const [newPropCompany, setNewPropCompany] = useState("");
   const [newPropAmount, setNewPropAmount] = useState("");
   const [newPropFile, setNewPropFile] = useState("");
-  const [newPropProviderId, setNewPropProviderId] = useState<string | null>(null);
-  const [showMeetingProviderDropdown, setShowMeetingProviderDropdown] = useState(false);
+  const [newPropProviderId, setNewPropProviderId] = useState<string | null>(
+    null,
+  );
+  const [showMeetingProviderDropdown, setShowMeetingProviderDropdown] =
+    useState(false);
   const [isAddingProposal, setIsAddingProposal] = useState(false);
 
   const { data: providers } = useQuery(
@@ -1962,15 +2130,18 @@ function CreateMeetingView({
     }
     const next = [...items];
     if (next[activeItemIndex]) {
-      const matched = (providers as any[] ?? []).find(
-        (p: any) => p.name.toLowerCase().trim() === newPropCompany.toLowerCase().trim(),
+      const matched = ((providers as any[]) ?? []).find(
+        (p: any) =>
+          p.name.toLowerCase().trim() === newPropCompany.toLowerCase().trim(),
       );
       next[activeItemIndex]!.proposals.push({
         companyName: newPropCompany.trim(),
         amount: formatEuro(newPropAmount.trim()),
         providerId: newPropProviderId || matched?.id || undefined,
         fileName: newPropFile || undefined,
-        fileUrl: newPropFile ? "https://example.com/" + encodeURIComponent(newPropFile) : undefined,
+        fileUrl: newPropFile
+          ? "https://example.com/" + encodeURIComponent(newPropFile)
+          : undefined,
       });
       setItems(next);
       setNewPropCompany("");
@@ -1993,7 +2164,9 @@ function CreateMeetingView({
       return;
     }
 
-    const parsedMeetingDate = new Date(`${meetingDate}T${meetingTime || "18:00"}:00`);
+    const parsedMeetingDate = new Date(
+      `${meetingDate}T${meetingTime || "18:00"}:00`,
+    );
     if (isNaN(parsedMeetingDate.getTime())) {
       alert("Por favor introduce una fecha y hora válidas para la junta.");
       return;
@@ -2002,7 +2175,9 @@ function CreateMeetingView({
 
     let fullSecondCall: string | undefined = undefined;
     if (secondCallDate) {
-      const parsed2nd = new Date(`${secondCallDate}T${secondCallTime || "18:30"}:00`);
+      const parsed2nd = new Date(
+        `${secondCallDate}T${secondCallTime || "18:30"}:00`,
+      );
       if (!isNaN(parsed2nd.getTime())) {
         fullSecondCall = parsed2nd.toISOString();
       }
@@ -2015,7 +2190,9 @@ function CreateMeetingView({
 
     const scheduledIso =
       activationType === "schedule" && scheduledDate
-        ? new Date(`${scheduledDate}T${scheduledTime || "09:00"}:00`).toISOString()
+        ? new Date(
+            `${scheduledDate}T${scheduledTime || "09:00"}:00`,
+          ).toISOString()
         : undefined;
 
     createMeetingMutation.mutate({
@@ -2049,17 +2226,22 @@ function CreateMeetingView({
   return (
     <div className="space-y-5">
       {/* Step 1: Datos de la junta */}
-      <div className="bg-white rounded-lg border border-slate-200/80 p-5 shadow-2xs space-y-3.5">
+      <div className="space-y-3.5 rounded-lg border border-slate-200/80 bg-white p-5 shadow-2xs">
         <div className="flex items-center gap-2.5">
-          <div className="w-6 h-6 rounded-md bg-[#008075] text-white flex items-center justify-center text-xs font-black">
+          <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[#008075] text-xs font-black text-white">
             1
           </div>
-          <h3 className="text-sm font-bold text-slate-900">Datos de la junta</h3>
+          <h3 className="text-sm font-bold text-slate-900">
+            Datos de la junta
+          </h3>
         </div>
 
         <div className="space-y-3 pl-8.5">
           <div className="space-y-1">
-            <Label htmlFor="meet-title" className="text-xs font-semibold text-slate-700">
+            <Label
+              htmlFor="meet-title"
+              className="text-xs font-semibold text-slate-700"
+            >
               Título de la junta *
             </Label>
             <Input
@@ -2067,13 +2249,16 @@ function CreateMeetingView({
               placeholder="Ej: Junta General Ordinaria - Septiembre 2026"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="text-xs h-9 rounded-md"
+              className="h-9 rounded-md text-xs"
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
             <div className="space-y-1">
-              <Label htmlFor="meet-date" className="text-xs font-semibold text-slate-700">
+              <Label
+                htmlFor="meet-date"
+                className="text-xs font-semibold text-slate-700"
+              >
                 Fecha *
               </Label>
               <Input
@@ -2081,11 +2266,14 @@ function CreateMeetingView({
                 type="date"
                 value={meetingDate}
                 onChange={(e) => setMeetingDate(e.target.value)}
-                className="text-xs h-9 rounded-md"
+                className="h-9 rounded-md text-xs"
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="meet-time" className="text-xs font-semibold text-slate-700">
+              <Label
+                htmlFor="meet-time"
+                className="text-xs font-semibold text-slate-700"
+              >
                 Hora *
               </Label>
               <Input
@@ -2093,13 +2281,16 @@ function CreateMeetingView({
                 type="time"
                 value={meetingTime}
                 onChange={(e) => setMeetingTime(e.target.value)}
-                className="text-xs h-9 rounded-md"
+                className="h-9 rounded-md text-xs"
               />
             </div>
           </div>
 
           <div className="space-y-1">
-            <Label htmlFor="meet-loc" className="text-xs font-semibold text-slate-700">
+            <Label
+              htmlFor="meet-loc"
+              className="text-xs font-semibold text-slate-700"
+            >
               Lugar de celebración *
             </Label>
             <Input
@@ -2107,13 +2298,16 @@ function CreateMeetingView({
               placeholder="Ej: Salón Comunitario / Portal principal"
               value={meetingLocation}
               onChange={(e) => setMeetingLocation(e.target.value)}
-              className="text-xs h-9 rounded-md"
+              className="h-9 rounded-md text-xs"
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
             <div className="space-y-1">
-              <Label htmlFor="meet-date2" className="text-xs font-semibold text-slate-700">
+              <Label
+                htmlFor="meet-date2"
+                className="text-xs font-semibold text-slate-700"
+              >
                 Segunda convocatoria (opcional)
               </Label>
               <Input
@@ -2121,11 +2315,14 @@ function CreateMeetingView({
                 type="date"
                 value={secondCallDate}
                 onChange={(e) => setSecondCallDate(e.target.value)}
-                className="text-xs h-9 rounded-md"
+                className="h-9 rounded-md text-xs"
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="meet-time2" className="text-xs font-semibold text-slate-700">
+              <Label
+                htmlFor="meet-time2"
+                className="text-xs font-semibold text-slate-700"
+              >
                 Hora (opcional)
               </Label>
               <Input
@@ -2133,34 +2330,39 @@ function CreateMeetingView({
                 type="time"
                 value={secondCallTime}
                 onChange={(e) => setSecondCallTime(e.target.value)}
-                className="text-xs h-9 rounded-md"
+                className="h-9 rounded-md text-xs"
               />
             </div>
           </div>
 
           {/* Fecha límite votación online — obligatoria */}
           <div className="space-y-1">
-            <Label htmlFor="meet-closes" className="text-xs font-semibold text-slate-700">
+            <Label
+              htmlFor="meet-closes"
+              className="text-xs font-semibold text-slate-700"
+            >
               Fecha límite para votar online *
             </Label>
-            <p className="text-[11px] text-slate-500">Los propietarios deben votar antes de esta fecha.</p>
+            <p className="text-[11px] text-slate-500">
+              Los propietarios deben votar antes de esta fecha.
+            </p>
             <div className="relative">
-              <Calendar className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+              <Calendar className="absolute top-2.5 left-2.5 h-3.5 w-3.5 text-slate-400" />
               <Input
                 id="meet-closes"
                 type="datetime-local"
                 value={closesAt}
                 onChange={(e) => setClosesAt(e.target.value)}
-                className="text-xs h-9 pl-8.5 rounded-md cursor-pointer"
+                className="h-9 cursor-pointer rounded-md pl-8.5 text-xs"
                 required
               />
             </div>
           </div>
 
           {/* Banner: 3 propietarios sin derecho a voto */}
-          <div className="flex items-center justify-between p-2.5 rounded-md bg-slate-50 border border-slate-200/80 text-xs">
+          <div className="flex items-center justify-between rounded-md border border-slate-200/80 bg-slate-50 p-2.5 text-xs">
             <div className="flex items-center gap-2 text-slate-600">
-              <Users className="w-3.5 h-3.5 text-slate-400" />
+              <Users className="h-3.5 w-3.5 text-slate-400" />
               <span>3 propietarios sin derecho a voto</span>
             </div>
             <button
@@ -2175,14 +2377,16 @@ function CreateMeetingView({
       </div>
 
       {/* Agenda Points Section */}
-      <div className="bg-white rounded-lg border border-slate-200/80 p-5 shadow-2xs space-y-3.5">
+      <div className="space-y-3.5 rounded-lg border border-slate-200/80 bg-white p-5 shadow-2xs">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-6 h-6 rounded-md bg-[#008075] text-white flex items-center justify-center text-xs font-black">
+            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[#008075] text-xs font-black text-white">
               2
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900">Puntos del orden del día</h3>
+              <h3 className="text-sm font-bold text-slate-900">
+                Puntos del orden del día
+              </h3>
               <p className="text-xs text-slate-500">
                 Añade los acuerdos a deliberar y presupuestos comparativos.
               </p>
@@ -2192,17 +2396,18 @@ function CreateMeetingView({
           <button
             type="button"
             onClick={handleAddNewItem}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-md border border-[#008075] text-[#008075] text-xs font-bold hover:bg-[#EAF5F2] transition-colors"
+            className="flex items-center gap-1 rounded-md border border-[#008075] px-3 py-1.5 text-xs font-bold text-[#008075] transition-colors hover:bg-[#EAF5F2]"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="h-3.5 w-3.5" />
             Añadir punto
           </button>
         </div>
 
         <div className="space-y-2.5 pl-8.5">
           {items.length === 0 ? (
-            <div className="p-5 text-center text-xs text-slate-400 bg-slate-50 rounded-md border border-dashed border-slate-200">
-              Aún no has añadido puntos al orden del día. Pulsa en &quot;Añadir punto&quot; para comenzar a redactar los temas de la junta.
+            <div className="rounded-md border border-dashed border-slate-200 bg-slate-50 p-5 text-center text-xs text-slate-400">
+              Aún no has añadido puntos al orden del día. Pulsa en &quot;Añadir
+              punto&quot; para comenzar a redactar los temas de la junta.
             </div>
           ) : (
             items.map((it, idx) => {
@@ -2210,34 +2415,38 @@ function CreateMeetingView({
               return (
                 <div
                   key={idx}
-                  className="rounded-md border border-slate-200 bg-white p-3.5 space-y-2.5 transition-all"
+                  className="space-y-2.5 rounded-md border border-slate-200 bg-white p-3.5 transition-all"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                      <span className="w-5 h-5 rounded bg-slate-100 text-slate-700 flex items-center justify-center text-xs font-bold shrink-0">
+                    <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-slate-100 text-xs font-bold text-slate-700">
                         {idx + 1}
                       </span>
                       <Input
                         placeholder="Título del punto (ej. Reparación del ascensor)..."
                         value={it.title}
-                        onChange={(e) => handleUpdateItemTitle(idx, e.target.value)}
-                        className="text-xs h-8 rounded-md flex-1"
+                        onChange={(e) =>
+                          handleUpdateItemTitle(idx, e.target.value)
+                        }
+                        className="h-8 flex-1 rounded-md text-xs"
                       />
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex shrink-0 items-center gap-2">
                       <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#008075]">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#008075]" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-[#008075]" />
                         {it.onlineVotingEnabled ? "Voto previo" : "Informativo"}
                       </span>
                       <button
                         type="button"
-                        onClick={() => setActiveItemIndex(isSelected ? -1 : idx)}
+                        onClick={() =>
+                          setActiveItemIndex(isSelected ? -1 : idx)
+                        }
                         className="p-1 text-slate-400 hover:text-slate-600"
                       >
                         {isSelected ? (
-                          <ChevronUp className="w-3.5 h-3.5" />
+                          <ChevronUp className="h-3.5 w-3.5" />
                         ) : (
-                          <ChevronDown className="w-3.5 h-3.5" />
+                          <ChevronDown className="h-3.5 w-3.5" />
                         )}
                       </button>
                       <button
@@ -2245,19 +2454,19 @@ function CreateMeetingView({
                         onClick={() => handleRemoveItem(idx)}
                         className="p-1 text-slate-400 hover:text-red-500"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   </div>
 
                   {isSelected && (
-                    <div className="pt-2.5 border-t border-slate-100 space-y-3">
+                    <div className="space-y-3 border-t border-slate-100 pt-2.5">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-semibold text-slate-700">
                           ¿Se vota este punto antes de la junta? *
                         </span>
                         <div className="flex items-center gap-3 text-xs">
-                          <label className="flex items-center gap-1 cursor-pointer">
+                          <label className="flex cursor-pointer items-center gap-1">
                             <input
                               type="radio"
                               name={`vote-point-${idx}`}
@@ -2271,7 +2480,7 @@ function CreateMeetingView({
                             />
                             <span>Sí</span>
                           </label>
-                          <label className="flex items-center gap-1 cursor-pointer">
+                          <label className="flex cursor-pointer items-center gap-1">
                             <input
                               type="radio"
                               name={`vote-point-${idx}`}
@@ -2301,13 +2510,13 @@ function CreateMeetingView({
                             next[idx]!.budget = e.target.value;
                             setItems(next);
                           }}
-                          className="text-xs h-8 bg-white rounded-md max-w-xs"
+                          className="h-8 max-w-xs rounded-md bg-white text-xs"
                         />
                       </div>
 
                       {/* Generar orden de trabajo si se aprueba */}
-                      <div className="pt-2.5 border-t border-slate-100 space-y-2">
-                        <label className="flex items-center gap-2 cursor-pointer">
+                      <div className="space-y-2 border-t border-slate-100 pt-2.5">
+                        <label className="flex cursor-pointer items-center gap-2">
                           <input
                             type="checkbox"
                             checked={it.autoGenerateOt ?? false}
@@ -2316,14 +2525,14 @@ function CreateMeetingView({
                               next[idx]!.autoGenerateOt = e.target.checked;
                               setItems(next);
                             }}
-                            className="w-3.5 h-3.5 rounded border-slate-300 text-[#008075] focus:ring-[#008075]"
+                            className="h-3.5 w-3.5 rounded border-slate-300 text-[#008075] focus:ring-[#008075]"
                           />
                           <span className="text-xs font-semibold text-slate-700">
                             Generar orden de trabajo si se aprueba
                           </span>
                         </label>
                         {it.autoGenerateOt && (
-                          <div className="pl-5.5 space-y-1">
+                          <div className="space-y-1 pl-5.5">
                             <label className="text-[11px] font-medium text-slate-500">
                               Proveedor asignado (opcional)
                             </label>
@@ -2334,12 +2543,13 @@ function CreateMeetingView({
                                 next[idx]!.otProviderId = e.target.value;
                                 setItems(next);
                               }}
-                              className="w-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#008075]"
+                              className="w-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 focus:ring-1 focus:ring-[#008075] focus:outline-none"
                             >
                               <option value="">Sin asignar</option>
-                              {(providers as any[] ?? []).map((p: any) => (
+                              {((providers as any[]) ?? []).map((p: any) => (
                                 <option key={p.id} value={p.id}>
-                                  {p.name} {p.speciality ? `(${p.speciality})` : ""}
+                                  {p.name}{" "}
+                                  {p.speciality ? `(${p.speciality})` : ""}
                                 </option>
                               ))}
                             </select>
@@ -2364,35 +2574,54 @@ function CreateMeetingView({
 
                         {/* Add proposal mini form */}
                         {isAddingProposal && (
-                          <div className="p-2.5 rounded-md bg-slate-50 border border-slate-200 space-y-2.5">
+                          <div className="space-y-2.5 rounded-md border border-slate-200 bg-slate-50 p-2.5">
                             <div className="grid grid-cols-2 gap-2">
                               {/* Empresa con autocomplete */}
-                              <div className="space-y-1 relative">
+                              <div className="relative space-y-1">
                                 <Input
                                   placeholder="Empresa (ej. Ascensores Madrid S.L.)"
                                   value={newPropCompany}
                                   onChange={(e) => {
                                     setNewPropCompany(e.target.value);
                                     setShowMeetingProviderDropdown(true);
-                                    const exact = (providers as any[] ?? []).find(
+                                    const exact = (
+                                      (providers as any[]) ?? []
+                                    ).find(
                                       (p: any) =>
                                         p.name.toLowerCase().trim() ===
                                         e.target.value.toLowerCase().trim(),
                                     );
-                                    setNewPropProviderId(exact ? exact.id : null);
+                                    setNewPropProviderId(
+                                      exact ? exact.id : null,
+                                    );
                                   }}
-                                  onFocus={() => setShowMeetingProviderDropdown(true)}
-                                  onBlur={() => setTimeout(() => setShowMeetingProviderDropdown(false), 150)}
-                                  className="text-xs h-7.5 bg-white rounded-md"
+                                  onFocus={() =>
+                                    setShowMeetingProviderDropdown(true)
+                                  }
+                                  onBlur={() =>
+                                    setTimeout(
+                                      () =>
+                                        setShowMeetingProviderDropdown(false),
+                                      150,
+                                    )
+                                  }
+                                  className="h-7.5 rounded-md bg-white text-xs"
                                 />
-                                {showMeetingProviderDropdown && newPropCompany.trim().length > 0 && (
+                                {showMeetingProviderDropdown &&
+                                  newPropCompany.trim().length > 0 &&
                                   (() => {
-                                    const filtered = (providers as any[] ?? []).filter((p: any) =>
-                                      p.name.toLowerCase().includes(newPropCompany.toLowerCase().trim()),
+                                    const filtered = (
+                                      (providers as any[]) ?? []
+                                    ).filter((p: any) =>
+                                      p.name
+                                        .toLowerCase()
+                                        .includes(
+                                          newPropCompany.toLowerCase().trim(),
+                                        ),
                                     );
                                     if (filtered.length === 0) return null;
                                     return (
-                                      <div className="absolute top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg z-30 py-1">
+                                      <div className="absolute top-full right-0 left-0 z-30 mt-1 max-h-40 overflow-y-auto rounded-md border border-slate-200 bg-white py-1 shadow-lg">
                                         {filtered.map((p: any) => (
                                           <button
                                             key={p.id}
@@ -2401,13 +2630,17 @@ function CreateMeetingView({
                                               e.preventDefault();
                                               setNewPropCompany(p.name);
                                               setNewPropProviderId(p.id);
-                                              setShowMeetingProviderDropdown(false);
+                                              setShowMeetingProviderDropdown(
+                                                false,
+                                              );
                                             }}
-                                            className="w-full text-left px-3 py-1.5 text-xs hover:bg-[#EAF5F2] flex items-center justify-between transition-colors"
+                                            className="flex w-full items-center justify-between px-3 py-1.5 text-left text-xs transition-colors hover:bg-[#EAF5F2]"
                                           >
-                                            <span className="font-semibold text-slate-800">{p.name}</span>
+                                            <span className="font-semibold text-slate-800">
+                                              {p.name}
+                                            </span>
                                             {p.speciality && (
-                                              <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                                              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-400">
                                                 {p.speciality}
                                               </span>
                                             )}
@@ -2415,23 +2648,24 @@ function CreateMeetingView({
                                         ))}
                                       </div>
                                     );
-                                  })()
-                                )}
+                                  })()}
                               </div>
                               <Input
                                 placeholder="Importe (ej. 2.500 €)"
                                 value={newPropAmount}
-                                onChange={(e) => setNewPropAmount(e.target.value)}
-                                className="text-xs h-7.5 bg-white rounded-md"
+                                onChange={(e) =>
+                                  setNewPropAmount(e.target.value)
+                                }
+                                className="h-7.5 rounded-md bg-white text-xs"
                               />
                             </div>
 
                             {/* Documento adjunto (opcional) */}
-                            <div className="rounded-md border-2 border-dashed border-slate-200 bg-white p-2 text-center cursor-pointer hover:border-[#008075] transition-colors">
+                            <div className="cursor-pointer rounded-md border-2 border-dashed border-slate-200 bg-white p-2 text-center transition-colors hover:border-[#008075]">
                               {newPropFile ? (
                                 <div className="flex items-center justify-between px-2 text-xs">
-                                  <div className="flex items-center gap-2 text-slate-800 font-medium">
-                                    <span className="p-0.5 rounded bg-rose-50 text-rose-600 font-bold text-[10px]">
+                                  <div className="flex items-center gap-2 font-medium text-slate-800">
+                                    <span className="rounded bg-rose-50 p-0.5 text-[10px] font-bold text-rose-600">
                                       PDF
                                     </span>
                                     <span>{newPropFile}</span>
@@ -2441,17 +2675,22 @@ function CreateMeetingView({
                                     onClick={() => setNewPropFile("")}
                                     className="text-slate-400 hover:text-slate-600"
                                   >
-                                    <X className="w-3.5 h-3.5" />
+                                    <X className="h-3.5 w-3.5" />
                                   </button>
                                 </div>
                               ) : (
                                 <button
                                   type="button"
-                                  onClick={() => setNewPropFile("Presupuesto_adjunto.pdf")}
-                                  className="flex flex-col items-center justify-center w-full py-1 text-xs text-slate-500"
+                                  onClick={() =>
+                                    setNewPropFile("Presupuesto_adjunto.pdf")
+                                  }
+                                  className="flex w-full flex-col items-center justify-center py-1 text-xs text-slate-500"
                                 >
-                                  <Upload className="w-4 h-4 text-slate-400 mb-1" />
-                                  <span>Arrastrar documento o hacer clic para adjuntar (opcional)</span>
+                                  <Upload className="mb-1 h-4 w-4 text-slate-400" />
+                                  <span>
+                                    Arrastrar documento o hacer clic para
+                                    adjuntar (opcional)
+                                  </span>
                                 </button>
                               )}
                             </div>
@@ -2474,7 +2713,7 @@ function CreateMeetingView({
                               <button
                                 type="button"
                                 onClick={handleSaveProposal}
-                                className="px-2.5 py-1 bg-[#008075] text-white text-xs font-bold rounded-md"
+                                className="rounded-md bg-[#008075] px-2.5 py-1 text-xs font-bold text-white"
                               >
                                 Guardar
                               </button>
@@ -2485,14 +2724,18 @@ function CreateMeetingView({
                         {it.proposals.map((p, pIdx) => (
                           <div
                             key={pIdx}
-                            className="flex items-center justify-between p-2 rounded bg-slate-50 text-xs"
+                            className="flex items-center justify-between rounded bg-slate-50 p-2 text-xs"
                           >
-                            <span className="font-medium text-slate-800">{p.companyName}</span>
+                            <span className="font-medium text-slate-800">
+                              {p.companyName}
+                            </span>
                             <div className="flex items-center gap-2.5">
-                              <span className="font-bold text-slate-900">{p.amount}</span>
+                              <span className="font-bold text-slate-900">
+                                {p.amount}
+                              </span>
                               {p.fileName && (
                                 <span className="inline-flex items-center gap-1 text-[11px] text-slate-400">
-                                  <Paperclip className="w-3 h-3" />
+                                  <Paperclip className="h-3 w-3" />
                                   {p.fileName}
                                 </span>
                               )}
@@ -2500,12 +2743,14 @@ function CreateMeetingView({
                                 type="button"
                                 onClick={() => {
                                   const next = [...items];
-                                  next[idx]!.proposals = next[idx]!.proposals.filter((_, i) => i !== pIdx);
+                                  next[idx]!.proposals = next[
+                                    idx
+                                  ]!.proposals.filter((_, i) => i !== pIdx);
                                   setItems(next);
                                 }}
                                 className="p-0.5 text-slate-400 hover:text-red-500"
                               >
-                                <Trash2 className="w-3 h-3" />
+                                <Trash2 className="h-3 w-3" />
                               </button>
                             </div>
                           </div>
@@ -2521,25 +2766,27 @@ function CreateMeetingView({
       </div>
 
       {/* "¿Cuándo quieres que se active?" */}
-      <div className="bg-white rounded-lg border border-slate-200/80 p-5 shadow-2xs space-y-3">
-        <h3 className="text-sm font-bold text-slate-900">¿Cuándo quieres que se active?</h3>
+      <div className="space-y-3 rounded-lg border border-slate-200/80 bg-white p-5 shadow-2xs">
+        <h3 className="text-sm font-bold text-slate-900">
+          ¿Cuándo quieres que se active?
+        </h3>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
           {/* Card 1: Ahora */}
           <div
             onClick={() => setActivationType("now")}
-            className={`flex items-start gap-2.5 p-3.5 rounded-md border-2 cursor-pointer transition-all ${
+            className={`flex cursor-pointer items-start gap-2.5 rounded-md border-2 p-3.5 transition-all ${
               activationType === "now"
                 ? "border-[#008075] bg-[#EAF5F2]/30"
                 : "border-slate-200 bg-white hover:border-slate-300"
             }`}
           >
-            <div className="w-7 h-7 rounded-md bg-[#EAF5F2] flex items-center justify-center text-[#008075] shrink-0">
-              <Zap className="w-3.5 h-3.5" />
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[#EAF5F2] text-[#008075]">
+              <Zap className="h-3.5 w-3.5" />
             </div>
             <div>
               <div className="text-xs font-bold text-slate-900">Ahora</div>
-              <div className="text-[11px] text-slate-500 mt-0.5">
+              <div className="mt-0.5 text-[11px] text-slate-500">
                 Se activará y se abrirá la votación en cuanto confirmes.
               </div>
             </div>
@@ -2551,32 +2798,40 @@ function CreateMeetingView({
               setActivationType("schedule");
               setShowScheduleModal(true);
             }}
-            className={`flex items-start gap-2.5 p-3.5 rounded-md border-2 cursor-pointer transition-all ${
+            className={`flex cursor-pointer items-start gap-2.5 rounded-md border-2 p-3.5 transition-all ${
               activationType === "schedule"
                 ? "border-[#008075] bg-[#EAF5F2]/30"
                 : "border-slate-200 bg-white hover:border-slate-300"
             }`}
           >
-            <div className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${
-              activationType === "schedule" ? "bg-[#008075] text-white" : "bg-slate-100 text-slate-600"
-            }`}>
-              <Calendar className="w-3.5 h-3.5" />
+            <div
+              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${
+                activationType === "schedule"
+                  ? "bg-[#008075] text-white"
+                  : "bg-slate-100 text-slate-600"
+              }`}
+            >
+              <Calendar className="h-3.5 w-3.5" />
             </div>
-            <div className="flex-1 min-w-0">
+            <div className="min-w-0 flex-1">
               {activationType === "schedule" && scheduledDate ? (
                 <>
-                  <div className="text-xs font-bold text-[#008075]">La junta se programará para</div>
-                  <div className="text-xs font-black text-slate-900 mt-0.5">
+                  <div className="text-xs font-bold text-[#008075]">
+                    La junta se programará para
+                  </div>
+                  <div className="mt-0.5 text-xs font-black text-slate-900">
                     {formatScheduledDisplay(scheduledDate, scheduledTime)}
                   </div>
-                  <div className="text-[10px] text-slate-400 mt-0.5 underline">
+                  <div className="mt-0.5 text-[10px] text-slate-400 underline">
                     Pulsar para cambiar fecha
                   </div>
                 </>
               ) : (
                 <>
-                  <div className="text-xs font-bold text-slate-900">Programar para más tarde</div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">
+                  <div className="text-xs font-bold text-slate-900">
+                    Programar para más tarde
+                  </div>
+                  <div className="mt-0.5 text-[11px] text-slate-500">
                     Se activará en la fecha y hora que elijas.
                   </div>
                 </>
@@ -2605,7 +2860,7 @@ function CreateMeetingView({
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 rounded-md border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+          className="rounded-md border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50"
         >
           Cancelar
         </button>
@@ -2613,7 +2868,7 @@ function CreateMeetingView({
           type="button"
           onClick={handlePublishMeeting}
           disabled={createMeetingMutation.isPending}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-[#008075] text-xs font-bold text-white hover:bg-[#006e64] transition-colors shadow-2xs"
+          className="flex items-center gap-1.5 rounded-md bg-[#008075] px-4 py-2 text-xs font-bold text-white shadow-2xs transition-colors hover:bg-[#006e64]"
         >
           {createMeetingMutation.isPending
             ? "Convocando..."
@@ -2672,13 +2927,17 @@ export default function VotesPage() {
   );
 
   const handleFinalizeActa = (sessionId: string) => {
-    if (confirm("¿Cerrar esta votación y formalizar el acta oficial de escrutinio?")) {
+    if (
+      confirm(
+        "¿Cerrar esta votación y formalizar el acta oficial de escrutinio?",
+      )
+    ) {
       closeMutation.mutate({ tenantId: TENANT_ID, sessionId });
     }
   };
 
   return (
-    <div className="flex flex-col gap-5 max-w-6xl mx-auto pb-10">
+    <div className="mx-auto flex max-w-6xl flex-col gap-5 pb-10">
       {/* ── Top Header matching Client Mockups ── */}
       <div className="flex flex-col justify-between gap-3.5 md:flex-row md:items-center">
         <div>
@@ -2686,17 +2945,28 @@ export default function VotesPage() {
             {activeView === "meeting"
               ? "Crear junta"
               : activeView === "rights"
-              ? "Habilitar voto"
-              : "Votaciones"}
+                ? "Habilitar voto"
+                : "Votaciones"}
           </h1>
-          <p className="text-slate-500 mt-0.5 text-xs">
-            {activeView === "meeting"
-              ? "Crea una junta, añade su orden del día y decide qué puntos requieren votación."
-              : activeView === "rights"
-              ? (<>Propietarios con recibos pendientes.<br />Puedes habilitar su voto de forma permanente cuando la ley lo permita, indicando el motivo.</>)
-              : activeView === "single"
-              ? (<>Crea una votación sobre un tema concreto de la comunidad.<br />Los propietarios podrán elegir entre las opciones que definas.</>)
-              : "Gestiona las votaciones de tu comunidad de forma sencilla y eficiente."}
+          <p className="mt-0.5 text-xs text-slate-500">
+            {activeView === "meeting" ? (
+              "Crea una junta, añade su orden del día y decide qué puntos requieren votación."
+            ) : activeView === "rights" ? (
+              <>
+                Propietarios con recibos pendientes.
+                <br />
+                Puedes habilitar su voto de forma permanente cuando la ley lo
+                permita, indicando el motivo.
+              </>
+            ) : activeView === "single" ? (
+              <>
+                Crea una votación sobre un tema concreto de la comunidad.
+                <br />
+                Los propietarios podrán elegir entre las opciones que definas.
+              </>
+            ) : (
+              "Gestiona las votaciones de tu comunidad de forma sencilla y eficiente."
+            )}
           </p>
         </div>
 
@@ -2705,7 +2975,9 @@ export default function VotesPage() {
           {/* Button 1: + Nueva junta (CTA principal) */}
           <button
             type="button"
-            onClick={() => setActiveView(activeView === "meeting" ? "list" : "meeting")}
+            onClick={() =>
+              setActiveView(activeView === "meeting" ? "list" : "meeting")
+            }
             className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-xs font-bold shadow-2xs transition-all ${
               activeView === "meeting"
                 ? "bg-[#006e64] text-white"
@@ -2721,7 +2993,9 @@ export default function VotesPage() {
           {/* Button 2: Votación sin junta */}
           <button
             type="button"
-            onClick={() => setActiveView(activeView === "single" ? "list" : "single")}
+            onClick={() =>
+              setActiveView(activeView === "single" ? "list" : "single")
+            }
             className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-xs font-bold shadow-2xs transition-all ${
               activeView === "single"
                 ? "bg-[#008075] text-white hover:bg-[#006e64]"
@@ -2735,7 +3009,9 @@ export default function VotesPage() {
           {/* Button 3: Habilitar voto */}
           <button
             type="button"
-            onClick={() => setActiveView(activeView === "rights" ? "list" : "rights")}
+            onClick={() =>
+              setActiveView(activeView === "rights" ? "list" : "rights")
+            }
             className={`flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-xs font-bold shadow-2xs transition-all ${
               activeView === "rights"
                 ? "bg-[#008075] text-white hover:bg-[#006e64]"

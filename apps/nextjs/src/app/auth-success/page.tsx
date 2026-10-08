@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+
 import { authClient } from "~/auth/client";
 
 export default function AuthSuccessPage() {
@@ -29,7 +30,7 @@ export default function AuthSuccessPage() {
         height: "100vh",
         background: "#f5f5f5",
         color: "#6b7280",
-        fontFamily: "sans-serif"
+        fontFamily: "sans-serif",
       }}
     >
       Verificando permisos y cargando el panel de control...

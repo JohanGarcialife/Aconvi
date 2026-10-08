@@ -1,20 +1,21 @@
 import { useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
   ActivityIndicator,
-  RefreshControl,
+  FlatList,
   Image,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Stack, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "~/utils/api";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+
+import { api } from "~/utils/api";
 import { getBaseUrl } from "~/utils/base-url";
 
 /** Converts a relative /uploads/... path to an absolute URL. Already-absolute URLs are returned unchanged. */
@@ -41,18 +42,51 @@ const BG = "#F9FAFB";
 const TENANT_ID = "org_aconvi_demo";
 
 // ─── Status config with human labels ─────────────────────────────────────────
-const STATUS_MAP: Record<string, { label: string; icon: string; color: string; bg: string }> = {
-  RECIBIDA:         { label: "Incidencia recibida",        icon: "✉️",  color: "#92400e", bg: "#fef3c7" },
-  EN_REVISION:      { label: "Profesional asignado",       icon: "🔍",  color: "#1e40af", bg: "#dbeafe" },
-  AGENDADA:         { label: "Intervención confirmada",    icon: "📅",  color: "#5b21b6", bg: "#ede9fe" },
-  EN_CURSO:         { label: "En intervención",            icon: "🔧",  color: "#065f46", bg: "#d1fae5" },
-  RESUELTA:         { label: "Resuelta",                   icon: "✅",  color: "#065f46", bg: "#d1fae5" },
-  RECHAZADA:        { label: "No procede",                 icon: "✕",   color: "#991b1b", bg: "#fee2e2" },
-  CERRADA:          { label: "Incidencia cerrada",         icon: "🔒",  color: "#374151", bg: "#f3f4f6" },
+const STATUS_MAP: Record<
+  string,
+  { label: string; icon: string; color: string; bg: string }
+> = {
+  RECIBIDA: {
+    label: "Incidencia recibida",
+    icon: "✉️",
+    color: "#92400e",
+    bg: "#fef3c7",
+  },
+  EN_REVISION: {
+    label: "Profesional asignado",
+    icon: "🔍",
+    color: "#1e40af",
+    bg: "#dbeafe",
+  },
+  AGENDADA: {
+    label: "Intervención confirmada",
+    icon: "📅",
+    color: "#5b21b6",
+    bg: "#ede9fe",
+  },
+  EN_CURSO: {
+    label: "En intervención",
+    icon: "🔧",
+    color: "#065f46",
+    bg: "#d1fae5",
+  },
+  RESUELTA: { label: "Resuelta", icon: "✅", color: "#065f46", bg: "#d1fae5" },
+  RECHAZADA: {
+    label: "No procede",
+    icon: "✕",
+    color: "#991b1b",
+    bg: "#fee2e2",
+  },
+  CERRADA: {
+    label: "Incidencia cerrada",
+    icon: "🔒",
+    color: "#374151",
+    bg: "#f3f4f6",
+  },
 };
 
 const ACTIVE_STATUSES = ["RECIBIDA", "EN_REVISION", "AGENDADA", "EN_CURSO"];
-const DONE_STATUSES   = ["RESUELTA", "CERRADA", "RECHAZADA"];
+const DONE_STATUSES = ["RESUELTA", "CERRADA", "RECHAZADA"];
 
 function formatDate(date: Date | string) {
   return format(new Date(date), "d 'de' MMMM", { locale: es });
@@ -62,7 +96,12 @@ export default function VecinoIncidentsScreen() {
   const router = useRouter();
   const [tab, setTab] = useState<"activas" | "finalizadas">("activas");
 
-  const { data: incidents = [], isLoading, refetch, isRefetching } = useQuery({
+  const {
+    data: incidents = [],
+    isLoading,
+    refetch,
+    isRefetching,
+  } = useQuery({
     ...api.incident.all.queryOptions({ tenantId: TENANT_ID }),
     refetchInterval: 300_000,
   });
@@ -73,7 +112,12 @@ export default function VecinoIncidentsScreen() {
 
   // ─── Card ────────────────────────────────────────────────────────────────────
   const renderItem = ({ item }: { item: (typeof incidents)[0] }) => {
-    const st = STATUS_MAP[item.status] ?? { label: item.status, icon: "", color: MUTED, bg: BG };
+    const st = STATUS_MAP[item.status] ?? {
+      label: item.status,
+      icon: "",
+      color: MUTED,
+      bg: BG,
+    };
     const isActive = ACTIVE_STATUSES.includes(item.status);
 
     return (
@@ -93,14 +137,19 @@ export default function VecinoIncidentsScreen() {
           ) : (
             <View style={[styles.thumbImg, styles.thumbPlaceholder]}>
               <Text style={{ fontSize: 26 }}>
-                {
-                  (item as any).category === "agua" ? "💧" :
-                  (item as any).category === "electricidad" ? "⚡" :
-                  (item as any).category === "acceso" ? "🔑" :
-                  (item as any).category === "limpieza" ? "🧹" :
-                  (item as any).category === "ruidos" ? "🔊" :
-                  (item as any).category === "instalaciones" ? "🔧" : "⚠️"
-                }
+                {(item as any).category === "agua"
+                  ? "💧"
+                  : (item as any).category === "electricidad"
+                    ? "⚡"
+                    : (item as any).category === "acceso"
+                      ? "🔑"
+                      : (item as any).category === "limpieza"
+                        ? "🧹"
+                        : (item as any).category === "ruidos"
+                          ? "🔊"
+                          : (item as any).category === "instalaciones"
+                            ? "🔧"
+                            : "⚠️"}
               </Text>
             </View>
           )}
@@ -108,7 +157,9 @@ export default function VecinoIncidentsScreen() {
 
         {/* Content */}
         <View style={styles.cardContent}>
-          <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
+          <Text style={styles.cardTitle} numberOfLines={1}>
+            {item.title}
+          </Text>
           <Text style={styles.cardDate}>
             Reportado el {formatDate(item.createdAt)}
           </Text>
@@ -121,7 +172,12 @@ export default function VecinoIncidentsScreen() {
 
         {/* Right side */}
         <View style={styles.cardRight}>
-          <View style={[styles.dot, { backgroundColor: isActive ? "#22c55e" : "#D1D5DB" }]} />
+          <View
+            style={[
+              styles.dot,
+              { backgroundColor: isActive ? "#22c55e" : "#D1D5DB" },
+            ]}
+          />
           <Text style={styles.chevron}>›</Text>
         </View>
       </TouchableOpacity>
@@ -148,7 +204,9 @@ export default function VecinoIncidentsScreen() {
             onPress={() => router.push("/(vecino)/incidents/new")}
             activeOpacity={0.85}
           >
-            <Text style={styles.emptyButtonText}>Informar de un problema  +</Text>
+            <Text style={styles.emptyButtonText}>
+              Informar de un problema +
+            </Text>
           </TouchableOpacity>
         )}
       </View>
@@ -175,16 +233,29 @@ export default function VecinoIncidentsScreen() {
             onPress={() => setTab("activas")}
             activeOpacity={0.8}
           >
-            <Text style={[styles.tabText, tab === "activas" && styles.tabTextActive]}>
+            <Text
+              style={[
+                styles.tabText,
+                tab === "activas" && styles.tabTextActive,
+              ]}
+            >
               Activas ({activas.length})
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.tabBtn, tab === "finalizadas" && styles.tabBtnActive]}
+            style={[
+              styles.tabBtn,
+              tab === "finalizadas" && styles.tabBtnActive,
+            ]}
             onPress={() => setTab("finalizadas")}
             activeOpacity={0.8}
           >
-            <Text style={[styles.tabText, tab === "finalizadas" && styles.tabTextActive]}>
+            <Text
+              style={[
+                styles.tabText,
+                tab === "finalizadas" && styles.tabTextActive,
+              ]}
+            >
               Finalizadas ({finalizadas.length})
             </Text>
           </TouchableOpacity>
@@ -206,7 +277,11 @@ export default function VecinoIncidentsScreen() {
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={PRIMARY} />
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={refetch}
+              tintColor={PRIMARY}
+            />
           }
         />
       )}
@@ -297,7 +372,13 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 1,
   },
-  thumb: { width: 72, height: 72, borderRadius: 12, overflow: "hidden", flexShrink: 0 },
+  thumb: {
+    width: 72,
+    height: 72,
+    borderRadius: 12,
+    overflow: "hidden",
+    flexShrink: 0,
+  },
   thumbImg: { width: 72, height: 72, borderRadius: 12 },
   thumbPlaceholder: {
     backgroundColor: `${PRIMARY}12`,
@@ -321,10 +402,20 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  chevron: { fontSize: 22, color: "#D1D5DB", fontWeight: "300", lineHeight: 26 },
+  chevron: {
+    fontSize: 22,
+    color: "#D1D5DB",
+    fontWeight: "300",
+    lineHeight: 26,
+  },
 
   // ── Empty state ───────────────────────────────────────────────────────────
-  emptyWrap: { flex: 1, padding: 20, justifyContent: "flex-start", paddingTop: 24 },
+  emptyWrap: {
+    flex: 1,
+    padding: 20,
+    justifyContent: "flex-start",
+    paddingTop: 24,
+  },
   emptyCard: {
     backgroundColor: `${PRIMARY}0D`,
     borderRadius: 20,
@@ -387,5 +478,11 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 6,
   },
-  fabText: { color: "#fff", fontSize: 28, fontWeight: "300", lineHeight: 32, marginTop: -2 },
+  fabText: {
+    color: "#fff",
+    fontSize: 28,
+    fontWeight: "300",
+    lineHeight: 32,
+    marginTop: -2,
+  },
 });

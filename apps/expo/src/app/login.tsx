@@ -1,27 +1,26 @@
 import { useState } from "react";
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
   ActivityIndicator,
-  StyleSheet,
+  Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Image,
-  Alert,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
+import Constants from "expo-constants";
+import * as Device from "expo-device";
+import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
-import * as Notifications from "expo-notifications";
-import * as Device from "expo-device";
-import Constants from "expo-constants";
-import { getBaseUrl } from "~/utils/base-url";
+
 import { queryClient } from "~/utils/api";
+import { getBaseUrl } from "~/utils/base-url";
 import { acquireAndRegisterPushToken } from "~/utils/usePushNotifications";
-
-
 
 const TEAL = "#00BDA5";
 const DARK = "#0F1B2B";
@@ -48,13 +47,20 @@ export default function LoginScreen() {
       const res = await fetch(`${getBaseUrl()}/api/auth/mobile-login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: username.trim().toLowerCase(), pin: pin.trim() }),
+        body: JSON.stringify({
+          username: username.trim().toLowerCase(),
+          pin: pin.trim(),
+        }),
       });
 
       const contentType = res.headers.get("content-type") ?? "";
       let data: { ok?: boolean; sessionToken?: string; error?: string } = {};
       if (contentType.includes("application/json")) {
-        data = (await res.json()) as { ok?: boolean; sessionToken?: string; error?: string };
+        data = (await res.json()) as {
+          ok?: boolean;
+          sessionToken?: string;
+          error?: string;
+        };
       } else {
         const text = await res.text();
         console.warn("[MobileLogin] Non-JSON response received:", text);
@@ -78,7 +84,7 @@ export default function LoginScreen() {
       const sessionRes = await fetch(`${getBaseUrl()}/api/auth/get-session`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const sessionData = await sessionRes.json() as {
+      const sessionData = (await sessionRes.json()) as {
         session?: { userId: string };
         user?: { id: string; role?: string };
       } | null;
@@ -88,7 +94,9 @@ export default function LoginScreen() {
       if (userId) {
         await SecureStore.setItemAsync("expo_user_id", userId);
       }
-      const isProvider = role.toLowerCase().includes("proveedor") || role.toLowerCase() === "provider";
+      const isProvider =
+        role.toLowerCase().includes("proveedor") ||
+        role.toLowerCase() === "provider";
 
       setStep("done");
 
@@ -107,7 +115,11 @@ export default function LoginScreen() {
     } catch (e: any) {
       setStep("error");
       const msg = String(e?.message ?? "");
-      if (msg.includes("JSON") || msg.includes("Unexpected") || msg.includes("SyntaxError")) {
+      if (
+        msg.includes("JSON") ||
+        msg.includes("Unexpected") ||
+        msg.includes("SyntaxError")
+      ) {
         setErrorMsg("PIN o usuario incorrecto.");
       } else {
         setErrorMsg("Error de conexión. Verifica tu internet.");
@@ -138,7 +150,8 @@ export default function LoginScreen() {
         <View style={styles.form}>
           <View style={styles.infoBox}>
             <Text style={styles.infoText}>
-              🔐 Acceso mediante tu usuario corporativo y el PIN de 6 dígitos que te proporcionó Aconvi.
+              🔐 Acceso mediante tu usuario corporativo y el PIN de 6 dígitos
+              que te proporcionó Aconvi.
             </Text>
           </View>
           <Text style={styles.label}>Usuario corporativo</Text>
@@ -228,7 +241,7 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#fca5a5"
+    borderColor: "#fca5a5",
   },
   infoBox: {
     backgroundColor: "#f0fdf9",

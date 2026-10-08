@@ -528,7 +528,9 @@ export default function VecinoHome() {
     v.status === "OPEN" &&
     Boolean(
       (v.closesAt && new Date(v.closesAt).getTime() < NOW) ||
-        (v.type === "JUNTA" && v.meetingDate && new Date(v.meetingDate).getTime() < NOW),
+        (v.type === "JUNTA" &&
+          v.meetingDate &&
+          new Date(v.meetingDate).getTime() < NOW),
     );
 
   // Votación válida debe contar obligatoriamente con fecha límite
@@ -604,8 +606,16 @@ export default function VecinoHome() {
 
   // Sort closed votings: closedAt desc (most recent first)
   const sortedClosed = [...recentClosedVotings].sort((a: any, b: any) => {
-    const timeA = a.closedAt ? new Date(a.closedAt).getTime() : a.closesAt ? new Date(a.closesAt).getTime() : new Date(a.createdAt).getTime();
-    const timeB = b.closedAt ? new Date(b.closedAt).getTime() : b.closesAt ? new Date(b.closesAt).getTime() : new Date(b.createdAt).getTime();
+    const timeA = a.closedAt
+      ? new Date(a.closedAt).getTime()
+      : a.closesAt
+        ? new Date(a.closesAt).getTime()
+        : new Date(a.createdAt).getTime();
+    const timeB = b.closedAt
+      ? new Date(b.closedAt).getTime()
+      : b.closesAt
+        ? new Date(b.closesAt).getTime()
+        : new Date(b.createdAt).getTime();
     return timeB - timeA;
   });
 
@@ -756,13 +766,23 @@ export default function VecinoHome() {
                 // Tratar como cerrada si status CLOSED o plazo expirado
                 const isClosed =
                   voting.status === "CLOSED" ||
-                  Boolean(voting.closesAt && new Date(voting.closesAt).getTime() < NOW) ||
-                  Boolean(voting.type === "JUNTA" && voting.meetingDate && new Date(voting.meetingDate).getTime() < NOW);
+                  Boolean(
+                    voting.closesAt &&
+                      new Date(voting.closesAt).getTime() < NOW,
+                  ) ||
+                  Boolean(
+                    voting.type === "JUNTA" &&
+                      voting.meetingDate &&
+                      new Date(voting.meetingDate).getTime() < NOW,
+                  );
 
                 // Calcular resultado para mostrar en tarjeta cerrada
                 const resultText: string | null = (() => {
                   if (!isClosed) return null;
-                  if (voting.resultSummary && typeof voting.resultSummary === "string") {
+                  if (
+                    voting.resultSummary &&
+                    typeof voting.resultSummary === "string"
+                  ) {
                     if (
                       voting.resultSummary.includes("Aprobado con") ||
                       voting.resultSummary.includes("Rechazado (")
@@ -778,20 +798,33 @@ export default function VecinoHome() {
 
                   const isApprove = (c: any) => {
                     const ch = (c.choice || "").toUpperCase();
-                    if (ch === "APPROVE" || ch === "APRUEBO" || ch === "SI" || ch === "SÍ") return true;
+                    if (
+                      ch === "APPROVE" ||
+                      ch === "APRUEBO" ||
+                      ch === "SI" ||
+                      ch === "SÍ"
+                    )
+                      return true;
                     if (c.optionId && voting.options) {
-                      const opt = voting.options.find((o: any) => o.id === c.optionId);
-                      if (opt && opt.label?.toLowerCase().includes("aprueb")) return true;
+                      const opt = voting.options.find(
+                        (o: any) => o.id === c.optionId,
+                      );
+                      if (opt && opt.label?.toLowerCase().includes("aprueb"))
+                        return true;
                     }
                     return false;
                   };
 
                   const isReject = (c: any) => {
                     const ch = (c.choice || "").toUpperCase();
-                    if (ch === "REJECT" || ch === "RECHAZO" || ch === "NO") return true;
+                    if (ch === "REJECT" || ch === "RECHAZO" || ch === "NO")
+                      return true;
                     if (c.optionId && voting.options) {
-                      const opt = voting.options.find((o: any) => o.id === c.optionId);
-                      if (opt && opt.label?.toLowerCase().includes("rechaz")) return true;
+                      const opt = voting.options.find(
+                        (o: any) => o.id === c.optionId,
+                      );
+                      if (opt && opt.label?.toLowerCase().includes("rechaz"))
+                        return true;
                     }
                     return false;
                   };
@@ -799,28 +832,52 @@ export default function VecinoHome() {
                   if (Array.isArray(voting.casts) && voting.casts.length > 0) {
                     approveW = voting.casts
                       .filter(isApprove)
-                      .reduce((sum: number, c: any) => sum + (c.coefficient || 1), 0);
+                      .reduce(
+                        (sum: number, c: any) => sum + (c.coefficient || 1),
+                        0,
+                      );
                     rejectW = voting.casts
                       .filter(isReject)
-                      .reduce((sum: number, c: any) => sum + (c.coefficient || 1), 0);
+                      .reduce(
+                        (sum: number, c: any) => sum + (c.coefficient || 1),
+                        0,
+                      );
                     const abstainW = voting.casts
-                      .filter((c: any) => (c.choice || "").toUpperCase() === "ABSTAIN")
-                      .reduce((sum: number, c: any) => sum + (c.coefficient || 1), 0);
+                      .filter(
+                        (c: any) =>
+                          (c.choice || "").toUpperCase() === "ABSTAIN",
+                      )
+                      .reduce(
+                        (sum: number, c: any) => sum + (c.coefficient || 1),
+                        0,
+                      );
                     totalW = approveW + rejectW + abstainW;
-                  } else if (Array.isArray(voting.options) && voting.options.length > 0) {
-                    const approveOpt = voting.options.find((o: any) => o.label?.toLowerCase().includes("aprueb"));
-                    const rejectOpt = voting.options.find((o: any) => o.label?.toLowerCase().includes("rechaz"));
-                    const abstainOpt = voting.options.find((o: any) => o.label?.toLowerCase().includes("absten"));
+                  } else if (
+                    Array.isArray(voting.options) &&
+                    voting.options.length > 0
+                  ) {
+                    const approveOpt = voting.options.find((o: any) =>
+                      o.label?.toLowerCase().includes("aprueb"),
+                    );
+                    const rejectOpt = voting.options.find((o: any) =>
+                      o.label?.toLowerCase().includes("rechaz"),
+                    );
+                    const abstainOpt = voting.options.find((o: any) =>
+                      o.label?.toLowerCase().includes("absten"),
+                    );
 
-                    approveW = (approveOpt?.weightedTotal && approveOpt.weightedTotal > 0)
-                      ? approveOpt.weightedTotal
-                      : (approveOpt?.voteCount ?? 0);
-                    rejectW = (rejectOpt?.weightedTotal && rejectOpt.weightedTotal > 0)
-                      ? rejectOpt.weightedTotal
-                      : (rejectOpt?.voteCount ?? 0);
-                    const abstainW = (abstainOpt?.weightedTotal && abstainOpt.weightedTotal > 0)
-                      ? abstainOpt.weightedTotal
-                      : (abstainOpt?.voteCount ?? 0);
+                    approveW =
+                      approveOpt?.weightedTotal && approveOpt.weightedTotal > 0
+                        ? approveOpt.weightedTotal
+                        : (approveOpt?.voteCount ?? 0);
+                    rejectW =
+                      rejectOpt?.weightedTotal && rejectOpt.weightedTotal > 0
+                        ? rejectOpt.weightedTotal
+                        : (rejectOpt?.voteCount ?? 0);
+                    const abstainW =
+                      abstainOpt?.weightedTotal && abstainOpt.weightedTotal > 0
+                        ? abstainOpt.weightedTotal
+                        : (abstainOpt?.voteCount ?? 0);
                     totalW = approveW + rejectW + abstainW;
                   }
 
@@ -907,7 +964,9 @@ export default function VecinoHome() {
                     {isClosed && resultText ? (
                       <View
                         style={{
-                          backgroundColor: isApprovedResult ? "#f0fdf4" : "#fef2f2",
+                          backgroundColor: isApprovedResult
+                            ? "#f0fdf4"
+                            : "#fef2f2",
                           borderWidth: 1,
                           borderColor: isApprovedResult ? "#bbf7d0" : "#fecaca",
                           borderRadius: 8,
@@ -947,13 +1006,16 @@ export default function VecinoHome() {
                           3}{" "}
                         respondidas
                       </Text>
-                     ) : !isClosed && (voting.budgetProposals?.length ?? 0) > 1 ? (
-                       <Text style={styles.votingAmount}>
-                         {voting.budgetProposals!.length} presupuestos
-                       </Text>
-                     ) : !isClosed && voting.budget ? (
-                       <Text style={styles.votingAmount}>{formatEuro(voting.budget)}</Text>
-                     ) : null}
+                    ) : !isClosed &&
+                      (voting.budgetProposals?.length ?? 0) > 1 ? (
+                      <Text style={styles.votingAmount}>
+                        {voting.budgetProposals!.length} presupuestos
+                      </Text>
+                    ) : !isClosed && voting.budget ? (
+                      <Text style={styles.votingAmount}>
+                        {formatEuro(voting.budget)}
+                      </Text>
+                    ) : null}
 
                     <Text
                       style={[

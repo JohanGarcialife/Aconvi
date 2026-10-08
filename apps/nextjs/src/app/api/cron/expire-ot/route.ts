@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
+import { and, eq, isNotNull, lt } from "drizzle-orm";
+
+import { emitWebSocketEvent, sendPushToAFs } from "@acme/api";
 import { db } from "@acme/db/client";
 import { incident, incidentHistory } from "@acme/db/schema";
-import { eq, and, isNotNull, lt } from "drizzle-orm";
-import { emitWebSocketEvent, sendPushToAFs } from "@acme/api";
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
-  
+
   if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -21,7 +22,7 @@ export async function GET(request: Request) {
       where: and(
         eq(incident.status, "EN_REVISION"),
         isNotNull(incident.assignedAt),
-        lt(incident.assignedAt, expirationThreshold)
+        lt(incident.assignedAt, expirationThreshold),
       ),
     });
 
@@ -56,7 +57,11 @@ export async function GET(request: Request) {
         data: { type: "ot_expired", incidentId: inc.id },
       }).catch(console.error);
 
-      void emitWebSocketEvent(inc.organizationId, "incident-updated", { ...inc, status: "CADUCADA", providerId: null });
+      void emitWebSocketEvent(inc.organizationId, "incident-updated", {
+        ...inc,
+        status: "CADUCADA",
+        providerId: null,
+      });
       expiredCount++;
     }
 
@@ -66,6 +71,9 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error("[CRON EXPIRE OT] Error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 },
+    );
   }
 }

@@ -1,10 +1,10 @@
-import { NextRequest } from "next/server";
-import { join } from "path";
 import { existsSync, readFileSync } from "fs";
+import { join } from "path";
+import { NextRequest } from "next/server";
 
 export async function GET(
   req: NextRequest,
-  props: { params: Promise<{ filename: string }> }
+  props: { params: Promise<{ filename: string }> },
 ) {
   try {
     const params = await props.params;
@@ -17,7 +17,7 @@ export async function GET(
     // Resolve path inside standalone container layout
     let baseDir = process.cwd();
     let filePath = join(baseDir, "apps/nextjs/public/uploads", filename);
-    
+
     if (!existsSync(filePath)) {
       filePath = join(baseDir, "public/uploads", filename);
     }
@@ -28,7 +28,7 @@ export async function GET(
     }
 
     const fileBuffer = readFileSync(filePath);
-    
+
     // Determine content type
     let contentType = "image/jpeg";
     if (filename.endsWith(".png")) contentType = "image/png";

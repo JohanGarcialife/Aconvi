@@ -1,15 +1,14 @@
-import express from "express";
 import http from "http";
-import { Server } from "socket.io";
 import cors from "cors";
+import express from "express";
+import { Server } from "socket.io";
 
 // ─── Aconvi WebSocket Notification Server ────────────────────────────────────
 // Handles real-time events for: incident updates, new notices, push fallbacks.
 // Also exposes a POST /internal/emit endpoint so the Next.js API (serverless)
 // can forward broadcast events without maintaining a persistent WS connection.
 
-const INTERNAL_SECRET =
-  process.env.WS_INTERNAL_SECRET ?? "aconvi-dev";
+const INTERNAL_SECRET = process.env.WS_INTERNAL_SECRET ?? "aconvi-dev";
 
 const app = express();
 app.use(cors({ origin: process.env.ALLOWED_ORIGIN ?? "*" }));
@@ -26,7 +25,10 @@ const io = new Server(server, {
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/health", (_req, res) => {
-  res.json({ status: "Aconvi WS Server running", clients: io.engine.clientsCount });
+  res.json({
+    status: "Aconvi WS Server running",
+    clients: io.engine.clientsCount,
+  });
 });
 
 // ─── Internal emit endpoint ───────────────────────────────────────────────────
@@ -125,8 +127,15 @@ io.on("connection", (socket) => {
   // ── Notice: new comunicado/aviso published ────────────────────────────────
   socket.on(
     "notice-published",
-    (payload: { noticeId: string; tenantId: string; type: string; title: string }) => {
-      socket.to(`tenant:${payload.tenantId}`).emit("notify-new-notice", payload);
+    (payload: {
+      noticeId: string;
+      tenantId: string;
+      type: string;
+      title: string;
+    }) => {
+      socket
+        .to(`tenant:${payload.tenantId}`)
+        .emit("notify-new-notice", payload);
     },
   );
 
@@ -152,5 +161,7 @@ io.on("connection", (socket) => {
 const PORT = process.env.PORT ?? 3001;
 server.listen(PORT, () => {
   console.log(`[WS] Aconvi WebSocket Server running on port ${PORT}`);
-  console.log(`[WS] Internal emit endpoint: POST http://localhost:${PORT}/internal/emit`);
+  console.log(
+    `[WS] Internal emit endpoint: POST http://localhost:${PORT}/internal/emit`,
+  );
 });

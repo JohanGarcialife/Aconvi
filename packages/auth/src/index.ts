@@ -2,7 +2,13 @@ import type { BetterAuthOptions, BetterAuthPlugin } from "better-auth";
 import { expo } from "@better-auth/expo";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { oAuthProxy, organization, phoneNumber, magicLink, bearer } from "better-auth/plugins";
+import {
+  bearer,
+  magicLink,
+  oAuthProxy,
+  organization,
+  phoneNumber,
+} from "better-auth/plugins";
 import { Resend } from "resend";
 
 import { db } from "@acme/db/client";
@@ -27,8 +33,8 @@ export function initAuth<
         user: schema.user,
         session: schema.session,
         account: schema.account,
-        verification: schema.verification
-      }
+        verification: schema.verification,
+      },
     }),
     baseURL: options.baseUrl,
     secret: options.secret,
@@ -48,7 +54,8 @@ export function initAuth<
           // Send SMS logic goes here (e.g., Twilio)
         },
         signUpOnVerification: {
-          getTempEmail: (phoneNumber) => `${phoneNumber.replace("+", "")}@aconvi.app`,
+          getTempEmail: (phoneNumber) =>
+            `${phoneNumber.replace("+", "")}@aconvi.app`,
           getTempName: () => "Vecino",
         },
       }),

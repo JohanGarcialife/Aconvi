@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { io, Socket } from "socket.io-client";
+
 import { authClient } from "~/auth/client";
 
 interface SocketContextType {
@@ -27,7 +28,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
     // Connect to the local WebSocket server (or production URL)
     const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "http://localhost:3001";
-    
+
     const socketInstance = io(WS_URL, {
       auth: {
         token: session.session?.token || "anonymous",
@@ -35,7 +36,10 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     });
 
     socketInstance.on("connect", () => {
-      console.log("[WS] Connected to Aconvi WebSocket Server", socketInstance.id);
+      console.log(
+        "[WS] Connected to Aconvi WebSocket Server",
+        socketInstance.id,
+      );
       setIsConnected(true);
 
       // We should join the specific tenant room if the user belongs to one.

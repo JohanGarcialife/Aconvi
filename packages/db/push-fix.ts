@@ -1,5 +1,6 @@
-import { db } from './src/client';
-import { sql } from 'drizzle-orm';
+import { sql } from "drizzle-orm";
+
+import { db } from "./src/client";
 
 async function run() {
   try {
@@ -18,7 +19,7 @@ async function run() {
         "closed_at" timestamp with time zone
       );
     `);
-    console.log('✅ Tabla vote_session creada exitosamente');
+    console.log("✅ Tabla vote_session creada exitosamente");
   } catch (error) {
     console.error("Error creating table:", error);
   } finally {

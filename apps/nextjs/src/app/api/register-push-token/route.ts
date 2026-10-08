@@ -1,7 +1,9 @@
-import { type NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
+import { and, eq, sql } from "drizzle-orm";
+
 import { db } from "@acme/db/client";
 import { pushToken, session } from "@acme/db/schema";
-import { eq, sql, and } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +24,10 @@ export async function POST(req: NextRequest) {
       : null;
 
     if (!sessionToken) {
-      return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
+      return NextResponse.json(
+        { ok: false, error: "UNAUTHORIZED" },
+        { status: 401 },
+      );
     }
 
     // 2. Resolve session from DB
@@ -31,21 +36,29 @@ export async function POST(req: NextRequest) {
     });
 
     if (!foundSession || foundSession.expiresAt < new Date()) {
-      return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
+      return NextResponse.json(
+        { ok: false, error: "UNAUTHORIZED" },
+        { status: 401 },
+      );
     }
 
     const userId = foundSession.userId;
 
     // 3. Parse body
-    const body = await req.json() as { token?: string; platform?: string };
+    const body = (await req.json()) as { token?: string; platform?: string };
     if (!body.token) {
-      return NextResponse.json({ ok: false, error: "token required" }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "token required" },
+        { status: 400 },
+      );
     }
 
     const platform = body.platform ?? "expo";
 
     // 4. Ensure each user has only ONE active token per platform
-    await db.execute(sql`DELETE FROM push_token WHERE user_id = ${userId} AND platform = ${(body.platform as any) ?? "expo"}`);
+    await db.execute(
+      sql`DELETE FROM push_token WHERE user_id = ${userId} AND platform = ${(body.platform as any) ?? "expo"}`,
+    );
     await db.execute(sql`DELETE FROM push_token WHERE token = ${body.token}`);
     await db.insert(pushToken).values({
       id: crypto.randomUUID(),
@@ -54,11 +67,15 @@ export async function POST(req: NextRequest) {
       platform: (body.platform as any) ?? "expo",
     });
 
-
-    console.log(`[PUSH_TOKEN] Registered for user ${userId}: ${body.token.slice(0, 30)}...`);
+    console.log(
+      `[PUSH_TOKEN] Registered for user ${userId}: ${body.token.slice(0, 30)}...`,
+    );
     return NextResponse.json({ ok: true });
   } catch (err: any) {
     console.error("[PUSH_TOKEN_ERROR]", err);
-    return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: err.message },
+      { status: 500 },
+    );
   }
 }

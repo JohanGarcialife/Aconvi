@@ -1,10 +1,10 @@
-import { eq, desc, and, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import { notice, member } from "@acme/db/schema";
-import { sendPushToAllMembers } from "./notification";
+import { member, notice } from "@acme/db/schema";
 
 import { createTRPCRouter, publicProcedure } from "../trpc";
+import { sendPushToAllMembers } from "./notification";
 
 const DEMO_AUTHOR_ID = "user_admin";
 
@@ -57,10 +57,13 @@ export const noticeRouter = createTRPCRouter({
       const orgMembers = await ctx.db.query.member.findMany({
         where: eq(member.organizationId, tenantId),
       });
-      const recipientCount = orgMembers.filter((m) => m.role !== "owner").length;
+      const recipientCount = orgMembers.filter(
+        (m) => m.role !== "owner",
+      ).length;
 
       // Fire push to all members (non-blocking — don't await in full)
-      const emoji = data.type === "URGENTE" ? "🚨" : data.type === "AVISO" ? "📢" : "📋";
+      const emoji =
+        data.type === "URGENTE" ? "🚨" : data.type === "AVISO" ? "📢" : "📋";
       sendPushToAllMembers(ctx.db, tenantId, {
         title: `${emoji} ${data.title}`,
         body: data.content.slice(0, 120),
@@ -72,7 +75,13 @@ export const noticeRouter = createTRPCRouter({
 
   // ── Toggle pin on a notice ─────────────────────────────────────────────────
   togglePin: publicProcedure
-    .input(z.object({ tenantId: z.string().min(1), id: z.string().uuid(), pinned: z.boolean() }))
+    .input(
+      z.object({
+        tenantId: z.string().min(1),
+        id: z.string().uuid(),
+        pinned: z.boolean(),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       return ctx.db
         .update(notice)

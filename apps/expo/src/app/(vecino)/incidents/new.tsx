@@ -1,29 +1,29 @@
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  TextInput,
-  ScrollView,
-  StyleSheet,
-  Alert,
   ActivityIndicator,
+  Alert,
+  Animated,
   Image,
   Keyboard,
-  Animated,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
-
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter, Stack } from "expo-router";
-import * as ImagePicker from "~/utils/safe-image-picker";
-import * as ImageManipulator from "expo-image-manipulator";
 import * as FileSystem from "expo-file-system/legacy";
+import * as ImageManipulator from "expo-image-manipulator";
+import { Stack, useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
+import { useMutation } from "@tanstack/react-query";
+
 import { api, queryClient } from "~/utils/api";
 import { authClient } from "~/utils/auth";
-import { useMutation } from "@tanstack/react-query";
+import * as ImagePicker from "~/utils/safe-image-picker";
 
 const PRIMARY = "#4aa19b";
 const DARK = "#0f172a";
@@ -36,11 +36,11 @@ const TENANT_ID = "org_aconvi_demo";
 // ─── Categories — matching the client mockup (6 tiles) ────────────────────────
 const CATEGORIES = [
   { id: "electricidad", label: "Instalaciones", icon: "⚡" },
-  { id: "agua",         label: "Agua",         icon: "💧" },
-  { id: "acceso",       label: "Acceso",        icon: "🔑" },
-  { id: "limpieza",     label: "Limpieza",      icon: "🧹" },
-  { id: "ruidos",       label: "Molestias",     icon: "🔊" },
-  { id: "otro",         label: "Otro",          icon: "➕" },
+  { id: "agua", label: "Agua", icon: "💧" },
+  { id: "acceso", label: "Acceso", icon: "🔑" },
+  { id: "limpieza", label: "Limpieza", icon: "🧹" },
+  { id: "ruidos", label: "Molestias", icon: "🔊" },
+  { id: "otro", label: "Otro", icon: "➕" },
 ];
 
 export default function NewIncidentScreen() {
@@ -48,14 +48,19 @@ export default function NewIncidentScreen() {
   const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    SecureStore.getItemAsync("expo_user_id").then((id) => {
-      if (id) {
-        setUserId(id);
-        console.log("[NewIncidentScreen] Loaded user ID:", id);
-      }
-    }).catch(err => {
-      console.warn("[NewIncidentScreen] Failed to load user ID from SecureStore:", err);
-    });
+    SecureStore.getItemAsync("expo_user_id")
+      .then((id) => {
+        if (id) {
+          setUserId(id);
+          console.log("[NewIncidentScreen] Loaded user ID:", id);
+        }
+      })
+      .catch((err) => {
+        console.warn(
+          "[NewIncidentScreen] Failed to load user ID from SecureStore:",
+          err,
+        );
+      });
   }, []);
 
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -78,10 +83,18 @@ export default function NewIncidentScreen() {
   ).current;
 
   const animatePressIn = (id: string) => {
-    Animated.spring(scaleAnims[id]!, { toValue: 0.93, useNativeDriver: true, speed: 40 }).start();
+    Animated.spring(scaleAnims[id]!, {
+      toValue: 0.93,
+      useNativeDriver: true,
+      speed: 40,
+    }).start();
   };
   const animatePressOut = (id: string) => {
-    Animated.spring(scaleAnims[id]!, { toValue: 1, useNativeDriver: true, speed: 20 }).start();
+    Animated.spring(scaleAnims[id]!, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 20,
+    }).start();
   };
 
   // ─── tRPC mutation ──────────────────────────────────────────────────────────
@@ -100,10 +113,18 @@ export default function NewIncidentScreen() {
       setIsUploading(false);
       // Inject the new incident at the top of the cache immediately —
       // the user sees it the instant they land on the list, no waiting for refetch.
-      const queryKey = api.incident.all.queryOptions({ tenantId: TENANT_ID }).queryKey;
+      const queryKey = api.incident.all.queryOptions({
+        tenantId: TENANT_ID,
+      }).queryKey;
       queryClient.setQueryData(queryKey, (old: any) => {
         if (!Array.isArray(old)) return old;
-        const optimistic = { ...created, reporter: null, provider: null, notes: [], history: [] };
+        const optimistic = {
+          ...created,
+          reporter: null,
+          provider: null,
+          notes: [],
+          history: [],
+        };
         return [optimistic, ...old];
       });
       resetForm();
@@ -119,7 +140,10 @@ export default function NewIncidentScreen() {
       // a non-JSON response (e.g. plain text "ok" or HTML error page).
       // Treat parse errors as a transient network/server issue with a user-friendly message.
       const msg: string = e?.message ?? "";
-      const isParseError = msg.toLowerCase().includes("json") || msg.toLowerCase().includes("parse") || msg.toLowerCase().includes("unexpected");
+      const isParseError =
+        msg.toLowerCase().includes("json") ||
+        msg.toLowerCase().includes("parse") ||
+        msg.toLowerCase().includes("unexpected");
       if (isParseError) {
         Alert.alert(
           "Error de conexión",
@@ -147,8 +171,14 @@ export default function NewIncidentScreen() {
 
     // Pick photo without requesting base64 — avoids OOM in native bridge
     const result = useCamera
-      ? await ImagePicker.launchCameraAsync({ mediaTypes: "images", allowsEditing: false })
-      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: "images", allowsEditing: false });
+      ? await ImagePicker.launchCameraAsync({
+          mediaTypes: "images",
+          allowsEditing: false,
+        })
+      : await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: "images",
+          allowsEditing: false,
+        });
 
     if (!result.canceled && result.assets[0]) {
       const originalUri = result.assets[0].uri;
@@ -199,7 +229,9 @@ export default function NewIncidentScreen() {
     setIsUploading(true);
 
     // ─── Upload photo to dedicated endpoint (avoids large tRPC body) ─────────
-    const uploadPhotoToServer = async (base64Data: string): Promise<string | null> => {
+    const uploadPhotoToServer = async (
+      base64Data: string,
+    ): Promise<string | null> => {
       try {
         const { getBaseUrl } = await import("~/utils/base-url");
         const controller = new AbortController();
@@ -214,7 +246,7 @@ export default function NewIncidentScreen() {
         clearTimeout(timeoutId);
 
         if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
-        const json = await res.json() as { url?: string; error?: string };
+        const json = (await res.json()) as { url?: string; error?: string };
         if (!json.url) throw new Error(json.error ?? "No URL returned");
         return json.url;
       } catch (err) {
@@ -223,7 +255,8 @@ export default function NewIncidentScreen() {
       }
     };
 
-    const catLabel = CATEGORIES.find((c) => c.id === selectedCategory)?.label ?? "Incidencia";
+    const catLabel =
+      CATEGORIES.find((c) => c.id === selectedCategory)?.label ?? "Incidencia";
     const cleanDesc = description.trim();
     const finalTitle = cleanDesc
       ? `${catLabel}: ${cleanDesc.slice(0, 60)}`
@@ -243,7 +276,10 @@ export default function NewIncidentScreen() {
         const uploadedUrl = await uploadPhotoToServer(base64Payload);
         if (!uploadedUrl) {
           setIsUploading(false);
-          Alert.alert("Error al subir foto", "No se pudo subir la foto del reporte. Verifica tu conexión e inténtalo de nuevo.");
+          Alert.alert(
+            "Error al subir foto",
+            "No se pudo subir la foto del reporte. Verifica tu conexión e inténtalo de nuevo.",
+          );
           return;
         }
         finalPhotoUrl = uploadedUrl;
@@ -264,7 +300,8 @@ export default function NewIncidentScreen() {
   };
 
   const isLoading = createIncident.isPending || isUploading || isCompressing;
-  const canSubmit = !!selectedCategory && description.trim().length > 0 && !isLoading;
+  const canSubmit =
+    !!selectedCategory && description.trim().length > 0 && !isLoading;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
@@ -272,7 +309,11 @@ export default function NewIncidentScreen() {
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} hitSlop={12}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backBtn}
+          hitSlop={12}
+        >
           <Text style={styles.backBtnText}>←</Text>
         </TouchableOpacity>
       </View>
@@ -282,119 +323,145 @@ export default function NewIncidentScreen() {
         behavior="padding"
         keyboardVerticalOffset={0}
       >
-      <ScrollView
-        ref={scrollRef}
-        contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* ── Title ──────────────────────────────────────────────────────── */}
-        <Text style={styles.pageTitle}>¿Qué ocurre?</Text>
-
-        {/* ── Category grid (2×3) ─────────────────────────────────────────────── */}
-        {/* Persistent hint — visible whenever no category is selected */}
-        {!selectedCategory && (
-          <Text style={styles.categoryHintText}>
-            📂 Selecciona una categoría para continuar.
-          </Text>
-        )}
-        {/* Error hint shown only after failed submit attempt */}
-        {categoryError && !selectedCategory && (
-          <Text style={styles.categoryErrorText}>⚠️ Selecciona una categoría</Text>
-        )}
-        <View style={[styles.grid, categoryError && !selectedCategory && styles.gridError]}>
-          {CATEGORIES.map((cat) => {
-            const isSelected = selectedCategory === cat.id;
-            return (
-              <Animated.View
-                key={cat.id}
-                style={[styles.categoryCardWrap, { transform: [{ scale: scaleAnims[cat.id]! }] }]}
-              >
-                <TouchableOpacity
-                  style={[
-                    styles.categoryCard,
-                    isSelected && styles.categoryCardSelected,
-                    categoryError && !selectedCategory && !isSelected && styles.categoryCardError,
-                  ]}
-                  onPress={() => {
-                    setSelectedCategory(cat.id);
-                    setCategoryError(false); // clear error on selection
-                  }}
-                  onPressIn={() => animatePressIn(cat.id)}
-                  onPressOut={() => animatePressOut(cat.id)}
-                  activeOpacity={1}
-                >
-                  <Text style={styles.categoryIcon}>{cat.icon}</Text>
-                  <Text style={[styles.categoryLabel, isSelected && styles.categoryLabelSelected]}>
-                    {cat.label}
-                  </Text>
-                </TouchableOpacity>
-              </Animated.View>
-            );
-          })}
-        </View>
-
-        {/* ── Photo button ───────────────────────────────────────────────── */}
-        <TouchableOpacity style={styles.photoRow} onPress={showPhotoOptions} activeOpacity={0.7}>
-          {photoUri ? (
-            <View style={styles.photoThumbWrap}>
-              <Image source={{ uri: photoUri }} style={styles.photoThumb} />
-              <TouchableOpacity
-                style={styles.photoRemoveBtn}
-                onPress={() => { setPhotoUri(null); }}
-                hitSlop={8}
-              >
-                <Text style={styles.photoRemoveText}>✕</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <>
-              <Text style={styles.photoCameraIcon}>📷</Text>
-              <Text style={styles.photoRowLabel}>Añadir foto</Text>
-            </>
-          )}
-        </TouchableOpacity>
-
-        {/* ── Description ────────────────────────────────────────────────── */}
-        <TextInput
-          ref={descInputRef}
-          style={styles.descInput}
-          placeholder="Describe el problema (obligatorio)..."
-          placeholderTextColor="#94a3b8"
-          multiline
-          value={description}
-          onChangeText={setDescription}
-          textAlignVertical="top"
-          maxLength={300}
-          returnKeyType="done"
-          blurOnSubmit
-          onFocus={() => {
-            // Scroll down so the input is fully visible above the keyboard
-            setTimeout(() => {
-              scrollRef.current?.scrollToEnd({ animated: true });
-            }, 150);
-          }}
-        />
-
-        {/* ── Submit ────────────────────────────────────────────────── */}
-        {!canSubmit && !isLoading && (
-          <Text style={styles.submitHintText}>
-            {!selectedCategory ? "Selecciona una categoría para continuar." : "Añade una descripción para continuar."}
-          </Text>
-        )}
-        <TouchableOpacity
-          style={[styles.submitBtn, !canSubmit && styles.submitBtnDisabled]}
-          onPress={handleSubmit}
-          disabled={!canSubmit}
-          activeOpacity={0.88}
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={styles.scroll}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          {isLoading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.submitBtnText}>Enviar reporte</Text>
+          {/* ── Title ──────────────────────────────────────────────────────── */}
+          <Text style={styles.pageTitle}>¿Qué ocurre?</Text>
+
+          {/* ── Category grid (2×3) ─────────────────────────────────────────────── */}
+          {/* Persistent hint — visible whenever no category is selected */}
+          {!selectedCategory && (
+            <Text style={styles.categoryHintText}>
+              📂 Selecciona una categoría para continuar.
+            </Text>
           )}
-        </TouchableOpacity>
-      </ScrollView>
+          {/* Error hint shown only after failed submit attempt */}
+          {categoryError && !selectedCategory && (
+            <Text style={styles.categoryErrorText}>
+              ⚠️ Selecciona una categoría
+            </Text>
+          )}
+          <View
+            style={[
+              styles.grid,
+              categoryError && !selectedCategory && styles.gridError,
+            ]}
+          >
+            {CATEGORIES.map((cat) => {
+              const isSelected = selectedCategory === cat.id;
+              return (
+                <Animated.View
+                  key={cat.id}
+                  style={[
+                    styles.categoryCardWrap,
+                    { transform: [{ scale: scaleAnims[cat.id]! }] },
+                  ]}
+                >
+                  <TouchableOpacity
+                    style={[
+                      styles.categoryCard,
+                      isSelected && styles.categoryCardSelected,
+                      categoryError &&
+                        !selectedCategory &&
+                        !isSelected &&
+                        styles.categoryCardError,
+                    ]}
+                    onPress={() => {
+                      setSelectedCategory(cat.id);
+                      setCategoryError(false); // clear error on selection
+                    }}
+                    onPressIn={() => animatePressIn(cat.id)}
+                    onPressOut={() => animatePressOut(cat.id)}
+                    activeOpacity={1}
+                  >
+                    <Text style={styles.categoryIcon}>{cat.icon}</Text>
+                    <Text
+                      style={[
+                        styles.categoryLabel,
+                        isSelected && styles.categoryLabelSelected,
+                      ]}
+                    >
+                      {cat.label}
+                    </Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              );
+            })}
+          </View>
+
+          {/* ── Photo button ───────────────────────────────────────────────── */}
+          <TouchableOpacity
+            style={styles.photoRow}
+            onPress={showPhotoOptions}
+            activeOpacity={0.7}
+          >
+            {photoUri ? (
+              <View style={styles.photoThumbWrap}>
+                <Image source={{ uri: photoUri }} style={styles.photoThumb} />
+                <TouchableOpacity
+                  style={styles.photoRemoveBtn}
+                  onPress={() => {
+                    setPhotoUri(null);
+                  }}
+                  hitSlop={8}
+                >
+                  <Text style={styles.photoRemoveText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
+                <Text style={styles.photoCameraIcon}>📷</Text>
+                <Text style={styles.photoRowLabel}>Añadir foto</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          {/* ── Description ────────────────────────────────────────────────── */}
+          <TextInput
+            ref={descInputRef}
+            style={styles.descInput}
+            placeholder="Describe el problema (obligatorio)..."
+            placeholderTextColor="#94a3b8"
+            multiline
+            value={description}
+            onChangeText={setDescription}
+            textAlignVertical="top"
+            maxLength={300}
+            returnKeyType="done"
+            blurOnSubmit
+            onFocus={() => {
+              // Scroll down so the input is fully visible above the keyboard
+              setTimeout(() => {
+                scrollRef.current?.scrollToEnd({ animated: true });
+              }, 150);
+            }}
+          />
+
+          {/* ── Submit ────────────────────────────────────────────────── */}
+          {!canSubmit && !isLoading && (
+            <Text style={styles.submitHintText}>
+              {!selectedCategory
+                ? "Selecciona una categoría para continuar."
+                : "Añade una descripción para continuar."}
+            </Text>
+          )}
+          <TouchableOpacity
+            style={[styles.submitBtn, !canSubmit && styles.submitBtnDisabled]}
+            onPress={handleSubmit}
+            disabled={!canSubmit}
+            activeOpacity={0.88}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.submitBtnText}>Enviar reporte</Text>
+            )}
+          </TouchableOpacity>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

@@ -1,26 +1,27 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
   ActivityIndicator,
   Alert,
-  PanResponder,
   Animated,
-  useWindowDimensions,
-  Modal,
   Dimensions,
+  Modal,
+  PanResponder,
+  ScrollView,
+  StyleSheet,
+  Text,
   TextInput,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter, Stack, useLocalSearchParams } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import NetInfo from "~/utils/safe-netinfo";
-import { api, queryClient } from "~/utils/api";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useMutation, useQuery } from "@tanstack/react-query";
+
+import { api, queryClient } from "~/utils/api";
+import NetInfo from "~/utils/safe-netinfo";
 
 const OFFLINE_ESTIMATE_QUEUE_KEY = "aconvi_offline_estimate_queue";
 
@@ -73,12 +74,21 @@ interface NativeSliderProps {
   disabled?: boolean;
 }
 
-function NativeSlider({ value, min, max, step = 5, onChange, disabled = false }: NativeSliderProps) {
+function NativeSlider({
+  value,
+  min,
+  max,
+  step = 5,
+  onChange,
+  disabled = false,
+}: NativeSliderProps) {
   const TRACK_WIDTH = useWindowDimensions().width - 80;
   const THUMB = 24;
   const safeRange = Math.max(1, max - min);
   const pct = Math.max(0, Math.min(1, (value - min) / safeRange));
-  const thumbX = useRef(new Animated.Value(pct * (TRACK_WIDTH - THUMB))).current;
+  const thumbX = useRef(
+    new Animated.Value(pct * (TRACK_WIDTH - THUMB)),
+  ).current;
   const startX = useRef(0);
   const startVal = useRef(value);
 
@@ -107,12 +117,18 @@ function NativeSlider({ value, min, max, step = 5, onChange, disabled = false }:
         thumbX.setValue(newPct * (TRACK_WIDTH - THUMB));
         onChange(stepped);
       },
-    })
+    }),
   ).current;
 
   return (
     <View style={{ height: 44, justifyContent: "center" }}>
-      <View style={[slStyles.track, { width: TRACK_WIDTH }, disabled && { backgroundColor: "#f1f5f9" }]}>
+      <View
+        style={[
+          slStyles.track,
+          { width: TRACK_WIDTH },
+          disabled && { backgroundColor: "#f1f5f9" },
+        ]}
+      >
         <Animated.View
           style={[
             slStyles.fill,
@@ -140,22 +156,89 @@ function NativeSlider({ value, min, max, step = 5, onChange, disabled = false }:
 }
 
 const slStyles = StyleSheet.create({
-  track: { height: 8, borderRadius: 4, backgroundColor: "#e2e8f0", overflow: "visible" },
+  track: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#e2e8f0",
+    overflow: "visible",
+  },
   fill: { height: 8, borderRadius: 4, backgroundColor: PRIMARY },
   thumb: {
-    position: "absolute", top: -8, width: 24, height: 24, borderRadius: 12,
-    backgroundColor: PRIMARY, borderWidth: 3, borderColor: "#fff",
-    shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 4, elevation: 4,
+    position: "absolute",
+    top: -8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: PRIMARY,
+    borderWidth: 3,
+    borderColor: "#fff",
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
 });
 
 // ─── Scheduling Helpers ───────────────────────────────────────────────────────
 const DAY_NAMES = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-const DAY_NAMES_FULL = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
-const MONTH_NAMES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-const MONTH_NAMES_FULL = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
-const ALL_HOUR_CHIPS = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "16:00", "17:00", "18:00", "19:00"];
-const DURATION_OPTIONS = ["30 min", "1 hora", "1.5 horas", "2 horas", "3 horas", "4+ horas"];
+const DAY_NAMES_FULL = [
+  "domingo",
+  "lunes",
+  "martes",
+  "miércoles",
+  "jueves",
+  "viernes",
+  "sábado",
+];
+const MONTH_NAMES = [
+  "Ene",
+  "Feb",
+  "Mar",
+  "Abr",
+  "May",
+  "Jun",
+  "Jul",
+  "Ago",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dic",
+];
+const MONTH_NAMES_FULL = [
+  "enero",
+  "febrero",
+  "marzo",
+  "abril",
+  "mayo",
+  "junio",
+  "julio",
+  "agosto",
+  "septiembre",
+  "octubre",
+  "noviembre",
+  "diciembre",
+];
+const ALL_HOUR_CHIPS = [
+  "08:00",
+  "09:00",
+  "10:00",
+  "11:00",
+  "12:00",
+  "13:00",
+  "14:00",
+  "16:00",
+  "17:00",
+  "18:00",
+  "19:00",
+];
+const DURATION_OPTIONS = [
+  "30 min",
+  "1 hora",
+  "1.5 horas",
+  "2 horas",
+  "3 horas",
+  "4+ horas",
+];
 
 interface DateChip {
   date: Date;
@@ -184,7 +267,11 @@ function generateDateChips(count = 14): DateChip[] {
 
 export default function JobEstimateScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ incidentId?: string; providerId?: string; tenantId?: string }>();
+  const params = useLocalSearchParams<{
+    incidentId?: string;
+    providerId?: string;
+    tenantId?: string;
+  }>();
 
   const incidentId = params.incidentId;
   const DEMO_TENANT_ID = "org_aconvi_demo";
@@ -194,8 +281,8 @@ export default function JobEstimateScreen() {
   const { data: incident } = useQuery(
     api.incident.byId.queryOptions(
       { id: incidentId ?? "", tenantId },
-      { enabled: !!incidentId }
-    )
+      { enabled: !!incidentId },
+    ),
   );
 
   const [departure, setDeparture] = useState(40);
@@ -255,9 +342,15 @@ export default function JobEstimateScreen() {
     }
   };
 
-  const departureMax = Math.max(150, Math.ceil(((departure || 0) * 1.25) / 50) * 50);
+  const departureMax = Math.max(
+    150,
+    Math.ceil(((departure || 0) * 1.25) / 50) * 50,
+  );
   const laborMax = Math.max(200, Math.ceil(((labor || 0) * 1.25) / 50) * 50);
-  const materialsMax = Math.max(100, Math.ceil(((materials || 0) * 1.25) / 50) * 50);
+  const materialsMax = Math.max(
+    100,
+    Math.ceil(((materials || 0) * 1.25) / 50) * 50,
+  );
 
   // Bottom Sheet
   const [showSchedule, setShowSchedule] = useState(false);
@@ -287,19 +380,23 @@ export default function JobEstimateScreen() {
   };
 
   const dateChips = generateDateChips(14);
-  const total = Math.round(((departure || 0) + (labor || 0) + (materials || 0)) * 100) / 100;
+  const total =
+    Math.round(((departure || 0) + (labor || 0) + (materials || 0)) * 100) /
+    100;
 
   const acceptMutation = useMutation(
     api.incident.providerAccept.mutationOptions({
       onSuccess: () => {
-        void queryClient.invalidateQueries(api.incident.assignedToProvider.queryFilter());
+        void queryClient.invalidateQueries(
+          api.incident.assignedToProvider.queryFilter(),
+        );
         void queryClient.invalidateQueries(api.incident.all.queryFilter());
       },
       onError: (e: any) => {
         const msg = e?.message ?? "Error al enviar la estimación.";
         Alert.alert("Error", msg);
       },
-    })
+    }),
   );
 
   // Offline queue sync
@@ -326,7 +423,9 @@ export default function JobEstimateScreen() {
           );
         });
         await removeEstimateFromQueue(job.id);
-      } catch { /* leave for next retry */ }
+      } catch {
+        /* leave for next retry */
+      }
     }
     const remaining = await loadEstimateQueue();
     setPendingCount(remaining.length);
@@ -347,11 +446,13 @@ export default function JobEstimateScreen() {
   const assignedTime = incident?.assignedAt
     ? new Date(incident.assignedAt).getTime()
     : incident?.createdAt
-    ? new Date(incident.createdAt).getTime()
-    : Date.now();
+      ? new Date(incident.createdAt).getTime()
+      : Date.now();
   const isIncidentExpired =
     incident?.status === "RECIBIDA" ||
-    (incident?.status !== "AGENDADA" && incident?.status !== "EN_CURSO" && Date.now() - assignedTime > 2 * 60 * 60 * 1000);
+    (incident?.status !== "AGENDADA" &&
+      incident?.status !== "EN_CURSO" &&
+      Date.now() - assignedTime > 2 * 60 * 60 * 1000);
 
   // Bottom sheet animation
   const openSheet = () => {
@@ -378,17 +479,21 @@ export default function JobEstimateScreen() {
     if (isIncidentExpired) {
       Alert.alert(
         "OT Caducada",
-        "El tiempo límite de 2 horas para responder esta orden ha finalizado. La incidencia ha sido devuelta al estado RECIBIDA y no se puede aceptar."
+        "El tiempo límite de 2 horas para responder esta orden ha finalizado. La incidencia ha sido devuelta al estado RECIBIDA y no se puede aceptar.",
       );
       return;
     }
 
-    const providerId = params.providerId ?? "11111111-2222-3333-4444-555555555555";
+    const providerId =
+      params.providerId ?? "11111111-2222-3333-4444-555555555555";
 
     if (!incidentId) {
-      Alert.alert("Estimación enviada ✓", `Presupuesto de ${total}€ enviado.`,
-        [{ text: "OK", onPress: () => router.push("/(proveedor)/job/inprogress") }]
-      );
+      Alert.alert("Estimación enviada ✓", `Presupuesto de ${total}€ enviado.`, [
+        {
+          text: "OK",
+          onPress: () => router.push("/(proveedor)/job/inprogress"),
+        },
+      ]);
       return;
     }
 
@@ -408,10 +513,16 @@ export default function JobEstimateScreen() {
       Alert.alert(
         "📶 Guardado sin conexión",
         "Tu estimación se ha guardado localmente.",
-        [{ text: "OK", onPress: () => router.push({
-          pathname: "/(proveedor)/job/inprogress",
-          params: { incidentId, providerId },
-        }) }]
+        [
+          {
+            text: "OK",
+            onPress: () =>
+              router.push({
+                pathname: "/(proveedor)/job/inprogress",
+                params: { incidentId, providerId },
+              }),
+          },
+        ],
       );
     } else {
       acceptMutation.mutate(
@@ -425,14 +536,22 @@ export default function JobEstimateScreen() {
         } as any,
         {
           onSuccess: () => {
-            Alert.alert("Intervención Aceptada ✓", `Presupuesto de ${total}€ registrado. Te diriges a la intervención.`,
-              [{ text: "OK", onPress: () => router.push({
-                pathname: "/(proveedor)/job/inprogress",
-                params: { incidentId, providerId },
-              }) }]
+            Alert.alert(
+              "Intervención Aceptada ✓",
+              `Presupuesto de ${total}€ registrado. Te diriges a la intervención.`,
+              [
+                {
+                  text: "OK",
+                  onPress: () =>
+                    router.push({
+                      pathname: "/(proveedor)/job/inprogress",
+                      params: { incidentId, providerId },
+                    }),
+                },
+              ],
             );
           },
-        }
+        },
       );
     }
   };
@@ -442,12 +561,13 @@ export default function JobEstimateScreen() {
     if (isIncidentExpired) {
       Alert.alert(
         "OT Caducada",
-        "El tiempo límite de 2 horas para responder esta orden ha finalizado. No es posible programar una cita."
+        "El tiempo límite de 2 horas para responder esta orden ha finalizado. No es posible programar una cita.",
       );
       return;
     }
 
-    const providerId = params.providerId ?? "11111111-2222-3333-4444-555555555555";
+    const providerId =
+      params.providerId ?? "11111111-2222-3333-4444-555555555555";
 
     if (!incidentId) {
       Alert.alert("Error", "No se encontró el ID de la incidencia.");
@@ -477,11 +597,19 @@ export default function JobEstimateScreen() {
       };
       addEstimateToQueue(job).then(() => {
         setPendingCount((c) => c + 1);
-        Alert.alert("📶 Guardado sin conexión", "La programación se enviará cuando recuperes señal.",
-          [{ text: "OK", onPress: () => router.push({
-            pathname: "/(proveedor)/job/inprogress",
-            params: { incidentId, providerId },
-          }) }]
+        Alert.alert(
+          "📶 Guardado sin conexión",
+          "La programación se enviará cuando recuperes señal.",
+          [
+            {
+              text: "OK",
+              onPress: () =>
+                router.push({
+                  pathname: "/(proveedor)/job/inprogress",
+                  params: { incidentId, providerId },
+                }),
+            },
+          ],
         );
       });
       return;
@@ -507,13 +635,19 @@ export default function JobEstimateScreen() {
           Alert.alert(
             "Intervención agendada ✓",
             `Cita programada para el ${dayName}, ${d.getDate()} de ${monthName} a las ${selectedHour}\nDuración: ${selectedDuration}\nPresupuesto: ${total}€`,
-            [{ text: "OK", onPress: () => router.replace({
-              pathname: "/(proveedor)/job",
-              params: { providerId },
-            }) }]
+            [
+              {
+                text: "OK",
+                onPress: () =>
+                  router.replace({
+                    pathname: "/(proveedor)/job",
+                    params: { providerId },
+                  }),
+              },
+            ],
           );
         },
-      }
+      },
     );
   };
 
@@ -524,7 +658,8 @@ export default function JobEstimateScreen() {
   const rawAvailableHours = isTodayDate
     ? ALL_HOUR_CHIPS.filter((h) => parseInt(h.split(":")[0]!, 10) > currentHour)
     : ALL_HOUR_CHIPS;
-  const availableHours = rawAvailableHours.length > 0 ? rawAvailableHours : ALL_HOUR_CHIPS;
+  const availableHours =
+    rawAvailableHours.length > 0 ? rawAvailableHours : ALL_HOUR_CHIPS;
 
   const summaryDayName = DAY_NAMES_FULL[selectedDate.getDay()];
   const summaryMonth = MONTH_NAMES_FULL[selectedDate.getMonth()];
@@ -532,12 +667,17 @@ export default function JobEstimateScreen() {
 
   const isLoading = acceptMutation.isPending || isSyncing;
 
-  const communityName = incident?.organization?.name || (incident as any)?.communityName || "Aconvi Demo Community";
+  const communityName =
+    incident?.organization?.name ||
+    (incident as any)?.communityName ||
+    "Aconvi Demo Community";
   const incidentTitle = incident?.title || "Intervención solicitada";
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
-      <Stack.Screen options={{ title: "Detalle de OT", headerBackTitle: "Regresar" }} />
+      <Stack.Screen
+        options={{ title: "Detalle de OT", headerBackTitle: "Regresar" }}
+      />
 
       <ScrollView
         contentContainerStyle={styles.scroll}
@@ -547,44 +687,54 @@ export default function JobEstimateScreen() {
         {/* Offline banner */}
         {isOffline && (
           <View style={styles.offlineBanner}>
-            <Text style={styles.offlineBannerText}>📵 Sin conexión — la estimación se guardará localmente</Text>
+            <Text style={styles.offlineBannerText}>
+              📵 Sin conexión — la estimación se guardará localmente
+            </Text>
           </View>
         )}
         {!isOffline && pendingCount > 0 && (
-          <TouchableOpacity style={styles.syncBanner} onPress={syncEstimateQueue} disabled={isSyncing}>
+          <TouchableOpacity
+            style={styles.syncBanner}
+            onPress={syncEstimateQueue}
+            disabled={isSyncing}
+          >
             <Text style={styles.syncBannerText}>
-              {isSyncing ? "⏳ Sincronizando..." : `☁️ ${pendingCount} estimación${pendingCount > 1 ? "es" : ""} pendiente${pendingCount > 1 ? "s" : ""} de subir.`}
+              {isSyncing
+                ? "⏳ Sincronizando..."
+                : `☁️ ${pendingCount} estimación${pendingCount > 1 ? "es" : ""} pendiente${pendingCount > 1 ? "s" : ""} de subir.`}
             </Text>
           </TouchableOpacity>
         )}
 
         {/* ── Dynamic OT Header ────────────────────────────────────────────── */}
         <View style={styles.otHeader}>
-          <View style={[
-            styles.otIconCircle,
-            {
-              backgroundColor: isIncidentExpired
-                ? "#fef2f2"
-                : incident?.status === "AGENDADA"
-                ? "#ecfdf5"
-                : "#fff7ed"
-            }
-          ]}>
+          <View
+            style={[
+              styles.otIconCircle,
+              {
+                backgroundColor: isIncidentExpired
+                  ? "#fef2f2"
+                  : incident?.status === "AGENDADA"
+                    ? "#ecfdf5"
+                    : "#fff7ed",
+              },
+            ]}
+          >
             <Ionicons
               name={
                 isIncidentExpired
                   ? "close-circle-outline"
                   : incident?.status === "AGENDADA"
-                  ? "checkmark-circle-outline"
-                  : "document-text-outline"
+                    ? "checkmark-circle-outline"
+                    : "document-text-outline"
               }
               size={32}
               color={
                 isIncidentExpired
                   ? "#ef4444"
                   : incident?.status === "AGENDADA"
-                  ? "#10b981"
-                  : "#ea580c"
+                    ? "#10b981"
+                    : "#ea580c"
               }
             />
           </View>
@@ -593,32 +743,46 @@ export default function JobEstimateScreen() {
             {isIncidentExpired
               ? "OT Caducada"
               : incident?.status === "AGENDADA"
-              ? "OT Aceptada"
-              : incident?.status === "EN_CURSO"
-              ? "OT en Curso"
-              : "Respuesta de OT"}
+                ? "OT Aceptada"
+                : incident?.status === "EN_CURSO"
+                  ? "OT en Curso"
+                  : "Respuesta de OT"}
           </Text>
 
           <Text style={styles.incidentTitleText}>{incidentTitle}</Text>
 
           <View style={styles.communityRow}>
-            <Ionicons name="business-outline" size={14} color={MUTED} style={{ marginRight: 4 }} />
+            <Ionicons
+              name="business-outline"
+              size={14}
+              color={MUTED}
+              style={{ marginRight: 4 }}
+            />
             <Text style={styles.communityName}>{communityName}</Text>
           </View>
 
           {/* Strict Expiration Banner - No acceptance allowed */}
           {isIncidentExpired && (
             <View style={styles.expiredNoticeCard}>
-              <Ionicons name="alert-circle" size={18} color="#ef4444" style={{ marginRight: 8 }} />
+              <Ionicons
+                name="alert-circle"
+                size={18}
+                color="#ef4444"
+                style={{ marginRight: 8 }}
+              />
               <Text style={styles.expiredNoticeText}>
-                Esta orden de trabajo ha superado el límite de 2 horas y ha caducado. Ha vuelto a la administración para su reasignación y no se puede aceptar.
+                Esta orden de trabajo ha superado el límite de 2 horas y ha
+                caducado. Ha vuelto a la administración para su reasignación y
+                no se puede aceptar.
               </Text>
             </View>
           )}
         </View>
 
         {/* Go now / Schedule toggle (Disabled if expired) */}
-        <Text style={[styles.questionLabel, isIncidentExpired && { color: MUTED }]}>
+        <Text
+          style={[styles.questionLabel, isIncidentExpired && { color: MUTED }]}
+        >
           ¿Cuándo realizarás la intervención?
         </Text>
         <View style={styles.toggleRow}>
@@ -626,20 +790,31 @@ export default function JobEstimateScreen() {
             style={[
               styles.toggleBtn,
               goNow && styles.toggleBtnActive,
-              isIncidentExpired && { opacity: 0.5, borderColor: "#e2e8f0" }
+              isIncidentExpired && { opacity: 0.5, borderColor: "#e2e8f0" },
             ]}
             onPress={() => !isIncidentExpired && setGoNow(true)}
             disabled={isIncidentExpired}
           >
-            <Ionicons name="car-outline" size={18} color={goNow && !isIncidentExpired ? "#fff" : MUTED} />
-            <Text style={[styles.toggleText, goNow && !isIncidentExpired && styles.toggleTextActive]}>Salir ahora</Text>
+            <Ionicons
+              name="car-outline"
+              size={18}
+              color={goNow && !isIncidentExpired ? "#fff" : MUTED}
+            />
+            <Text
+              style={[
+                styles.toggleText,
+                goNow && !isIncidentExpired && styles.toggleTextActive,
+              ]}
+            >
+              Salir ahora
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[
               styles.toggleBtn,
               !goNow && styles.toggleBtnActive,
-              isIncidentExpired && { opacity: 0.5, borderColor: "#e2e8f0" }
+              isIncidentExpired && { opacity: 0.5, borderColor: "#e2e8f0" },
             ]}
             onPress={() => {
               if (!isIncidentExpired) {
@@ -649,20 +824,41 @@ export default function JobEstimateScreen() {
             }}
             disabled={isIncidentExpired}
           >
-            <Ionicons name="calendar-outline" size={18} color={!goNow && !isIncidentExpired ? "#fff" : MUTED} />
-            <Text style={[styles.toggleText, !goNow && !isIncidentExpired && styles.toggleTextActive]}>Programar</Text>
+            <Ionicons
+              name="calendar-outline"
+              size={18}
+              color={!goNow && !isIncidentExpired ? "#fff" : MUTED}
+            />
+            <Text
+              style={[
+                styles.toggleText,
+                !goNow && !isIncidentExpired && styles.toggleTextActive,
+              ]}
+            >
+              Programar
+            </Text>
           </TouchableOpacity>
         </View>
 
         {/* Show schedule summary if programmed */}
         {!goNow && !isIncidentExpired && (
-          <TouchableOpacity style={styles.scheduleSummaryCard} onPress={openSheet} activeOpacity={0.7}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <TouchableOpacity
+            style={styles.scheduleSummaryCard}
+            onPress={openSheet}
+            activeOpacity={0.7}
+          >
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+            >
               <Ionicons name="calendar" size={20} color={PRIMARY} />
               <View>
-                <Text style={styles.scheduleSummaryLabel}>Cita programada:</Text>
+                <Text style={styles.scheduleSummaryLabel}>
+                  Cita programada:
+                </Text>
                 <Text style={styles.scheduleSummaryText}>{summaryText}</Text>
-                <Text style={styles.scheduleSummaryDuration}>Duración estimada: {selectedDuration}</Text>
+                <Text style={styles.scheduleSummaryDuration}>
+                  Duración estimada: {selectedDuration}
+                </Text>
               </View>
             </View>
             <Ionicons name="create-outline" size={18} color={PRIMARY} />
@@ -672,7 +868,12 @@ export default function JobEstimateScreen() {
         {/* Sliders for cost estimation */}
         <View style={[styles.sliderBox, isIncidentExpired && { opacity: 0.5 }]}>
           <View style={styles.sliderHeader}>
-            <Ionicons name="car-outline" size={18} color={DARK} style={{ marginRight: 8 }} />
+            <Ionicons
+              name="car-outline"
+              size={18}
+              color={DARK}
+              style={{ marginRight: 8 }}
+            />
             <Text style={styles.sliderLabel}>Desplazamiento</Text>
             <View style={styles.editableInputContainer}>
               <TextInput
@@ -698,15 +899,24 @@ export default function JobEstimateScreen() {
           />
           <View style={styles.scaleRow}>
             <Text style={styles.scaleMark}>0 €</Text>
-            <Text style={styles.scaleMark}>{Math.round(departureMax / 3)} €</Text>
-            <Text style={styles.scaleMark}>{Math.round((departureMax * 2) / 3)} €</Text>
+            <Text style={styles.scaleMark}>
+              {Math.round(departureMax / 3)} €
+            </Text>
+            <Text style={styles.scaleMark}>
+              {Math.round((departureMax * 2) / 3)} €
+            </Text>
             <Text style={styles.scaleMark}>{departureMax} €</Text>
           </View>
         </View>
 
         <View style={[styles.sliderBox, isIncidentExpired && { opacity: 0.5 }]}>
           <View style={styles.sliderHeader}>
-            <Ionicons name="build-outline" size={18} color={DARK} style={{ marginRight: 8 }} />
+            <Ionicons
+              name="build-outline"
+              size={18}
+              color={DARK}
+              style={{ marginRight: 8 }}
+            />
             <Text style={styles.sliderLabel}>Mano de obra</Text>
             <View style={styles.editableInputContainer}>
               <TextInput
@@ -733,14 +943,21 @@ export default function JobEstimateScreen() {
           <View style={styles.scaleRow}>
             <Text style={styles.scaleMark}>0 €</Text>
             <Text style={styles.scaleMark}>{Math.round(laborMax / 3)} €</Text>
-            <Text style={styles.scaleMark}>{Math.round((laborMax * 2) / 3)} €</Text>
+            <Text style={styles.scaleMark}>
+              {Math.round((laborMax * 2) / 3)} €
+            </Text>
             <Text style={styles.scaleMark}>{laborMax} €</Text>
           </View>
         </View>
 
         <View style={[styles.sliderBox, isIncidentExpired && { opacity: 0.5 }]}>
           <View style={styles.sliderHeader}>
-            <Ionicons name="briefcase-outline" size={18} color={DARK} style={{ marginRight: 8 }} />
+            <Ionicons
+              name="briefcase-outline"
+              size={18}
+              color={DARK}
+              style={{ marginRight: 8 }}
+            />
             <Text style={styles.sliderLabel}>Materiales</Text>
             <View style={styles.editableInputContainer}>
               <TextInput
@@ -766,8 +983,12 @@ export default function JobEstimateScreen() {
           />
           <View style={styles.scaleRow}>
             <Text style={styles.scaleMark}>0 €</Text>
-            <Text style={styles.scaleMark}>{Math.round(materialsMax / 3)} €</Text>
-            <Text style={styles.scaleMark}>{Math.round((materialsMax * 2) / 3)} €</Text>
+            <Text style={styles.scaleMark}>
+              {Math.round(materialsMax / 3)} €
+            </Text>
+            <Text style={styles.scaleMark}>
+              {Math.round((materialsMax * 2) / 3)} €
+            </Text>
             <Text style={styles.scaleMark}>{materialsMax} €</Text>
           </View>
         </View>
@@ -775,9 +996,18 @@ export default function JobEstimateScreen() {
         {/* Total sum row */}
         <View style={styles.totalRow}>
           <Text style={styles.totalLabel}>Presupuesto total estimativo:</Text>
-          <View style={[styles.totalBadge, isIncidentExpired && { backgroundColor: "#94a3b8" }]}>
+          <View
+            style={[
+              styles.totalBadge,
+              isIncidentExpired && { backgroundColor: "#94a3b8" },
+            ]}
+          >
             <Text style={styles.totalAmount}>
-              {total.toLocaleString("es-ES", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €
+              {total.toLocaleString("es-ES", {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 2,
+              })}{" "}
+              €
             </Text>
           </View>
         </View>
@@ -786,7 +1016,10 @@ export default function JobEstimateScreen() {
         <TouchableOpacity
           style={[
             styles.sendButton,
-            isIncidentExpired && { backgroundColor: "#94a3b8", shadowColor: "transparent" }
+            isIncidentExpired && {
+              backgroundColor: "#94a3b8",
+              shadowColor: "transparent",
+            },
           ]}
           onPress={goNow ? handleSendNow : handleConfirmSchedule}
           disabled={isLoading || isIncidentExpired}
@@ -799,19 +1032,30 @@ export default function JobEstimateScreen() {
               {isIncidentExpired
                 ? "OT Caducada — No se puede aceptar"
                 : goNow
-                ? "Aceptar e Intervenir Ahora"
-                : "Confirmar Cita y Aceptar"}
+                  ? "Aceptar e Intervenir Ahora"
+                  : "Confirmar Cita y Aceptar"}
             </Text>
           )}
         </TouchableOpacity>
       </ScrollView>
 
       {/* ─── Bottom sheet for scheduling ─────────────────────────────────── */}
-      <Modal visible={showSchedule} transparent animationType="none" onRequestClose={closeSheet}>
+      <Modal
+        visible={showSchedule}
+        transparent
+        animationType="none"
+        onRequestClose={closeSheet}
+      >
         <View style={bsStyles.overlay}>
-          <TouchableOpacity style={bsStyles.backdrop} activeOpacity={1} onPress={closeSheet} />
+          <TouchableOpacity
+            style={bsStyles.backdrop}
+            activeOpacity={1}
+            onPress={closeSheet}
+          />
 
-          <Animated.View style={[bsStyles.sheet, { transform: [{ translateY: slideAnim }] }]}>
+          <Animated.View
+            style={[bsStyles.sheet, { transform: [{ translateY: slideAnim }] }]}
+          >
             <View style={bsStyles.header}>
               <Text style={bsStyles.headerTitle}>Programar intervención</Text>
               <TouchableOpacity onPress={closeSheet}>
@@ -819,7 +1063,10 @@ export default function JobEstimateScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              nestedScrollEnabled
+            >
               <Text style={bsStyles.sectionLabel}>Día de la visita</Text>
               <ScrollView
                 ref={dateScrollRef}
@@ -827,28 +1074,51 @@ export default function JobEstimateScreen() {
                 showsHorizontalScrollIndicator={false}
                 style={bsStyles.chipScroll}
               >
-                {(showAllDates ? dateChips : dateChips.slice(0, 5)).map((chip, idx) => {
-                  const isActive = selectedDateIdx === idx;
-                  return (
-                    <TouchableOpacity
-                      key={chip.date.toISOString()}
-                      style={[bsStyles.dateChip, isActive && bsStyles.dateChipActive]}
-                      onPress={() => setSelectedDateIdx(idx)}
-                    >
-                      <Text style={[bsStyles.dateChipLabel, isActive && bsStyles.dateChipLabelActive]}>
-                        {chip.isToday ? "Hoy" : chip.dayName}
-                      </Text>
-                      <Text style={[bsStyles.dateChipDay, isActive && bsStyles.dateChipDayActive]}>
-                        {chip.dayNum}
-                      </Text>
-                      <Text style={[bsStyles.dateChipMonth, isActive && bsStyles.dateChipMonthActive]}>
-                        {chip.monthName}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+                {(showAllDates ? dateChips : dateChips.slice(0, 5)).map(
+                  (chip, idx) => {
+                    const isActive = selectedDateIdx === idx;
+                    return (
+                      <TouchableOpacity
+                        key={chip.date.toISOString()}
+                        style={[
+                          bsStyles.dateChip,
+                          isActive && bsStyles.dateChipActive,
+                        ]}
+                        onPress={() => setSelectedDateIdx(idx)}
+                      >
+                        <Text
+                          style={[
+                            bsStyles.dateChipLabel,
+                            isActive && bsStyles.dateChipLabelActive,
+                          ]}
+                        >
+                          {chip.isToday ? "Hoy" : chip.dayName}
+                        </Text>
+                        <Text
+                          style={[
+                            bsStyles.dateChipDay,
+                            isActive && bsStyles.dateChipDayActive,
+                          ]}
+                        >
+                          {chip.dayNum}
+                        </Text>
+                        <Text
+                          style={[
+                            bsStyles.dateChipMonth,
+                            isActive && bsStyles.dateChipMonthActive,
+                          ]}
+                        >
+                          {chip.monthName}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  },
+                )}
 
-                <TouchableOpacity style={bsStyles.dateChipCalendar} onPress={handleToggleDates}>
+                <TouchableOpacity
+                  style={bsStyles.dateChipCalendar}
+                  onPress={handleToggleDates}
+                >
                   <Ionicons name="calendar-outline" size={20} color={PRIMARY} />
                   <Text style={bsStyles.dateChipCalendarText}>
                     {showAllDates ? "Menos" : "Ver más"}
@@ -856,31 +1126,49 @@ export default function JobEstimateScreen() {
                 </TouchableOpacity>
               </ScrollView>
 
-              <Text style={bsStyles.sectionLabel}>Hora de llegada estimada</Text>
+              <Text style={bsStyles.sectionLabel}>
+                Hora de llegada estimada
+              </Text>
               <ScrollView
                 ref={hourScrollRef}
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 style={bsStyles.chipScroll}
               >
-                {(showAllHours ? availableHours : availableHours.slice(0, 5)).map((h) => {
+                {(showAllHours
+                  ? availableHours
+                  : availableHours.slice(0, 5)
+                ).map((h) => {
                   const isActive = selectedHour === h;
                   return (
                     <TouchableOpacity
                       key={h}
-                      style={[bsStyles.hourChip, isActive && bsStyles.hourChipActive]}
+                      style={[
+                        bsStyles.hourChip,
+                        isActive && bsStyles.hourChipActive,
+                      ]}
                       onPress={() => setSelectedHour(h)}
                     >
-                      <Text style={[bsStyles.hourChipText, isActive && bsStyles.hourChipTextActive]}>
+                      <Text
+                        style={[
+                          bsStyles.hourChipText,
+                          isActive && bsStyles.hourChipTextActive,
+                        ]}
+                      >
                         {h}
                       </Text>
                     </TouchableOpacity>
                   );
                 })}
 
-                <TouchableOpacity style={bsStyles.hourChipMore} onPress={handleToggleHours}>
+                <TouchableOpacity
+                  style={bsStyles.hourChipMore}
+                  onPress={handleToggleHours}
+                >
                   <Ionicons name="time-outline" size={18} color={PRIMARY} />
-                  <Text style={bsStyles.hourChipMoreText}>{showAllHours ? "Menos" : "Ver más"}</Text>
+                  <Text style={bsStyles.hourChipMoreText}>
+                    {showAllHours ? "Menos" : "Ver más"}
+                  </Text>
                 </TouchableOpacity>
               </ScrollView>
 
@@ -891,10 +1179,18 @@ export default function JobEstimateScreen() {
                   return (
                     <TouchableOpacity
                       key={dur}
-                      style={[bsStyles.durationChip, isActive && bsStyles.durationChipActive]}
+                      style={[
+                        bsStyles.durationChip,
+                        isActive && bsStyles.durationChipActive,
+                      ]}
                       onPress={() => setSelectedDuration(dur)}
                     >
-                      <Text style={[bsStyles.durationChipText, isActive && bsStyles.durationChipTextActive]}>
+                      <Text
+                        style={[
+                          bsStyles.durationChipText,
+                          isActive && bsStyles.durationChipTextActive,
+                        ]}
+                      >
                         {dur}
                       </Text>
                     </TouchableOpacity>
@@ -905,7 +1201,9 @@ export default function JobEstimateScreen() {
               <View style={bsStyles.summaryCard}>
                 <Text style={bsStyles.summaryLabel}>Resumen de la cita:</Text>
                 <Text style={bsStyles.summaryDate}>{summaryText}</Text>
-                <Text style={bsStyles.summaryDuration}>Duración: {selectedDuration}</Text>
+                <Text style={bsStyles.summaryDuration}>
+                  Duración: {selectedDuration}
+                </Text>
               </View>
             </ScrollView>
 
@@ -936,23 +1234,59 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#fff" },
   scroll: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 40 },
   offlineBanner: {
-    backgroundColor: "#fef3c7", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10,
-    marginBottom: 12, borderWidth: 1, borderColor: "#fde68a",
+    backgroundColor: "#fef3c7",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#fde68a",
   },
-  offlineBannerText: { fontSize: 13, color: "#92400e", fontWeight: "600", textAlign: "center" },
+  offlineBannerText: {
+    fontSize: 13,
+    color: "#92400e",
+    fontWeight: "600",
+    textAlign: "center",
+  },
   syncBanner: {
-    backgroundColor: "#ecfdf5", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10,
-    marginBottom: 12, borderWidth: 1, borderColor: "#bbf7d0",
+    backgroundColor: "#ecfdf5",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
   },
-  syncBannerText: { fontSize: 13, color: "#065f46", fontWeight: "600", textAlign: "center" },
+  syncBannerText: {
+    fontSize: 13,
+    color: "#065f46",
+    fontWeight: "600",
+    textAlign: "center",
+  },
 
   otHeader: { alignItems: "center", marginBottom: 24 },
   otIconCircle: {
-    width: 64, height: 64, borderRadius: 32,
-    justifyContent: "center", alignItems: "center", marginBottom: 12,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 12,
   },
-  otTitle: { fontSize: 24, fontWeight: "800", color: DARK, letterSpacing: -0.5, marginBottom: 4 },
-  incidentTitleText: { fontSize: 16, fontWeight: "700", color: DARK, textAlign: "center", marginBottom: 4 },
+  otTitle: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: DARK,
+    letterSpacing: -0.5,
+    marginBottom: 4,
+  },
+  incidentTitleText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: DARK,
+    textAlign: "center",
+    marginBottom: 4,
+  },
   communityRow: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
   communityName: { fontSize: 14, color: MUTED, fontWeight: "600" },
 
@@ -975,34 +1309,63 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  questionLabel: { fontSize: 16, fontWeight: "700", color: DARK, marginBottom: 10 },
+  questionLabel: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: DARK,
+    marginBottom: 10,
+  },
   toggleRow: { flexDirection: "row", gap: 10, marginBottom: 16 },
   toggleBtn: {
-    flex: 1, paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, borderColor: BORDER,
-    alignItems: "center", backgroundColor: "#fff", flexDirection: "row", justifyContent: "center", gap: 6,
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: BORDER,
+    alignItems: "center",
+    backgroundColor: "#fff",
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 6,
   },
   toggleBtnActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
   toggleText: { fontSize: 15, fontWeight: "600", color: MUTED },
   toggleTextActive: { color: "#fff" },
 
   scheduleSummaryCard: {
-    backgroundColor: "#f0fdfa", borderRadius: 12, padding: 14, marginBottom: 16,
-    borderWidth: 1, borderColor: "#ccfbf1", flexDirection: "row",
-    justifyContent: "space-between", alignItems: "center",
+    backgroundColor: "#f0fdfa",
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#ccfbf1",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   scheduleSummaryLabel: { fontSize: 12, color: MUTED, fontWeight: "600" },
   scheduleSummaryText: { fontSize: 15, color: PRIMARY, fontWeight: "700" },
   scheduleSummaryDuration: { fontSize: 12, color: MUTED, marginTop: 2 },
 
   sliderBox: {
-    backgroundColor: "#f8fafc", borderRadius: 16, borderWidth: 1, borderColor: BORDER,
-    padding: 14, marginBottom: 12,
+    backgroundColor: "#f8fafc",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: BORDER,
+    padding: 14,
+    marginBottom: 12,
   },
   sliderHeader: { flexDirection: "row", alignItems: "center", marginBottom: 4 },
   sliderLabel: { fontSize: 15, fontWeight: "600", color: DARK, flex: 1 },
   sliderBadge: {
-    flexDirection: "row", alignItems: "center", backgroundColor: "#fff",
-    borderWidth: 1, borderColor: BORDER, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   sliderBadgeText: { fontSize: 14, fontWeight: "700", color: DARK },
   editableInputContainer: {
@@ -1031,18 +1394,39 @@ const styles = StyleSheet.create({
     color: PRIMARY,
     marginLeft: 4,
   },
-  scaleRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 2 },
+  scaleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 2,
+  },
   scaleMark: { fontSize: 10, color: MUTED },
 
-  totalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginVertical: 16 },
+  totalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginVertical: 16,
+  },
   totalLabel: { fontSize: 16, fontWeight: "700", color: DARK },
-  totalBadge: { backgroundColor: PRIMARY, borderRadius: 12, paddingHorizontal: 18, paddingVertical: 8 },
+  totalBadge: {
+    backgroundColor: PRIMARY,
+    borderRadius: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+  },
   totalAmount: { color: "#fff", fontSize: 20, fontWeight: "800" },
 
   sendButton: {
-    backgroundColor: PRIMARY, borderRadius: 14, paddingVertical: 16, alignItems: "center",
-    marginBottom: 12, shadowColor: PRIMARY, shadowOpacity: 0.25, shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 }, elevation: 4,
+    backgroundColor: PRIMARY,
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: "center",
+    marginBottom: 12,
+    shadowColor: PRIMARY,
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
   },
   sendButtonText: { color: "#fff", fontSize: 16, fontWeight: "700" },
 });
@@ -1050,72 +1434,164 @@ const styles = StyleSheet.create({
 // Bottom sheet styles
 const bsStyles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: "flex-end" },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.4)" },
-  sheet: {
-    backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    maxHeight: SCREEN_HEIGHT * 0.90, paddingHorizontal: 20, paddingTop: 16,
-    shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 20, shadowOffset: { width: 0, height: -4 }, elevation: 10,
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.4)",
   },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
+  sheet: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: SCREEN_HEIGHT * 0.9,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: -4 },
+    elevation: 10,
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
   headerTitle: { fontSize: 18, fontWeight: "700", color: DARK },
-  sectionLabel: { fontSize: 15, fontWeight: "600", color: DARK, marginBottom: 10, marginTop: 8 },
+  sectionLabel: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: DARK,
+    marginBottom: 10,
+    marginTop: 8,
+  },
   chipScroll: { marginBottom: 8 },
   dateChip: {
-    width: 72, height: 88, borderRadius: 14, borderWidth: 1.5, borderColor: BORDER,
-    alignItems: "center", justifyContent: "center", marginRight: 8, backgroundColor: "#fff",
+    width: 72,
+    height: 88,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: BORDER,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+    backgroundColor: "#fff",
   },
   dateChipActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
-  dateChipLabel: { fontSize: 12, fontWeight: "600", color: MUTED, marginBottom: 2 },
+  dateChipLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: MUTED,
+    marginBottom: 2,
+  },
   dateChipLabelActive: { color: "#fff" },
   dateChipDay: { fontSize: 24, fontWeight: "800", color: DARK },
   dateChipDayActive: { color: "#fff" },
   dateChipMonth: { fontSize: 12, color: MUTED, fontWeight: "600" },
   dateChipMonthActive: { color: "rgba(255,255,255,0.8)" },
   dateChipCalendar: {
-    width: 72, height: 88, borderRadius: 14, borderWidth: 1.5, borderColor: BORDER,
-    alignItems: "center", justifyContent: "center", backgroundColor: "#f8fafc",
+    width: 72,
+    height: 88,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: BORDER,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f8fafc",
   },
-  dateChipCalendarText: { fontSize: 11, color: MUTED, textAlign: "center", fontWeight: "600", marginTop: 4 },
+  dateChipCalendarText: {
+    fontSize: 11,
+    color: MUTED,
+    textAlign: "center",
+    fontWeight: "600",
+    marginTop: 4,
+  },
   hourChip: {
-    paddingHorizontal: 18, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5,
-    borderColor: BORDER, marginRight: 8, backgroundColor: "#fff",
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: BORDER,
+    marginRight: 8,
+    backgroundColor: "#fff",
   },
   hourChipActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
   hourChipText: { fontSize: 15, fontWeight: "600", color: DARK },
   hourChipTextActive: { color: "#fff" },
   hourChipMore: {
-    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, borderWidth: 1.5,
-    borderColor: BORDER, alignItems: "center", justifyContent: "center", backgroundColor: "#f8fafc",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: BORDER,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f8fafc",
   },
-  hourChipMoreText: { fontSize: 11, color: MUTED, textAlign: "center", fontWeight: "600", marginTop: 2 },
-  durationRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 },
+  hourChipMoreText: {
+    fontSize: 11,
+    color: MUTED,
+    textAlign: "center",
+    fontWeight: "600",
+    marginTop: 2,
+  },
+  durationRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 16,
+  },
   durationChip: {
-    paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, borderWidth: 1.5,
-    borderColor: BORDER, backgroundColor: "#fff",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: BORDER,
+    backgroundColor: "#fff",
   },
   durationChipActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
   durationChipText: { fontSize: 14, fontWeight: "600", color: DARK },
   durationChipTextActive: { color: "#fff" },
   summaryCard: {
-    backgroundColor: "#f0fdfa", borderRadius: 14, padding: 16, marginBottom: 16,
-    borderWidth: 1, borderColor: "#ccfbf1",
+    backgroundColor: "#f0fdfa",
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#ccfbf1",
   },
   summaryLabel: { fontSize: 12, color: MUTED, fontWeight: "600" },
   summaryDate: { fontSize: 16, fontWeight: "700", color: PRIMARY },
   summaryDuration: { fontSize: 14, color: MUTED },
   footer: {
-    flexDirection: "row", gap: 12, paddingTop: 14, paddingBottom: 16,
-    borderTopWidth: 1, borderTopColor: BORDER, backgroundColor: "#fff",
+    flexDirection: "row",
+    gap: 12,
+    paddingTop: 14,
+    paddingBottom: 16,
+    borderTopWidth: 1,
+    borderTopColor: BORDER,
+    backgroundColor: "#fff",
   },
   cancelBtn: {
-    flex: 1, paddingVertical: 14, borderRadius: 12, borderWidth: 1.5,
-    borderColor: PRIMARY, alignItems: "center",
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: PRIMARY,
+    alignItems: "center",
   },
   cancelBtnText: { fontSize: 15, fontWeight: "700", color: PRIMARY },
   confirmBtn: {
-    flex: 1.5, paddingVertical: 14, borderRadius: 12, backgroundColor: PRIMARY,
-    alignItems: "center", shadowColor: PRIMARY, shadowOpacity: 0.25, shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 }, elevation: 4,
+    flex: 1.5,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: PRIMARY,
+    alignItems: "center",
+    shadowColor: PRIMARY,
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
   },
   confirmBtnText: { fontSize: 15, fontWeight: "700", color: "#fff" },
 });

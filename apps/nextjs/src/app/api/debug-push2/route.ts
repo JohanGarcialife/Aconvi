@@ -1,6 +1,8 @@
-import { type NextRequest, NextResponse } from "next/server";
-import { db } from "@acme/db/client";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { sql } from "drizzle-orm";
+
+import { db } from "@acme/db/client";
 
 export const dynamic = "force-dynamic";
 
@@ -20,25 +22,39 @@ export async function GET() {
       ORDER BY created_at DESC
       LIMIT 20
     `);
-    return NextResponse.json({ ok: true, tokenCount: (tokens.rows as any[]).length, tokens: tokens.rows, recentUsers: recentUsers.rows });
+    return NextResponse.json({
+      ok: true,
+      tokenCount: (tokens.rows as any[]).length,
+      tokens: tokens.rows,
+      recentUsers: recentUsers.rows,
+    });
   } catch (err: any) {
-    return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: err.message },
+      { status: 500 },
+    );
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json() as { token?: string; userId?: string };
+    const body = (await req.json()) as { token?: string; userId?: string };
     let pushToken = body.token;
     let platform = "expo";
 
     if (!pushToken && body.userId) {
-      const row = await db.execute(sql`SELECT token, platform FROM push_token WHERE user_id = ${body.userId} ORDER BY created_at DESC LIMIT 1`);
+      const row = await db.execute(
+        sql`SELECT token, platform FROM push_token WHERE user_id = ${body.userId} ORDER BY created_at DESC LIMIT 1`,
+      );
       pushToken = (row.rows[0] as any)?.token;
       platform = (row.rows[0] as any)?.platform ?? "expo";
     }
 
-    if (!pushToken) return NextResponse.json({ ok: false, error: "No token" }, { status: 400 });
+    if (!pushToken)
+      return NextResponse.json(
+        { ok: false, error: "No token" },
+        { status: 400 },
+      );
 
     // Detect if token is a native FCM token (not ExponentPushToken)
     const isExpoToken = pushToken.startsWith("ExponentPushToken[");
@@ -53,7 +69,8 @@ export async function POST(req: NextRequest) {
 
       const serviceAccount = {
         project_id: "creative-feel-agency",
-        client_email: "firebase-adminsdk-6xe0d@creative-feel-agency.iam.gserviceaccount.com",
+        client_email:
+          "firebase-adminsdk-6xe0d@creative-feel-agency.iam.gserviceaccount.com",
         private_key: process.env.FCM_PRIVATE_KEY ?? "",
       };
 
@@ -69,14 +86,20 @@ export async function POST(req: NextRequest) {
       };
 
       const base64UrlEncode = (str: string) =>
-        Buffer.from(str).toString("base64").replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+        Buffer.from(str)
+          .toString("base64")
+          .replace(/=/g, "")
+          .replace(/\+/g, "-")
+          .replace(/\//g, "_");
 
       const unsignedToken = `${base64UrlEncode(JSON.stringify(header))}.${base64UrlEncode(JSON.stringify(claim))}`;
       const signer = crypto.createSign("RSA-SHA256");
       signer.update(unsignedToken);
 
       // Use the embedded private key from notification.ts DEFAULT_FCM_SERVICE_ACCOUNT
-      const privateKey = serviceAccount.private_key || `-----BEGIN PRIVATE KEY-----
+      const privateKey =
+        serviceAccount.private_key ||
+        `-----BEGIN PRIVATE KEY-----
 MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDYwk5jQVu6OOCy
 6nK7iZsXTajWOCGtaf0HeJkvZ/YRNuWZdxaQZsjdbcC5h8BZ3vuw/6YR6Vu5mzmE
 Oz4Z506DEsT04NojOyzO2XmcAvu05wTpRBF6Yv44h64mLLvV+Wa0S9imyTq17bNP
@@ -117,10 +140,16 @@ R68IoI2ve4sKfFr3WTXY2nil
           assertion: jwt,
         }),
       });
-      const tokenData = (await tokenRes.json()) as { access_token?: string; error?: string };
+      const tokenData = (await tokenRes.json()) as {
+        access_token?: string;
+        error?: string;
+      };
 
       if (!tokenData.access_token) {
-        return NextResponse.json({ ok: false, error: "OAuth2 failed", details: tokenData }, { status: 500 });
+        return NextResponse.json(
+          { ok: false, error: "OAuth2 failed", details: tokenData },
+          { status: 500 },
+        );
       }
 
       const fcmRes = await fetch(
@@ -134,28 +163,53 @@ R68IoI2ve4sKfFr3WTXY2nil
           body: JSON.stringify({
             message: {
               token: pushToken,
-              notification: { title: "Test Aconvi", body: "Push directo FCM V1 funcionando." },
+              notification: {
+                title: "Test Aconvi",
+                body: "Push directo FCM V1 funcionando.",
+              },
               android: {
                 priority: "high",
                 notification: { sound: "default", channel_id: "default" },
               },
             },
           }),
-        }
+        },
       );
       const fcmData = await fcmRes.json();
-      return NextResponse.json({ ok: true, sentTo: pushToken, method: "fcm_v1_direct", fcmResponse: fcmData });
+      return NextResponse.json({
+        ok: true,
+        sentTo: pushToken,
+        method: "fcm_v1_direct",
+        fcmResponse: fcmData,
+      });
     }
 
     // Expo token relay
     const expoRes = await fetch("https://exp.host/--/api/v2/push/send", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ to: pushToken, title: "Test Aconvi", body: "Push funcionando.", sound: "default", priority: "high" }),
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        to: pushToken,
+        title: "Test Aconvi",
+        body: "Push funcionando.",
+        sound: "default",
+        priority: "high",
+      }),
     });
     const expoData = await expoRes.json();
-    return NextResponse.json({ ok: true, sentTo: pushToken, method: "expo_relay", expoResponse: expoData });
+    return NextResponse.json({
+      ok: true,
+      sentTo: pushToken,
+      method: "expo_relay",
+      expoResponse: expoData,
+    });
   } catch (err: any) {
-    return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: err.message },
+      { status: 500 },
+    );
   }
 }

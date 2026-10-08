@@ -1,24 +1,24 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  TextInput,
-  ScrollView,
-  StyleSheet,
   ActivityIndicator,
-  Image,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useLocalSearchParams, useRouter, Stack } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
-import { api, queryClient } from "~/utils/api";
-import { useMutation } from "@tanstack/react-query";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+
+import { api, queryClient } from "~/utils/api";
 
 const PRIMARY = "#4aa19b";
 const GREEN = "#22c55e";
@@ -67,7 +67,10 @@ export default function RatingScreen() {
 
   // ─── Fetch incident for context ──────────────────────────────────────────
   const { data: incident } = useQuery({
-    ...api.incident.byId.queryOptions({ id: incidentId as string, tenantId: TENANT_ID }),
+    ...api.incident.byId.queryOptions({
+      id: incidentId as string,
+      tenantId: TENANT_ID,
+    }),
     enabled: !!incidentId,
   });
 
@@ -79,7 +82,12 @@ export default function RatingScreen() {
   // ─── Submit mutation ─────────────────────────────────────────────────────
   const submitRating = useMutation({
     ...((api.incident as any).submitRating?.mutationOptions?.() ?? {}),
-    mutationFn: async (data: { tenantId: string; id: string; rating: number; comment?: string }) => {
+    mutationFn: async (data: {
+      tenantId: string;
+      id: string;
+      rating: number;
+      comment?: string;
+    }) => {
       const opts = (api.incident as any).submitRating.mutationOptions();
       return opts.mutationFn(data);
     },
@@ -94,7 +102,10 @@ export default function RatingScreen() {
 
   const handleSubmit = () => {
     if (!rating) {
-      Alert.alert("Selecciona una valoración", "Toca las estrellas para puntuar el servicio.");
+      Alert.alert(
+        "Selecciona una valoración",
+        "Toca las estrellas para puntuar el servicio.",
+      );
       return;
     }
     if (!incidentId) return;
@@ -107,9 +118,15 @@ export default function RatingScreen() {
     });
   };
 
-  const displayId = incidentId ? `#INC-${incidentId.slice(0, 8).toUpperCase()}` : "";
+  const displayId = incidentId
+    ? `#INC-${incidentId.slice(0, 8).toUpperCase()}`
+    : "";
   const resolvedDate = incident
-    ? format(new Date(incident.updatedAt ?? incident.createdAt), "d 'de' MMMM, HH:mm", { locale: es })
+    ? format(
+        new Date(incident.updatedAt ?? incident.createdAt),
+        "d 'de' MMMM, HH:mm",
+        { locale: es },
+      )
     : "";
 
   // ─── Submitted state ──────────────────────────────────────────────────────
@@ -127,7 +144,13 @@ export default function RatingScreen() {
           </Text>
           <View style={s.submittedStars}>
             {[1, 2, 3, 4, 5].map((i) => (
-              <Text key={i} style={[s.starChar, { color: i <= effectiveRating ? "#F59E0B" : "#E5E7EB" }]}>
+              <Text
+                key={i}
+                style={[
+                  s.starChar,
+                  { color: i <= effectiveRating ? "#F59E0B" : "#E5E7EB" },
+                ]}
+              >
                 ★
               </Text>
             ))}
@@ -155,7 +178,8 @@ export default function RatingScreen() {
           </View>
           <Text style={s.submittedTitle}>Valoración no disponible</Text>
           <Text style={s.submittedSub}>
-            Podrás valorar el servicio una vez el administrador cierre la incidencia.
+            Podrás valorar el servicio una vez el administrador cierre la
+            incidencia.
           </Text>
           <TouchableOpacity
             style={[s.submitBtn, { alignSelf: "stretch", marginHorizontal: 0 }]}
@@ -177,162 +201,206 @@ export default function RatingScreen() {
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "padding"}
       >
-      <ScrollView
-        contentContainerStyle={s.scroll}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* ── Header ─────────────────────────────────────────────────────── */}
-        <View style={s.headerSection}>
-          <Text style={s.pageTitle}>Tu opinión cuenta 🛡️</Text>
-          <Text style={s.pageSubtitle}>
-            El técnico ha terminado el trabajo. Revísalo y cuéntanos qué te parece.
-          </Text>
-        </View>
-
-        {/* ── Info banner ─────────────────────────────────────────────────── */}
-        <View style={s.infoBanner}>
-          <Text style={s.infoBannerIcon}>👥</Text>
-          <Text style={s.infoBannerText}>
-            Tu valoración quedará registrada para el Administrador de Finca como parte de la trazabilidad.
-          </Text>
-        </View>
-
-        {/* ── Incident card ───────────────────────────────────────────────── */}
-        <View style={s.incidentCard}>
-          <View style={s.incidentCardTop}>
-            <Text style={s.incidentId}>Incidencia {displayId}</Text>
-            <View style={s.workedBadge}>
-              <Text style={s.workedBadgeText}>Trabajado</Text>
-            </View>
-          </View>
-          {resolvedDate ? (
-            <Text style={s.incidentDate}>Hoy, {format(new Date(), "HH:mm", { locale: es })}</Text>
-          ) : null}
-
-          {/* Photos: before → after */}
-          {incident && ((incident as any).photoUrl || (incident as any).finalPhotoUrl) && (
-            <View style={s.photosRow}>
-              <View style={s.photoWrap}>
-                <Text style={s.photoCaption}>Antes</Text>
-                {resolvePhotoUri((incident as any).photoUrl) ? (
-                <Image
-                  source={{ uri: resolvePhotoUri((incident as any).photoUrl)! }}
-                  style={s.photoImg}
-                  resizeMode="cover"
-                />
-                ) : (
-                  <View style={[s.photoImg, s.photoPlaceholder]}>
-                    <Text style={{ fontSize: 13, color: MUTED, textAlign: "center" }}>Sin foto</Text>
-                  </View>
-                )}
-              </View>
-              <View style={s.photoArrowWrap}>
-                <Text style={s.photoArrow}>→</Text>
-              </View>
-              <View style={s.photoWrap}>
-                <Text style={s.photoCaption}>Después</Text>
-                {resolvePhotoUri((incident as any).finalPhotoUrl) ? (
-                  <>
-                    <Image
-                      source={{ uri: resolvePhotoUri((incident as any).finalPhotoUrl)! }}
-                      style={s.photoImg}
-                      resizeMode="cover"
-                    />
-                    <View style={s.resolvedBadgeOverlay}>
-                      <Text style={s.resolvedBadgeText}>RESULTADO</Text>
-                    </View>
-                  </>
-                ) : (
-                  <View style={[s.photoImg, s.photoPlaceholder]}>
-                    <Text style={{ fontSize: 13, color: MUTED, textAlign: "center" }}>
-                      Sin foto del técnico
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </View>
-          )}
-        </View>
-
-        {/* ── Stars ───────────────────────────────────────────────────────── */}
-        <View style={s.ratingSection}>
-          <Text style={s.ratingQuestion}>¿Qué te ha parecido el trabajo?</Text>
-          <Text style={s.ratingSubtitle}>Tu valoración ayuda a mantener un servicio de calidad.</Text>
-
-          <View style={s.starsRow}>
-            {[1, 2, 3, 4, 5].map((i) => (
-              <TouchableOpacity
-                key={i}
-                onPress={() => setRating(i)}
-                onPressIn={() => setHoveredStar(i)}
-                onPressOut={() => setHoveredStar(0)}
-                activeOpacity={0.9}
-                style={{ padding: 4 }}
-              >
-                <Text style={[s.starChar, { fontSize: 44, color: i <= displayRating ? "#F59E0B" : "#E5E7EB" }]}>
-                  ★
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {displayRating > 0 && (
-            <Text style={s.starLabel}>{STAR_LABELS[displayRating]}</Text>
-          )}
-        </View>
-
-        {/* ── Comment ─────────────────────────────────────────────────────── */}
-        <View style={s.commentSection}>
-          <Text style={s.commentLabel}>Cuéntanos más (opcional)</Text>
-          <TextInput
-            style={s.commentInput}
-            placeholder="Escribe aquí tu comentario..."
-            placeholderTextColor="#9CA3AF"
-            multiline
-            value={comment}
-            onChangeText={setComment}
-            textAlignVertical="top"
-            maxLength={250}
-          />
-          <Text style={s.commentCounter}>{comment.length}/250</Text>
-        </View>
-
-        {/* ── Thank you note ──────────────────────────────────────────────── */}
-        <View style={s.thanksBanner}>
-          <Text style={s.thanksBannerIcon}>🛡️</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={s.thanksBannerTitle}>¡Gracias!</Text>
-            <Text style={s.thanksBannerText}>
-              Tu valoración se envía al Administrador de Finca y queda registrada para futuras consultas.
+        <ScrollView
+          contentContainerStyle={s.scroll}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* ── Header ─────────────────────────────────────────────────────── */}
+          <View style={s.headerSection}>
+            <Text style={s.pageTitle}>Tu opinión cuenta 🛡️</Text>
+            <Text style={s.pageSubtitle}>
+              El técnico ha terminado el trabajo. Revísalo y cuéntanos qué te
+              parece.
             </Text>
           </View>
-        </View>
 
-        {/* ── Submit ──────────────────────────────────────────────────────── */}
-        <TouchableOpacity
-          style={[s.submitBtn, (!rating || submitRating.isPending) && s.submitBtnDisabled]}
-          onPress={handleSubmit}
-          disabled={!rating || submitRating.isPending}
-          activeOpacity={0.88}
-        >
-          {submitRating.isPending ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={s.submitBtnText}>✅ Enviar valoración</Text>
-          )}
-        </TouchableOpacity>
+          {/* ── Info banner ─────────────────────────────────────────────────── */}
+          <View style={s.infoBanner}>
+            <Text style={s.infoBannerIcon}>👥</Text>
+            <Text style={s.infoBannerText}>
+              Tu valoración quedará registrada para el Administrador de Finca
+              como parte de la trazabilidad.
+            </Text>
+          </View>
 
-        <TouchableOpacity
-          style={s.skipBtn}
-          onPress={() => router.replace("/(vecino)/incidents")}
-          activeOpacity={0.7}
-        >
-          <Text style={s.skipBtnText}>Ir a mis incidencias</Text>
-        </TouchableOpacity>
+          {/* ── Incident card ───────────────────────────────────────────────── */}
+          <View style={s.incidentCard}>
+            <View style={s.incidentCardTop}>
+              <Text style={s.incidentId}>Incidencia {displayId}</Text>
+              <View style={s.workedBadge}>
+                <Text style={s.workedBadgeText}>Trabajado</Text>
+              </View>
+            </View>
+            {resolvedDate ? (
+              <Text style={s.incidentDate}>
+                Hoy, {format(new Date(), "HH:mm", { locale: es })}
+              </Text>
+            ) : null}
 
-        <Text style={s.privacyNote}>🔒 Tu evaluación es anónima y segura</Text>
-      </ScrollView>
+            {/* Photos: before → after */}
+            {incident &&
+              ((incident as any).photoUrl ||
+                (incident as any).finalPhotoUrl) && (
+                <View style={s.photosRow}>
+                  <View style={s.photoWrap}>
+                    <Text style={s.photoCaption}>Antes</Text>
+                    {resolvePhotoUri((incident as any).photoUrl) ? (
+                      <Image
+                        source={{
+                          uri: resolvePhotoUri((incident as any).photoUrl)!,
+                        }}
+                        style={s.photoImg}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={[s.photoImg, s.photoPlaceholder]}>
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            color: MUTED,
+                            textAlign: "center",
+                          }}
+                        >
+                          Sin foto
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  <View style={s.photoArrowWrap}>
+                    <Text style={s.photoArrow}>→</Text>
+                  </View>
+                  <View style={s.photoWrap}>
+                    <Text style={s.photoCaption}>Después</Text>
+                    {resolvePhotoUri((incident as any).finalPhotoUrl) ? (
+                      <>
+                        <Image
+                          source={{
+                            uri: resolvePhotoUri(
+                              (incident as any).finalPhotoUrl,
+                            )!,
+                          }}
+                          style={s.photoImg}
+                          resizeMode="cover"
+                        />
+                        <View style={s.resolvedBadgeOverlay}>
+                          <Text style={s.resolvedBadgeText}>RESULTADO</Text>
+                        </View>
+                      </>
+                    ) : (
+                      <View style={[s.photoImg, s.photoPlaceholder]}>
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            color: MUTED,
+                            textAlign: "center",
+                          }}
+                        >
+                          Sin foto del técnico
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              )}
+          </View>
+
+          {/* ── Stars ───────────────────────────────────────────────────────── */}
+          <View style={s.ratingSection}>
+            <Text style={s.ratingQuestion}>
+              ¿Qué te ha parecido el trabajo?
+            </Text>
+            <Text style={s.ratingSubtitle}>
+              Tu valoración ayuda a mantener un servicio de calidad.
+            </Text>
+
+            <View style={s.starsRow}>
+              {[1, 2, 3, 4, 5].map((i) => (
+                <TouchableOpacity
+                  key={i}
+                  onPress={() => setRating(i)}
+                  onPressIn={() => setHoveredStar(i)}
+                  onPressOut={() => setHoveredStar(0)}
+                  activeOpacity={0.9}
+                  style={{ padding: 4 }}
+                >
+                  <Text
+                    style={[
+                      s.starChar,
+                      {
+                        fontSize: 44,
+                        color: i <= displayRating ? "#F59E0B" : "#E5E7EB",
+                      },
+                    ]}
+                  >
+                    ★
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {displayRating > 0 && (
+              <Text style={s.starLabel}>{STAR_LABELS[displayRating]}</Text>
+            )}
+          </View>
+
+          {/* ── Comment ─────────────────────────────────────────────────────── */}
+          <View style={s.commentSection}>
+            <Text style={s.commentLabel}>Cuéntanos más (opcional)</Text>
+            <TextInput
+              style={s.commentInput}
+              placeholder="Escribe aquí tu comentario..."
+              placeholderTextColor="#9CA3AF"
+              multiline
+              value={comment}
+              onChangeText={setComment}
+              textAlignVertical="top"
+              maxLength={250}
+            />
+            <Text style={s.commentCounter}>{comment.length}/250</Text>
+          </View>
+
+          {/* ── Thank you note ──────────────────────────────────────────────── */}
+          <View style={s.thanksBanner}>
+            <Text style={s.thanksBannerIcon}>🛡️</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={s.thanksBannerTitle}>¡Gracias!</Text>
+              <Text style={s.thanksBannerText}>
+                Tu valoración se envía al Administrador de Finca y queda
+                registrada para futuras consultas.
+              </Text>
+            </View>
+          </View>
+
+          {/* ── Submit ──────────────────────────────────────────────────────── */}
+          <TouchableOpacity
+            style={[
+              s.submitBtn,
+              (!rating || submitRating.isPending) && s.submitBtnDisabled,
+            ]}
+            onPress={handleSubmit}
+            disabled={!rating || submitRating.isPending}
+            activeOpacity={0.88}
+          >
+            {submitRating.isPending ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={s.submitBtnText}>✅ Enviar valoración</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={s.skipBtn}
+            onPress={() => router.replace("/(vecino)/incidents")}
+            activeOpacity={0.7}
+          >
+            <Text style={s.skipBtnText}>Ir a mis incidencias</Text>
+          </TouchableOpacity>
+
+          <Text style={s.privacyNote}>
+            🔒 Tu evaluación es anónima y segura
+          </Text>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -410,7 +478,13 @@ const s = StyleSheet.create({
     marginTop: 8,
   },
   photoWrap: { flex: 1, position: "relative" },
-  photoCaption: { fontSize: 11, color: MUTED, fontWeight: "600", textAlign: "center", marginBottom: 4 },
+  photoCaption: {
+    fontSize: 11,
+    color: MUTED,
+    fontWeight: "600",
+    textAlign: "center",
+    marginBottom: 4,
+  },
   photoImg: { width: "100%", aspectRatio: 1, borderRadius: 10 },
   photoPlaceholder: {
     backgroundColor: BG,
@@ -431,7 +505,12 @@ const s = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
-  resolvedBadgeText: { fontSize: 9, fontWeight: "800", color: "#fff", letterSpacing: 0.5 },
+  resolvedBadgeText: {
+    fontSize: 9,
+    fontWeight: "800",
+    color: "#fff",
+    letterSpacing: 0.5,
+  },
 
   // Rating section
   ratingSection: {
@@ -445,7 +524,12 @@ const s = StyleSheet.create({
     textAlign: "center",
     marginBottom: 4,
   },
-  ratingSubtitle: { fontSize: 13, color: MUTED, textAlign: "center", marginBottom: 16 },
+  ratingSubtitle: {
+    fontSize: 13,
+    color: MUTED,
+    textAlign: "center",
+    marginBottom: 16,
+  },
   starsRow: { flexDirection: "row", gap: 2, marginBottom: 8 },
   starChar: { fontWeight: "400" },
   starLabel: {
@@ -457,7 +541,12 @@ const s = StyleSheet.create({
 
   // Comment
   commentSection: { marginBottom: 16 },
-  commentLabel: { fontSize: 14, fontWeight: "600", color: DARK, marginBottom: 8 },
+  commentLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: DARK,
+    marginBottom: 8,
+  },
   commentInput: {
     backgroundColor: BG,
     borderRadius: 14,
@@ -470,7 +559,12 @@ const s = StyleSheet.create({
     minHeight: 88,
     lineHeight: 20,
   },
-  commentCounter: { fontSize: 11, color: MUTED, textAlign: "right", marginTop: 4 },
+  commentCounter: {
+    fontSize: 11,
+    color: MUTED,
+    textAlign: "right",
+    marginTop: 4,
+  },
 
   // Thanks banner
   thanksBanner: {
@@ -483,7 +577,12 @@ const s = StyleSheet.create({
     alignItems: "flex-start",
   },
   thanksBannerIcon: { fontSize: 18 },
-  thanksBannerTitle: { fontSize: 14, fontWeight: "700", color: "#166534", marginBottom: 2 },
+  thanksBannerTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#166534",
+    marginBottom: 2,
+  },
   thanksBannerText: { fontSize: 13, color: "#166534", lineHeight: 18 },
 
   // Buttons
