@@ -23,6 +23,7 @@ import {
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { emitWebSocketEvent } from "../utils/ws";
 import { sendPushToAFs, sendPushToUser } from "./notification";
+import { processAutoCloseVotings } from "./voting";
 
 // Save base64 image data to the local file system on the Next.js server
 function saveBase64Image(base64Data: string): string | undefined {
@@ -303,6 +304,7 @@ export const incidentRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       await ensureIncidentColumns(ctx.db);
       await processOverdueIncidents(ctx.db, input.tenantId);
+      await processAutoCloseVotings(ctx.db, input.tenantId);
 
       try {
         const results = await ctx.db.query.incident.findMany({

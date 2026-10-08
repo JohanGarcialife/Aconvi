@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -13,11 +13,9 @@ import {
   ChevronDown,
   ChevronUp,
   Clock,
-  LogOut,
   Plus,
   Search,
   Star,
-  User,
   XCircle,
 } from "lucide-react";
 
@@ -252,14 +250,18 @@ export default function IncidentsPage() {
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [noteText, setNoteText] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [showBulkConfirmModal, setShowBulkConfirmModal] = useState(false);
   const [closeComment, setCloseComment] = useState("");
   const [closeIban, setCloseIban] = useState("");
-  const userMenuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { data: session } = authClient.useSession();
+
+  useEffect(() => {
+    const q = searchParams.get("q") ?? searchParams.get("search");
+    if (q) setSearchQuery(q);
+  }, [searchParams]);
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok });
@@ -342,25 +344,6 @@ export default function IncidentsPage() {
     }),
   );
 
-  // Close user menu on outside click
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (
-        userMenuRef.current &&
-        !userMenuRef.current.contains(e.target as Node)
-      ) {
-        setUserMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const handleSignOut = async () => {
-    await authClient.signOut();
-    router.push("/login");
-  };
-
   const filtered = incidents.filter((i: any) => {
     const matchesStatus = filterStatus === "ALL" || i.status === filterStatus;
     const q = searchQuery.trim().toLowerCase();
@@ -372,13 +355,6 @@ export default function IncidentsPage() {
       i.description?.toLowerCase().includes(q);
     return matchesStatus && matchesSearch;
   });
-
-  const userName = session?.user?.name ?? "Usuario";
-  const userInitials = userName
-    .split(" ")
-    .slice(0, 2)
-    .map((n: string) => n[0]?.toUpperCase() ?? "")
-    .join("");
   const selected = incidents.find((i: any) => i.id === selectedId) ?? null;
   const selectedProvider =
     providers.find((p: any) => p.id === selectedProviderId) ??
@@ -534,7 +510,7 @@ export default function IncidentsPage() {
   const FILTERS = [
     { key: "ALL", label: "Todas" },
     { key: "RECIBIDA", label: "Pendientes" },
-    { key: "EN_REVISION", label: "En revisión" },
+    { key: "EN_REVISION", label: "Asignadas" },
     { key: "AGENDADA", label: "Agendadas" },
     { key: "EN_CURSO", label: "En curso" },
     { key: "RESUELTA", label: "Resueltas" },
@@ -782,90 +758,42 @@ export default function IncidentsPage() {
         </div>
       )}
 
-      {/* Top bar */}
-      <header className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-6 py-3">
-        <h1 className="text-xl font-bold text-slate-900">Incidencias</h1>
-        <div className="flex items-center gap-3">
-          {/* Search bar - fully functional */}
-          <div className="flex w-72 items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-500 transition-all focus-within:border-teal-400 focus-within:ring-2 focus-within:ring-teal-100">
-            <Search size={15} className="shrink-0 text-slate-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar comunidad, avería, vecino..."
-              className="flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="text-slate-400 transition-colors hover:text-slate-600"
-              >
-                <XCircle size={14} />
-              </button>
-            )}
-          </div>
-
-          {/* User avatar with dropdown */}
-          <div className="relative" ref={userMenuRef}>
-            <button
-              onClick={() => setUserMenuOpen((v) => !v)}
-              className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-slate-800 text-xs font-bold text-white transition-colors hover:bg-slate-700"
-              title={userName}
-            >
-              {userInitials || "JL"}
-            </button>
-
-            {/* Dropdown menu */}
-            {userMenuOpen && (
-              <div className="absolute top-11 right-0 z-50 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
-                {/* User info */}
-                <div className="border-b border-slate-100 px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-800 text-xs font-bold text-white">
-                      {userInitials || "JL"}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-slate-900">
-                        {userName}
-                      </p>
-                      <p className="truncate text-xs text-slate-400">
-                        {session?.user?.email ?? ""}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                {/* Menu items */}
-                <div className="py-1">
-                  <button
-                    onClick={() => {
-                      setUserMenuOpen(false);
-                      router.push("/profile");
-                    }}
-                    className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-slate-600 transition-colors hover:bg-slate-50"
-                  >
-                    <User size={15} className="text-slate-400" />
-                    Mi perfil
-                  </button>
-                  <div className="my-1 border-t border-slate-100" />
-                  <button
-                    onClick={() => void handleSignOut()}
-                    className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-red-600 transition-colors hover:bg-red-50"
-                  >
-                    <LogOut size={15} />
-                    Cerrar sesión
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+      {/* Page Title Bar */}
+      <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-6 py-3.5">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900">Incidencias</h1>
+          <p className="text-xs text-slate-500">
+            Órdenes de trabajo e intervenciones de la comunidad
+          </p>
         </div>
-      </header>
+      </div>
 
       {/* Body */}
       <div className="flex flex-1 overflow-hidden">
         {/* Column 1: List */}
         <div className="flex w-72 shrink-0 flex-col border-r border-slate-200 bg-white">
+          {/* Quick list filter search */}
+          <div className="border-b border-slate-100 p-2.5">
+            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-500 focus-within:border-[#008075] focus-within:bg-white focus-within:ring-1 focus-within:ring-[#008075]/20">
+              <Search size={14} className="shrink-0 text-slate-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Filtrar incidencias..."
+                className="flex-1 bg-transparent text-xs text-slate-700 outline-none placeholder:text-slate-400"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="text-slate-400 transition-colors hover:text-slate-600"
+                >
+                  <XCircle size={13} />
+                </button>
+              )}
+            </div>
+          </div>
           {/* Bulk action bar */}
           {checked.size > 0 ? (
             <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">

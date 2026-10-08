@@ -1,9 +1,21 @@
-import { and, asc, desc, eq, ilike, inArray, lte, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNotNull,
+  lt,
+  lte,
+  sql,
+} from "drizzle-orm";
 import { z } from "zod";
 
 import {
   fee,
   incident,
+  incidentHistory,
   member,
   notice,
   provider,
@@ -18,7 +30,11 @@ import {
 
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { emitWebSocketEvent } from "../utils/ws";
-import { sendPushToAllMembers } from "./notification";
+import {
+  sendPushToAFs,
+  sendPushToAllMembers,
+  sendPushToUser,
+} from "./notification";
 
 const DEMO_AUTHOR_ID = "00000000-0000-0000-0000-000000000000";
 
@@ -96,6 +112,614 @@ function formatEuro(val?: string | number | null): string {
   return str;
 }
 
+function parseAmountToNumber(amountStr?: string | null): number | null {
+  if (!amountStr) return null;
+  const clean = amountStr.replace(/[€\s]/g, "").trim();
+  if (!clean) return null;
+  if (clean.includes(",") && clean.includes(".")) {
+    const num = parseFloat(clean.replace(/\./g, "").replace(",", "."));
+    return isNaN(num) ? null : num;
+  }
+  if (clean.includes(",")) {
+    const num = parseFloat(clean.replace(",", "."));
+    return isNaN(num) ? null : num;
+  }
+  const num = parseFloat(clean);
+  return isNaN(num) ? null : num;
+}
+
+async function findOrMatchProvider(
+  db: any,
+  tenantId: string,
+  companyName?: string | null,
+  fallbackProviderId?: string | null,
+): Promise<{ id: string; name: string } | null> {
+  if (fallbackProviderId) {
+    const prov = await db.query.provider.findFirst({
+      where: and(
+        eq(provider.id, fallbackProviderId),
+        eq(provider.organizationId, tenantId),
+      ),
+    });
+    if (prov) return { id: prov.id, name: prov.name };
+  }
+
+  if (!companyName || !companyName.trim()) return null;
+  const trimmed = companyName.trim().toLowerCase();
+
+  const exact = await db.query.provider.findFirst({
+    where: and(
+      eq(provider.organizationId, tenantId),
+      ilike(provider.name, trimmed),
+    ),
+  });
+  if (exact) return { id: exact.id, name: exact.name };
+
+  const allProviders = await db.query.provider.findMany({
+    where: eq(provider.organizationId, tenantId),
+  });
+  const partial = allProviders.find(
+    (p: any) =>
+      p.name.toLowerCase().includes(trimmed) ||
+      trimmed.includes(p.name.toLowerCase()),
+  );
+  if (partial) return { id: partial.id, name: partial.name };
+
+  return null;
+}
+
+async function notifyProviderOfAssignedOt(
+  db: any,
+  providerId: string,
+  incidentData: any,
+) {
+  try {
+    const prov = await db.query.provider.findFirst({
+      where: eq(provider.id, providerId),
+    });
+    if (!prov) return;
+
+    let usr: any = null;
+    if (prov.email) {
+      usr = await db.query.user.findFirst({
+        where: eq(sql`lower(${user.email})`, prov.email.toLowerCase()),
+      });
+    }
+    if (!usr && prov.phone) {
+      usr = await db.query.user.findFirst({
+        where: eq(user.phoneNumber, prov.phone),
+      });
+    }
+    if (!usr && prov.name) {
+      usr = await db.query.user.findFirst({
+        where: eq(sql`lower(${user.name})`, prov.name.toLowerCase()),
+      });
+    }
+    if (!usr) {
+      usr = await db.query.user.findFirst({
+        where: eq(user.role, "Proveedor"),
+      });
+    }
+
+    if (usr?.id) {
+      await sendPushToUser(db, usr.id, {
+        title: "📋 Nueva orden de trabajo asignada",
+        body: `Se te ha asignado la OT: "${incidentData.title}" tras la votación de la comunidad.`,
+        data: { type: "job_assigned", incidentId: incidentData.id },
+      });
+      void emitWebSocketEvent(usr.id, "incident-assigned", incidentData);
+    }
+  } catch (err) {
+    console.warn("[notifyProviderOfAssignedOt] Error:", err);
+  }
+}
+
+interface GenerateOtParams {
+  db: any;
+  tenantId: string;
+  authorId: string;
+  sessionTitle: string;
+  itemTitle?: string;
+  budgetProposals?: Array<{
+    id: string;
+    companyName: string;
+    amount: string;
+    providerId?: string | null;
+  }> | null;
+  casts: Array<{
+    choice: string;
+    coefficient: number;
+    selectedProposalId?: string | null;
+  }>;
+  defaultProviderId?: string | null;
+}
+
+async function generateOtForWinner(params: GenerateOtParams): Promise<{
+  incidentId: string;
+  assignedProviderId: string | null;
+  winningCompanyName: string | null;
+  createdIncident: any;
+} | null> {
+  const {
+    db,
+    tenantId,
+    authorId,
+    sessionTitle,
+    itemTitle,
+    budgetProposals,
+    casts,
+    defaultProviderId,
+  } = params;
+
+  // 1. Verify approval: approveWeight > rejectWeight
+  const approveWeight = casts
+    .filter((c) => c.choice === "APPROVE")
+    .reduce((s, c) => s + (c.coefficient || 1), 0);
+  const rejectWeight = casts
+    .filter((c) => c.choice === "REJECT")
+    .reduce((s, c) => s + (c.coefficient || 1), 0);
+
+  if (approveWeight <= rejectWeight) {
+    return null; // Rejected, do not generate OT
+  }
+
+  // 2. Determine winning proposal
+  let topProposal: {
+    id: string;
+    companyName: string;
+    amount: string;
+    providerId?: string | null;
+  } | null = null;
+
+  if (budgetProposals && budgetProposals.length > 0) {
+    const proposalVotes: Record<string, number> = {};
+    for (const c of casts) {
+      if (c.choice === "APPROVE" && c.selectedProposalId) {
+        proposalVotes[c.selectedProposalId] =
+          (proposalVotes[c.selectedProposalId] || 0) + (c.coefficient || 1);
+      }
+    }
+
+    let maxWeight = -1;
+    for (const [pId, weight] of Object.entries(proposalVotes)) {
+      if (weight > maxWeight) {
+        maxWeight = weight;
+        const p = budgetProposals.find((bp) => bp.id === pId);
+        if (p) topProposal = p;
+      }
+    }
+
+    // Fallback: if only 1 proposal or no specific proposal selected
+    if (!topProposal && budgetProposals.length > 0) {
+      topProposal = budgetProposals[0] ?? null;
+    }
+  }
+
+  // 3. Match provider
+  let assignedProviderId: string | null = null;
+  let winningCompanyName = topProposal?.companyName ?? null;
+  let winningAmount = topProposal?.amount ?? null;
+
+  if (topProposal?.providerId) {
+    assignedProviderId = topProposal.providerId;
+  } else if (winningCompanyName) {
+    const matched = await findOrMatchProvider(
+      db,
+      tenantId,
+      winningCompanyName,
+      defaultProviderId,
+    );
+    if (matched) {
+      assignedProviderId = matched.id;
+      winningCompanyName = matched.name;
+    } else if (defaultProviderId) {
+      assignedProviderId = defaultProviderId;
+    }
+  } else if (defaultProviderId) {
+    assignedProviderId = defaultProviderId;
+  }
+
+  const estimatedCost = parseAmountToNumber(winningAmount);
+  const incidentId = crypto.randomUUID();
+  const workTitle = itemTitle ? itemTitle : sessionTitle;
+  const displayTitle = `OT: ${workTitle}${winningCompanyName ? ` (${winningCompanyName})` : ""}`;
+  const displayDesc = itemTitle
+    ? `Orden de trabajo generada automáticamente tras la aprobación del punto "${itemTitle}" en la junta "${sessionTitle}".${
+        winningCompanyName
+          ? ` Empresa adjudicataria: ${winningCompanyName}${winningAmount ? ` por ${winningAmount}` : ""}.`
+          : ""
+      }`
+    : `Orden de trabajo generada automáticamente tras la aprobación por mayoría de la votación "${sessionTitle}".${
+        winningCompanyName
+          ? ` Empresa adjudicataria: ${winningCompanyName}${winningAmount ? ` por ${winningAmount}` : ""}.`
+          : ""
+      }`;
+
+  // 4. Create Incident in DB with status EN_REVISION ("Asignada")
+  const [createdIncident] = await db
+    .insert(incident)
+    .values({
+      id: incidentId,
+      title: displayTitle,
+      description: displayDesc,
+      category: "obra",
+      status: "EN_REVISION", // State "Asignada" in AF dashboard!
+      priority: "MEDIA",
+      organizationId: tenantId,
+      reporterId: authorId,
+      providerId: assignedProviderId,
+      assignedAt: new Date(),
+      estimatedCost,
+    })
+    .returning();
+
+  // 5. Insert history
+  try {
+    await db.insert(incidentHistory).values({
+      incidentId,
+      actorName: "Sistema / Votación",
+      action: "ASSIGNED",
+      previousStatus: null,
+      newStatus: "EN_REVISION",
+      comment: `Orden de trabajo adjudicada automáticamente tras la votación.${
+        winningCompanyName ? ` Proveedor: ${winningCompanyName}.` : ""
+      }`,
+    });
+  } catch (histErr) {
+    console.warn("[generateOtForWinner] History insert failed:", histErr);
+  }
+
+  // 6. Notify Provider (Push + WS)
+  if (assignedProviderId) {
+    void notifyProviderOfAssignedOt(db, assignedProviderId, createdIncident);
+  }
+
+  // 7. Notify Vecinos / Community members (Push)
+  try {
+    void sendPushToAllMembers(db, tenantId, {
+      title: "🔧 Orden de trabajo adjudicada",
+      body: `Tras la votación, se ha asignado la OT "${workTitle}" a ${winningCompanyName ?? "un profesional"} y está lista para su ejecución.`,
+      data: { type: "incident_assigned", incidentId },
+    });
+  } catch (pushVecinoErr) {
+    console.warn(
+      "[generateOtForWinner] Push to members failed:",
+      pushVecinoErr,
+    );
+  }
+
+  // 8. Notify AFs / Administrator (Push)
+  try {
+    void sendPushToAFs(db, tenantId, {
+      title: "📋 OT asignada automáticamente",
+      body: `La OT para "${workTitle}" ha sido asignada a ${winningCompanyName ?? "el proveedor"} tras aprobarse la votación.`,
+      data: { type: "ot_assigned", incidentId },
+    });
+  } catch (pushAfErr) {
+    console.warn("[generateOtForWinner] Push to AF failed:", pushAfErr);
+  }
+
+  // 9. Realtime WebSocket for AF dashboard
+  try {
+    void emitWebSocketEvent(tenantId, "incident-updated", createdIncident);
+  } catch (wsErr) {
+    console.warn("[generateOtForWinner] WS emit failed:", wsErr);
+  }
+
+  return {
+    incidentId,
+    assignedProviderId,
+    winningCompanyName,
+    createdIncident,
+  };
+}
+
+async function executeCloseVotingSession(
+  db: any,
+  session: any,
+  authorId: string,
+  tenantId: string,
+) {
+  // Ensure author exists in user table for FK satisfaction
+  try {
+    const { sql } = await import("drizzle-orm");
+    await db.execute(
+      sql`INSERT INTO "user" ("id", "name", "email", "role")
+          VALUES (${authorId}, 'Administrador de Fincas', 'af@aconvi.es', 'AF')
+          ON CONFLICT ("id") DO NOTHING;`,
+    );
+  } catch (authorErr) {
+    console.warn(
+      "[executeCloseVotingSession] Could not ensure author user:",
+      authorErr,
+    );
+  }
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("es-ES", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  const lines: string[] = [
+    `ACTA DE VOTACIÓN OFICIAL — ${session.title}`,
+    `Tipo: ${session.type === "JUNTA" ? "Junta Extraordinaria (Varios Puntos)" : "Decisión sin Junta"}`,
+    `Fecha de cierre: ${dateStr}`,
+    `Administrador: ${session.author?.name ?? "Administración"}`,
+    `Total de votantes: ${new Set((session.casts || []).map((c: any) => c.userId)).size}`,
+    ``,
+    `═══════════════════════════════════════════════════════════════════`,
+    `RESULTADOS DE LA VOTACIÓN:`,
+    `═══════════════════════════════════════════════════════════════════`,
+  ];
+
+  const generatedIncidentIds: string[] = [];
+
+  if (session.type === "JUNTA" && session.items && session.items.length > 0) {
+    for (const item of session.items) {
+      const itemCasts = (session.casts || []).filter(
+        (c: any) => c.itemId === item.id,
+      );
+      const app = itemCasts
+        .filter((c: any) => c.choice === "APPROVE")
+        .reduce((s: number, c: any) => s + (c.coefficient || 1), 0);
+      const rej = itemCasts
+        .filter((c: any) => c.choice === "REJECT")
+        .reduce((s: number, c: any) => s + (c.coefficient || 1), 0);
+      const abs = itemCasts
+        .filter((c: any) => c.choice === "ABSTAIN")
+        .reduce((s: number, c: any) => s + (c.coefficient || 1), 0);
+      const tot = app + rej + abs || 1;
+
+      const isApproved = app > rej;
+      const winner = isApproved ? "APROBADO" : "RECHAZADO";
+
+      lines.push(
+        `\nPUNTO ${item.orderIndex}: ${item.title} ${item.budget ? `(${item.budget})` : ""}`,
+      );
+      lines.push(
+        `  • Apruebo:     ${itemCasts.filter((c: any) => c.choice === "APPROVE").length} votos (${((app / tot) * 100).toFixed(1)}% coef.)`,
+      );
+      lines.push(
+        `  • Rechazo:     ${itemCasts.filter((c: any) => c.choice === "REJECT").length} votos (${((rej / tot) * 100).toFixed(1)}% coef.)`,
+      );
+      lines.push(
+        `  • Me abstengo: ${itemCasts.filter((c: any) => c.choice === "ABSTAIN").length} votos (${((abs / tot) * 100).toFixed(1)}% coef.)`,
+      );
+      lines.push(`  → Resultado: ${winner}`);
+
+      if (item.budgetProposals && item.budgetProposals.length > 0) {
+        lines.push(`  DESGLOSE POR PROPUESTA:`);
+        for (const bp of item.budgetProposals) {
+          const bpCasts = itemCasts.filter(
+            (c: any) =>
+              c.choice === "APPROVE" && c.selectedProposalId === bp.id,
+          );
+          const bpWeight = bpCasts.reduce(
+            (s: number, c: any) => s + (c.coefficient || 1),
+            0,
+          );
+          lines.push(
+            `  • ${bp.companyName} (${bp.amount}): ${bpCasts.length} votos (${((bpWeight / tot) * 100).toFixed(1)}% coef.)`,
+          );
+        }
+      }
+
+      // Auto-generate OT for Junta item if approved and (item.autoGenerateOt || has budget proposals)
+      if (
+        item.autoGenerateOt ||
+        (item.budgetProposals && item.budgetProposals.length > 0)
+      ) {
+        try {
+          const otRes = await generateOtForWinner({
+            db,
+            tenantId,
+            authorId,
+            sessionTitle: session.title,
+            itemTitle: item.title,
+            budgetProposals: item.budgetProposals,
+            casts: itemCasts,
+            defaultProviderId: item.otProviderId,
+          });
+
+          if (otRes) {
+            await db
+              .update(voteItem)
+              .set({ otGeneratedIncidentId: otRes.incidentId })
+              .where(eq(voteItem.id, item.id));
+
+            generatedIncidentIds.push(otRes.incidentId);
+            lines.push(
+              `  → Orden de Trabajo asignada: ${otRes.winningCompanyName ?? "Proveedor"} (OT: ${otRes.incidentId})`,
+            );
+          }
+        } catch (itemOtErr) {
+          console.warn(
+            `[executeCloseVotingSession] OT generation failed for item ${item.id}:`,
+            itemOtErr,
+          );
+        }
+      }
+    }
+  } else {
+    // SINGLE session
+    const allCasts = session.casts || [];
+    const app = allCasts
+      .filter((c: any) => c.choice === "APPROVE")
+      .reduce((s: number, c: any) => s + (c.coefficient || 1), 0);
+    const rej = allCasts
+      .filter((c: any) => c.choice === "REJECT")
+      .reduce((s: number, c: any) => s + (c.coefficient || 1), 0);
+    const abs = allCasts
+      .filter((c: any) => c.choice === "ABSTAIN")
+      .reduce((s: number, c: any) => s + (c.coefficient || 1), 0);
+    const tot = app + rej + abs || 1;
+
+    const isApproved = app > rej;
+    lines.push(
+      `\nDECISIÓN: ${session.title} ${session.budget ? `(${session.budget})` : ""}`,
+    );
+    lines.push(
+      `  • Apruebo:     ${allCasts.filter((c: any) => c.choice === "APPROVE").length} votos (${((app / tot) * 100).toFixed(1)}% coef.)`,
+    );
+    lines.push(
+      `  • Rechazo:     ${allCasts.filter((c: any) => c.choice === "REJECT").length} votos (${((rej / tot) * 100).toFixed(1)}% coef.)`,
+    );
+    lines.push(
+      `  • Me abstengo: ${allCasts.filter((c: any) => c.choice === "ABSTAIN").length} votos (${((abs / tot) * 100).toFixed(1)}% coef.)`,
+    );
+    lines.push(`  → Resultado: ${isApproved ? "APROBADO" : "RECHAZADO"}`);
+
+    if (session.budgetProposals && session.budgetProposals.length > 0) {
+      lines.push(`\n  DESGLOSE POR PROPUESTA:`);
+      for (const bp of session.budgetProposals) {
+        const bpCasts = allCasts.filter(
+          (c: any) => c.choice === "APPROVE" && c.selectedProposalId === bp.id,
+        );
+        const bpWeight = bpCasts.reduce(
+          (s: number, c: any) => s + (c.coefficient || 1),
+          0,
+        );
+        lines.push(
+          `  • ${bp.companyName} (${bp.amount}): ${bpCasts.length} votos (${((bpWeight / tot) * 100).toFixed(1)}% coef.)`,
+        );
+      }
+    }
+
+    // Auto-generate OT for Single session if approved and (session.autoGenerateOt || has budget proposals)
+    if (
+      session.autoGenerateOt ||
+      (session.budgetProposals && session.budgetProposals.length > 0)
+    ) {
+      try {
+        const otRes = await generateOtForWinner({
+          db,
+          tenantId,
+          authorId,
+          sessionTitle: session.title,
+          budgetProposals: session.budgetProposals,
+          casts: allCasts,
+          defaultProviderId: session.otProviderId,
+        });
+
+        if (otRes) {
+          await db
+            .update(voteSession)
+            .set({ otGeneratedIncidentId: otRes.incidentId })
+            .where(eq(voteSession.id, session.id));
+
+          generatedIncidentIds.push(otRes.incidentId);
+          lines.push(
+            `  → Orden de Trabajo asignada: ${otRes.winningCompanyName ?? "Proveedor"} (OT: ${otRes.incidentId})`,
+          );
+        }
+      } catch (sessionOtErr) {
+        console.warn(
+          `[executeCloseVotingSession] OT generation failed for session ${session.id}:`,
+          sessionOtErr,
+        );
+      }
+    }
+  }
+
+  lines.push(
+    `\nDocumento emitido y sellado legalmente por la plataforma Aconvi.`,
+  );
+
+  // Insert minute
+  await db.insert(voteMinute).values({
+    id: crypto.randomUUID(),
+    sessionId: session.id,
+    content: lines.join("\n"),
+  });
+
+  // Mark session CLOSED
+  await db
+    .update(voteSession)
+    .set({ status: "CLOSED", closedAt: now })
+    .where(eq(voteSession.id, session.id));
+
+  // WS Event
+  try {
+    await emitWebSocketEvent(tenantId, "voting-closed", {
+      sessionId: session.id,
+      closedAt: now,
+    });
+  } catch (wsErr) {
+    console.warn("[executeCloseVotingSession] WS emit failed:", wsErr);
+  }
+
+  // Push to members
+  try {
+    await sendPushToAllMembers(db, tenantId, {
+      title: `📋 Votación cerrada: ${session.title}`,
+      body: "El Administrador de Fincas ha cerrado la votación y generado el acta oficial. Ya puedes consultar los resultados.",
+      data: { type: "vote_closed", sessionId: session.id },
+    });
+  } catch (pushErr) {
+    console.warn("[executeCloseVotingSession] Push broadcast failed:", pushErr);
+  }
+
+  return {
+    ok: true,
+    minuteContent: lines.join("\n"),
+    generatedIncidentId: generatedIncidentIds[0] ?? null,
+    generatedIncidentIds,
+  };
+}
+
+export async function processAutoCloseVotings(
+  db: any,
+  tenantId?: string | null,
+) {
+  try {
+    const now = new Date();
+    const whereConditions = [
+      eq(voteSession.status, "OPEN"),
+      isNotNull(voteSession.closesAt),
+      lt(voteSession.closesAt, now),
+    ];
+    if (tenantId) {
+      whereConditions.push(eq(voteSession.organizationId, tenantId));
+    }
+
+    const expiredSessions = await db.query.voteSession.findMany({
+      where: and(...whereConditions),
+      with: {
+        items: {
+          orderBy: (i: any, { asc }: any) => [asc(i.orderIndex)],
+          with: {
+            budgetProposals: {
+              orderBy: (bp: any, { asc }: any) => [asc(bp.displayOrder)],
+            },
+          },
+        },
+        casts: { with: { user: { columns: { id: true, name: true } } } },
+        author: { columns: { name: true } },
+        budgetProposals: {
+          orderBy: (bp: any, { asc }: any) => [asc(bp.displayOrder)],
+        },
+      },
+    });
+
+    for (const session of expiredSessions) {
+      console.log(
+        `[AutoCloseSweep] Closing expired session ${session.id} (${session.title})`,
+      );
+      const authorId = session.authorId ?? DEMO_AUTHOR_ID;
+      await executeCloseVotingSession(
+        db,
+        session,
+        authorId,
+        session.organizationId,
+      );
+    }
+  } catch (err) {
+    console.warn("[AutoCloseSweep] Error during sweep:", err);
+  }
+}
+
 export const votingRouter = createTRPCRouter({
   // ── List all sessions for a community with user-specific voting status ─────────
   all: publicProcedure
@@ -107,6 +731,7 @@ export const votingRouter = createTRPCRouter({
     )
     .query(async ({ ctx, input }) => {
       await ensureVotingTables(ctx.db);
+      await processAutoCloseVotings(ctx.db, input.tenantId);
       const resolvedUserId =
         ctx.session?.user?.id ?? input.userId ?? DEMO_AUTHOR_ID;
 
@@ -422,6 +1047,7 @@ export const votingRouter = createTRPCRouter({
   results: publicProcedure
     .input(z.object({ sessionId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
+      await processAutoCloseVotings(ctx.db);
       const session = await ctx.db.query.voteSession.findFirst({
         where: eq(voteSession.id, input.sessionId),
         with: {
@@ -672,7 +1298,9 @@ export const votingRouter = createTRPCRouter({
           priority: input.priority ?? 0,
           closesAt: input.closesAt ? new Date(input.closesAt) : null,
           scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : null,
-          autoGenerateOt: input.autoGenerateOt ?? false,
+          autoGenerateOt: Boolean(
+            input.autoGenerateOt || allProposals.length > 0,
+          ),
           otProviderId: input.otProviderId ?? null,
         })
         .returning();
@@ -702,7 +1330,9 @@ export const votingRouter = createTRPCRouter({
           budget: derivedBudget,
           description: input.description ?? null,
           onlineVotingEnabled: true,
-          autoGenerateOt: input.autoGenerateOt ?? false,
+          autoGenerateOt: Boolean(
+            input.autoGenerateOt || allProposals.length > 0,
+          ),
           otProviderId: input.otProviderId ?? null,
         });
       }
@@ -908,7 +1538,10 @@ export const votingRouter = createTRPCRouter({
           budget: itemInput.budget ? formatEuro(itemInput.budget) : null,
           description: itemInput.description ?? null,
           onlineVotingEnabled: itemInput.onlineVotingEnabled ?? true,
-          autoGenerateOt: itemInput.autoGenerateOt ?? false,
+          autoGenerateOt: Boolean(
+            itemInput.autoGenerateOt ||
+              (itemInput.proposals && itemInput.proposals.length > 0),
+          ),
           otProviderId: itemInput.otProviderId ?? null,
         });
 
@@ -1382,305 +2015,13 @@ Fdo. La Administración de Fincas`;
       if (session.status !== "OPEN")
         throw new Error("Solo se pueden cerrar votaciones abiertas");
 
-      const now = new Date();
-      const dateStr = now.toLocaleDateString("es-ES", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      });
-
-      const lines: string[] = [
-        `ACTA DE VOTACIÓN OFICIAL — ${session.title}`,
-        `Tipo: ${session.type === "JUNTA" ? "Junta Extraordinaria (Varios Puntos)" : "Decisión sin Junta"}`,
-        `Fecha de cierre: ${dateStr}`,
-        `Administrador: ${session.author?.name ?? "Administración"}`,
-        `Total de votantes: ${new Set(session.casts.map((c) => c.userId)).size}`,
-        ``,
-        `═══════════════════════════════════════════════════════════════════`,
-        `RESULTADOS DE LA VOTACIÓN:`,
-        `═══════════════════════════════════════════════════════════════════`,
-      ];
-
-      if (session.type === "JUNTA" && session.items.length > 0) {
-        for (const item of session.items) {
-          const itemCasts = session.casts.filter((c) => c.itemId === item.id);
-          const app = itemCasts
-            .filter((c) => c.choice === "APPROVE")
-            .reduce((s, c) => s + c.coefficient, 0);
-          const rej = itemCasts
-            .filter((c) => c.choice === "REJECT")
-            .reduce((s, c) => s + c.coefficient, 0);
-          const abs = itemCasts
-            .filter((c) => c.choice === "ABSTAIN")
-            .reduce((s, c) => s + c.coefficient, 0);
-          const tot = app + rej + abs || 1;
-
-          const winner = app > rej ? "APROBADO" : "RECHAZADO";
-
-          lines.push(
-            `\nPUNTO ${item.orderIndex}: ${item.title} ${item.budget ? `(${item.budget})` : ""}`,
-          );
-          lines.push(
-            `  • Apruebo:     ${itemCasts.filter((c) => c.choice === "APPROVE").length} votos (${((app / tot) * 100).toFixed(1)}% coef.)`,
-          );
-          lines.push(
-            `  • Rechazo:     ${itemCasts.filter((c) => c.choice === "REJECT").length} votos (${((rej / tot) * 100).toFixed(1)}% coef.)`,
-          );
-          lines.push(
-            `  • Me abstengo: ${itemCasts.filter((c) => c.choice === "ABSTAIN").length} votos (${((abs / tot) * 100).toFixed(1)}% coef.)`,
-          );
-          lines.push(`  → Resultado: ${winner}`);
-        }
-      } else {
-        const app = session.casts
-          .filter((c) => c.choice === "APPROVE")
-          .reduce((s, c) => s + c.coefficient, 0);
-        const rej = session.casts
-          .filter((c) => c.choice === "REJECT")
-          .reduce((s, c) => s + c.coefficient, 0);
-        const abs = session.casts
-          .filter((c) => c.choice === "ABSTAIN")
-          .reduce((s, c) => s + c.coefficient, 0);
-        const tot = app + rej + abs || 1;
-
-        lines.push(
-          `\nDECISIÓN: ${session.title} ${session.budget ? `(${session.budget})` : ""}`,
-        );
-        lines.push(
-          `  • Apruebo:     ${session.casts.filter((c) => c.choice === "APPROVE").length} votos (${((app / tot) * 100).toFixed(1)}% coef.)`,
-        );
-        lines.push(
-          `  • Rechazo:     ${session.casts.filter((c) => c.choice === "REJECT").length} votos (${((rej / tot) * 100).toFixed(1)}% coef.)`,
-        );
-        lines.push(
-          `  • Me abstengo: ${session.casts.filter((c) => c.choice === "ABSTAIN").length} votos (${((abs / tot) * 100).toFixed(1)}% coef.)`,
-        );
-        lines.push(`  → Resultado: ${app > rej ? "APROBADO" : "RECHAZADO"}`);
-
-        if (session.budgetProposals && session.budgetProposals.length > 1) {
-          lines.push(`\n  DESGLOSE POR PROPUESTA:`);
-          for (const bp of session.budgetProposals) {
-            const bpCasts = session.casts.filter(
-              (c) => c.choice === "APPROVE" && c.selectedProposalId === bp.id,
-            );
-            const bpWeight = bpCasts.reduce((s, c) => s + c.coefficient, 0);
-            lines.push(
-              `  • ${bp.companyName} (${bp.amount}): ${bpCasts.length} votos (${((bpWeight / tot) * 100).toFixed(1)}% coef.)`,
-            );
-          }
-        }
-      }
-
-      lines.push(
-        `\nDocumento emitido y sellado legalmente por la plataforma Aconvi.`,
-      );
-
-      await ctx.db.insert(voteMinute).values({
-        id: crypto.randomUUID(),
-        sessionId: session.id,
-        content: lines.join("\n"),
-      });
-
-      await ctx.db
-        .update(voteSession)
-        .set({ status: "CLOSED", closedAt: now })
-        .where(eq(voteSession.id, input.sessionId));
-
-      try {
-        await emitWebSocketEvent(input.tenantId, "voting-closed", {
-          sessionId: input.sessionId,
-          closedAt: now,
-        });
-      } catch (wsErr) {
-        console.warn("[voting.close] WebSocket emit failed:", wsErr);
-      }
-
-      // Send push notification to all members that the session is closed
-      try {
-        await sendPushToAllMembers(ctx.db, input.tenantId, {
-          title: `📋 Votación cerrada: ${session.title}`,
-          body: "El Administrador de Fincas ha cerrado la votación y generado el acta oficial. Ya puedes consultar los resultados.",
-          data: { type: "vote_closed", sessionId: session.id },
-        });
-      } catch (pushErr) {
-        console.warn("[voting.close] Push broadcast failed:", pushErr);
-      }
-
-      // Auto-generate OT (incident) for items (or session level if SINGLE)
-      const generatedIncidentIds: string[] = [];
       const authorId = ctx.session?.user?.id ?? DEMO_AUTHOR_ID;
-
-      // Ensure author exists in user table for incident reporter foreign key
-      try {
-        const { sql } = await import("drizzle-orm");
-        await ctx.db.execute(
-          sql`INSERT INTO "user" ("id", "name", "email", "role")
-              VALUES (${authorId}, 'Administrador de Fincas', 'af@aconvi.es', 'AF')
-              ON CONFLICT ("id") DO NOTHING;`,
-        );
-      } catch (authorErr) {
-        console.warn("[voting.close] Could not ensure author user:", authorErr);
-      }
-
-      if (
-        session.type === "JUNTA" &&
-        session.items &&
-        session.items.length > 0
-      ) {
-        for (const item of session.items) {
-          if (item.autoGenerateOt) {
-            try {
-              const itemCasts = session.casts.filter(
-                (c) => c.itemId === item.id,
-              );
-              const approveWeight = itemCasts
-                .filter((c) => c.choice === "APPROVE")
-                .reduce((s, c) => s + c.coefficient, 0);
-              const rejectWeight = itemCasts
-                .filter((c) => c.choice === "REJECT")
-                .reduce((s, c) => s + c.coefficient, 0);
-
-              if (approveWeight > rejectWeight) {
-                const incidentId = crypto.randomUUID();
-                await ctx.db.insert(incident).values({
-                  id: incidentId,
-                  title: `OT: ${item.title}`,
-                  description: `Orden de trabajo generada automáticamente tras la aprobación del punto "${item.title}" en la junta "${session.title}".`,
-                  category: "obra",
-                  status: "RECIBIDA",
-                  priority: "MEDIA",
-                  organizationId: input.tenantId,
-                  reporterId: authorId,
-                  providerId: item.otProviderId ?? null,
-                });
-
-                await ctx.db
-                  .update(voteItem)
-                  .set({ otGeneratedIncidentId: incidentId })
-                  .where(eq(voteItem.id, item.id));
-
-                generatedIncidentIds.push(incidentId);
-                console.log(
-                  `[voting.close] Auto-generated OT incident for item ${item.id}: ${incidentId}`,
-                );
-              }
-            } catch (otErr) {
-              console.warn(
-                `[voting.close] Auto-OT generation failed for item ${item.id}:`,
-                otErr,
-              );
-            }
-          }
-        }
-      }
-
-      // Also check session-level auto-OT (for SINGLE votes or session-wide)
-      if (session.autoGenerateOt) {
-        try {
-          const allCasts = session.casts;
-          const approveWeight = allCasts
-            .filter((c) => c.choice === "APPROVE")
-            .reduce((s, c) => s + c.coefficient, 0);
-          const rejectWeight = allCasts
-            .filter((c) => c.choice === "REJECT")
-            .reduce((s, c) => s + c.coefficient, 0);
-
-          if (approveWeight > rejectWeight) {
-            let assignedProviderId: string | null =
-              session.otProviderId ?? null;
-            let winningCompanyName: string | null = null;
-            let winningAmount: string | null = null;
-
-            if (session.budgetProposals && session.budgetProposals.length > 0) {
-              const proposalVotes: Record<string, number> = {};
-              for (const c of allCasts) {
-                if (c.choice === "APPROVE" && c.selectedProposalId) {
-                  proposalVotes[c.selectedProposalId] =
-                    (proposalVotes[c.selectedProposalId] || 0) +
-                    (c.coefficient || 1);
-                }
-              }
-
-              let topProposalId: string | null = null;
-              let topWeight = -1;
-              for (const [pId, weight] of Object.entries(proposalVotes)) {
-                if (weight > topWeight) {
-                  topWeight = weight;
-                  topProposalId = pId;
-                }
-              }
-
-              // Fallback to first proposal if only 1 exists and no direct proposal votes recorded
-              if (!topProposalId && session.budgetProposals.length === 1) {
-                topProposalId = session.budgetProposals[0]?.id ?? null;
-              }
-
-              if (topProposalId) {
-                const winningProp = session.budgetProposals.find(
-                  (p) => p.id === topProposalId,
-                );
-                if (winningProp) {
-                  winningCompanyName = winningProp.companyName;
-                  winningAmount = winningProp.amount;
-                  if ((winningProp as any).providerId) {
-                    assignedProviderId = (winningProp as any).providerId;
-                  } else {
-                    const matchedProvider =
-                      await ctx.db.query.provider.findFirst({
-                        where: and(
-                          eq(provider.organizationId, input.tenantId),
-                          ilike(provider.name, winningProp.companyName.trim()),
-                        ),
-                      });
-                    if (matchedProvider) {
-                      assignedProviderId = matchedProvider.id;
-                    }
-                  }
-                }
-              }
-            }
-
-            const incidentId = crypto.randomUUID();
-            await ctx.db.insert(incident).values({
-              id: incidentId,
-              title: `OT: ${session.title}${winningCompanyName ? ` (${winningCompanyName})` : ""}`,
-              description: `Orden de trabajo generada automáticamente tras la aprobación por mayoría de la votación "${session.title}".${
-                winningCompanyName
-                  ? ` Empresa seleccionada: ${winningCompanyName}${winningAmount ? ` por ${winningAmount}` : ""}.`
-                  : ""
-              }`,
-              category: "obra",
-              status: "RECIBIDA",
-              priority: "MEDIA",
-              organizationId: input.tenantId,
-              reporterId: authorId,
-              providerId: assignedProviderId,
-            });
-
-            await ctx.db
-              .update(voteSession)
-              .set({ otGeneratedIncidentId: incidentId })
-              .where(eq(voteSession.id, input.sessionId));
-
-            generatedIncidentIds.push(incidentId);
-            console.log(
-              `[voting.close] Auto-generated OT incident for session: ${incidentId} (assigned to provider: ${assignedProviderId})`,
-            );
-          }
-        } catch (otErr) {
-          console.warn(
-            "[voting.close] Auto-OT generation failed for session:",
-            otErr,
-          );
-        }
-      }
-
-      return {
-        ok: true,
-        minuteContent: lines.join("\n"),
-        generatedIncidentId: generatedIncidentIds[0] ?? null,
-        generatedIncidentIds,
-      };
+      return await executeCloseVotingSession(
+        ctx.db,
+        session,
+        authorId,
+        input.tenantId,
+      );
     }),
 
   // ── Debtors with voting rights info (for AF "Habilitar voto" view) ─────────

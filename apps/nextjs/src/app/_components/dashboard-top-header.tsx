@@ -13,13 +13,16 @@ import {
   Check,
   CheckCircle2,
   ChevronRight,
+  LogOut,
   MessageSquare,
   Search,
+  User,
   Vote,
 } from "lucide-react";
 
 import { Input } from "@acme/ui/input";
 
+import { authClient } from "~/auth/client";
 import { useTRPC } from "~/trpc/react";
 
 const TENANT_ID = "org_aconvi_demo";
@@ -39,9 +42,32 @@ export function DashboardTopHeader() {
   const router = useRouter();
   const trpc = useTRPC();
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const userDropdownRef = useRef<HTMLDivElement>(null);
 
   const [isOpen, setIsOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [globalSearch, setGlobalSearch] = useState("");
   const [lastSeenTs, setLastSeenTs] = useState<number>(0);
+
+  const { data: session } = authClient.useSession();
+  const userName = session?.user?.name || "María Jiménez";
+  const userEmail = session?.user?.email || "af@aconvi.es";
+  const userInitials = useMemo(() => {
+    if (!userName) return "MJ";
+    const parts = userName.trim().split(" ");
+    if (parts.length >= 2) {
+      return `${parts[0]![0]}${parts[1]![0]}`.toUpperCase();
+    }
+    return userName.slice(0, 2).toUpperCase();
+  }, [userName]);
+
+  const handleGlobalSearchKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+  ) => {
+    if (e.key === "Enter" && globalSearch.trim()) {
+      router.push(`/incidents?q=${encodeURIComponent(globalSearch.trim())}`);
+    }
+  };
 
   // Load last seen timestamp from localStorage
   useEffect(() => {
@@ -62,15 +88,22 @@ export function DashboardTopHeader() {
       ) {
         setIsOpen(false);
       }
+      if (
+        userDropdownRef.current &&
+        !userDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsProfileOpen(false);
+      }
     }
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setIsOpen(false);
+        setIsProfileOpen(false);
       }
     }
 
-    if (isOpen) {
+    if (isOpen || isProfileOpen) {
       document.addEventListener("mousedown", handleClickOutside);
       document.addEventListener("keydown", handleKeyDown);
     }
@@ -78,7 +111,7 @@ export function DashboardTopHeader() {
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isOpen]);
+  }, [isOpen, isProfileOpen]);
 
   // Live queries
   const { data: incidents } = useQuery({
@@ -230,6 +263,9 @@ export function DashboardTopHeader() {
           <Search className="absolute top-2.5 left-3 h-3.5 w-3.5 text-slate-400" />
           <Input
             type="text"
+            value={globalSearch}
+            onChange={(e) => setGlobalSearch(e.target.value)}
+            onKeyDown={handleGlobalSearchKeyDown}
             placeholder="Buscar votación, incidencia..."
             className="h-8.5 w-full rounded-md border-slate-200 bg-slate-50 pr-4 pl-8.5 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white"
           />
@@ -377,9 +413,76 @@ export function DashboardTopHeader() {
           )}
         </div>
 
-        {/* User avatar circle */}
-        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-xs font-black text-slate-700 select-none">
-          MJ
+        {/* User avatar with interactive dropdown */}
+        <div className="relative" ref={userDropdownRef}>
+          <button
+            type="button"
+            aria-label="Menú de perfil"
+            aria-expanded={isProfileOpen}
+            onClick={() => setIsProfileOpen((prev) => !prev)}
+            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-slate-800 text-xs font-bold text-white transition-all select-none hover:ring-2 hover:ring-[#008075]/30"
+          >
+            {userInitials}
+          </button>
+
+          {isProfileOpen && (
+            <div className="animate-in fade-in-0 zoom-in-95 absolute top-11 right-0 z-50 w-64 overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-xl">
+              {/* User info header */}
+              <div className="border-b border-slate-100 bg-slate-50/60 p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-800 text-sm font-bold text-white">
+                    {userInitials}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-bold text-slate-900">
+                      {userName}
+                    </p>
+                    <p className="truncate text-[11px] text-slate-500">
+                      {userEmail}
+                    </p>
+                    <span className="mt-1 inline-block rounded-sm bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-[#008075]">
+                      Administrador de Fincas
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Menu items */}
+              <div className="p-1.5">
+                <Link
+                  href="/profile"
+                  onClick={() => setIsProfileOpen(false)}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100"
+                >
+                  <User className="h-4 w-4 text-slate-500" />
+                  <span>Mi perfil</span>
+                </Link>
+                <Link
+                  href="/communities"
+                  onClick={() => setIsProfileOpen(false)}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100"
+                >
+                  <Building2 className="h-4 w-4 text-slate-500" />
+                  <span>Mis comunidades</span>
+                </Link>
+              </div>
+
+              <div className="border-t border-slate-100 p-1.5">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setIsProfileOpen(false);
+                    await authClient.signOut();
+                    router.push("/login");
+                  }}
+                  className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>Cerrar sesión</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </header>
