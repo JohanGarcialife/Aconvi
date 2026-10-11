@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -236,7 +236,7 @@ function formatTimelineEntry(h: any) {
   return { title, comment, dotColor };
 }
 
-export default function IncidentsPage() {
+function IncidentsContent() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
@@ -1385,5 +1385,19 @@ export default function IncidentsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function IncidentsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-full items-center justify-center p-8 text-sm text-slate-400">
+          Cargando incidencias...
+        </div>
+      }
+    >
+      <IncidentsContent />
+    </Suspense>
   );
 }
