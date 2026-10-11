@@ -131,6 +131,10 @@ async function acquirePushToken(): Promise<{
   token: string;
   platform: string;
 } | null> {
+  if (Platform.OS === "ios" && !Device.isDevice) {
+    return null;
+  }
+
   // Setup notification channel on Android for instant high-priority alerts
   if (Platform.OS === "android") {
     await Notifications.setNotificationChannelAsync("default", {

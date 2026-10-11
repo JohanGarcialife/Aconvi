@@ -16,7 +16,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as FileSystem from "expo-file-system/legacy";
-import * as ImageManipulator from "expo-image-manipulator";
 import { Stack, useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { useMutation } from "@tanstack/react-query";
@@ -24,6 +23,25 @@ import { useMutation } from "@tanstack/react-query";
 import { api, queryClient } from "~/utils/api";
 import { authClient } from "~/utils/auth";
 import * as ImagePicker from "~/utils/safe-image-picker";
+
+let ImageManipulator: {
+  manipulateAsync: (
+    uri: string,
+    actions: unknown[],
+    saveOptions: unknown,
+  ) => Promise<{ uri: string }>;
+  SaveFormat: { JPEG: string };
+};
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  ImageManipulator =
+    require("expo-image-manipulator") as typeof ImageManipulator;
+} catch {
+  ImageManipulator = {
+    manipulateAsync: (uri: string) => Promise.resolve({ uri }),
+    SaveFormat: { JPEG: "jpeg" },
+  };
+}
 
 const PRIMARY = "#4aa19b";
 const DARK = "#0f172a";

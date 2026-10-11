@@ -165,6 +165,33 @@ async function findOrMatchProvider(
   );
   if (partial) return { id: partial.id, name: partial.name };
 
+  // Auto-create provider record in catalog so OT always has an assigned provider
+  try {
+    const cleanName = companyName.trim();
+    const parts = cleanName.split(/\s+/);
+    const initials =
+      parts.length >= 2
+        ? `${parts[0]?.[0] ?? ""}${parts[1]?.[0] ?? ""}`.toUpperCase()
+        : cleanName.slice(0, 2).toUpperCase();
+    const newId = crypto.randomUUID();
+    const [createdProv] = await db
+      .insert(provider)
+      .values({
+        id: newId,
+        organizationId: tenantId,
+        name: cleanName,
+        avatarInitials: initials || "PR",
+        rating: 4.5,
+        isFavorite: false,
+        speciality: "General",
+        completedJobs: 0,
+      })
+      .returning();
+    if (createdProv) return { id: createdProv.id, name: createdProv.name };
+  } catch (createErr) {
+    console.warn("[findOrMatchProvider] Auto-create failed:", createErr);
+  }
+
   return null;
 }
 
@@ -197,7 +224,7 @@ async function notifyProviderOfAssignedOt(
     }
     if (!usr) {
       usr = await db.query.user.findFirst({
-        where: eq(user.role, "Proveedor"),
+        where: ilike(user.role, "%proveedor%"),
       });
     }
 
@@ -420,6 +447,30 @@ async function executeCloseVotingSession(
   authorId: string,
   tenantId: string,
 ) {
+  const now = new Date();
+  const effectiveClosedAt =
+    session.closesAt && new Date(session.closesAt).getTime() <= now.getTime()
+      ? new Date(session.closesAt)
+      : now;
+
+  // Atomically claim the OPEN session so concurrent requests never generate duplicate OTs
+  const [claimed] = await db
+    .update(voteSession)
+    .set({ status: "CLOSED", closedAt: effectiveClosedAt })
+    .where(and(eq(voteSession.id, session.id), eq(voteSession.status, "OPEN")))
+    .returning({ id: voteSession.id });
+
+  if (!claimed) {
+    return {
+      ok: true,
+      minuteContent: "",
+      generatedIncidentId: session.otGeneratedIncidentId ?? null,
+      generatedIncidentIds: session.otGeneratedIncidentId
+        ? [session.otGeneratedIncidentId]
+        : [],
+    };
+  }
+
   // Ensure author exists in user table for FK satisfaction
   try {
     const { sql } = await import("drizzle-orm");
@@ -435,8 +486,7 @@ async function executeCloseVotingSession(
     );
   }
 
-  const now = new Date();
-  const dateStr = now.toLocaleDateString("es-ES", {
+  const dateStr = effectiveClosedAt.toLocaleDateString("es-ES", {
     year: "numeric",
     month: "long",
     day: "numeric",
@@ -508,8 +558,9 @@ async function executeCloseVotingSession(
 
       // Auto-generate OT for Junta item if approved and (item.autoGenerateOt || has budget proposals)
       if (
-        item.autoGenerateOt ||
-        (item.budgetProposals && item.budgetProposals.length > 0)
+        !item.otGeneratedIncidentId &&
+        (item.autoGenerateOt ||
+          (item.budgetProposals && item.budgetProposals.length > 0))
       ) {
         try {
           const otRes = await generateOtForWinner({
@@ -541,6 +592,13 @@ async function executeCloseVotingSession(
           );
         }
       }
+    }
+
+    if (generatedIncidentIds.length > 0 && !session.otGeneratedIncidentId) {
+      await db
+        .update(voteSession)
+        .set({ otGeneratedIncidentId: generatedIncidentIds[0] })
+        .where(eq(voteSession.id, session.id));
     }
   } else {
     // SINGLE session
@@ -589,8 +647,9 @@ async function executeCloseVotingSession(
 
     // Auto-generate OT for Single session if approved and (session.autoGenerateOt || has budget proposals)
     if (
-      session.autoGenerateOt ||
-      (session.budgetProposals && session.budgetProposals.length > 0)
+      !session.otGeneratedIncidentId &&
+      (session.autoGenerateOt ||
+        (session.budgetProposals && session.budgetProposals.length > 0))
     ) {
       try {
         const otRes = await generateOtForWinner({
@@ -608,6 +667,13 @@ async function executeCloseVotingSession(
             .update(voteSession)
             .set({ otGeneratedIncidentId: otRes.incidentId })
             .where(eq(voteSession.id, session.id));
+
+          if (session.items && session.items[0]?.id) {
+            await db
+              .update(voteItem)
+              .set({ otGeneratedIncidentId: otRes.incidentId })
+              .where(eq(voteItem.id, session.items[0].id));
+          }
 
           generatedIncidentIds.push(otRes.incidentId);
           lines.push(
@@ -633,12 +699,6 @@ async function executeCloseVotingSession(
     sessionId: session.id,
     content: lines.join("\n"),
   });
-
-  // Mark session CLOSED
-  await db
-    .update(voteSession)
-    .set({ status: "CLOSED", closedAt: now })
-    .where(eq(voteSession.id, session.id));
 
   // WS Event
   try {
@@ -669,10 +729,14 @@ async function executeCloseVotingSession(
   };
 }
 
+let isAutoClosingSweepRunning = false;
+
 export async function processAutoCloseVotings(
   db: any,
   tenantId?: string | null,
 ) {
+  if (isAutoClosingSweepRunning) return;
+  isAutoClosingSweepRunning = true;
   try {
     const now = new Date();
     const whereConditions = [
@@ -717,6 +781,8 @@ export async function processAutoCloseVotings(
     }
   } catch (err) {
     console.warn("[AutoCloseSweep] Error during sweep:", err);
+  } finally {
+    isAutoClosingSweepRunning = false;
   }
 }
 

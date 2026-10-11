@@ -8,6 +8,7 @@ import {
   isNotNull,
   isNull,
   lt,
+  ne,
   sql,
 } from "drizzle-orm";
 import { z } from "zod";
@@ -170,6 +171,7 @@ async function processOverdueIncidents(
           ? eq(incident.organizationId, organizationId)
           : undefined,
         eq(incident.status, "EN_REVISION"),
+        ne(incident.category, "obra"),
         isNotNull(incident.assignedAt),
         lt(incident.assignedAt, expirationThreshold),
       ),

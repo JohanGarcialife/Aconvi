@@ -371,6 +371,7 @@ export default function ProveedorJobScreen() {
   const rawExpired = (expiredIncidents as any[] | undefined) ?? [];
 
   const isOTExpired = useCallback((item: any) => {
+    if (item.category === "obra") return false;
     const ts = item.assignedAt ?? item.createdAt;
     if (!ts) return false;
     const startMs = new Date(ts).getTime();

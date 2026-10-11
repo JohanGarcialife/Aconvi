@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -15,7 +15,7 @@ import {
 import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 
 import { queryClient } from "~/utils/api";
@@ -30,6 +30,10 @@ type Step = "idle" | "loading" | "done" | "error";
 
 export default function LoginScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{
+    autoUser?: string;
+    autoPin?: string;
+  }>();
 
   // ── Unified Login state ──────────────────────────────────────────────────
   const [username, setUsername] = useState("");
@@ -38,8 +42,13 @@ export default function LoginScreen() {
   const [errorMsg, setErrorMsg] = useState("");
 
   // ── PIN login ────────────────────────────────────────────────────────────
-  const handlePinLogin = async () => {
-    if (!username.trim() || !pin.trim()) return;
+  const handlePinLogin = async (
+    overrideUser?: string,
+    overridePin?: string,
+  ) => {
+    const u = (overrideUser ?? username).trim();
+    const p = (overridePin ?? pin).trim();
+    if (!u || !p) return;
     setStep("loading");
     setErrorMsg("");
     try {
@@ -48,8 +57,8 @@ export default function LoginScreen() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          username: username.trim().toLowerCase(),
-          pin: pin.trim(),
+          username: u.toLowerCase(),
+          pin: p,
         }),
       });
 
@@ -127,6 +136,14 @@ export default function LoginScreen() {
     }
   };
 
+  useEffect(() => {
+    if (params.autoUser && params.autoPin) {
+      setUsername(params.autoUser);
+      setPin(params.autoPin);
+      void handlePinLogin(params.autoUser, params.autoPin);
+    }
+  }, [params.autoUser, params.autoPin]);
+
   return (
     <KeyboardAvoidingView
       style={styles.root}
@@ -178,7 +195,7 @@ export default function LoginScreen() {
           {step === "error" && <Text style={styles.error}>{errorMsg}</Text>}
           <TouchableOpacity
             style={[styles.btn, step === "loading" && styles.btnDisabled]}
-            onPress={handlePinLogin}
+            onPress={() => handlePinLogin()}
             disabled={step === "loading"}
           >
             {step === "loading" ? (
