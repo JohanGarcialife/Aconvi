@@ -999,12 +999,23 @@ export const incidentRouter = createTRPCRouter({
 
       const actualTenantId = current.organizationId;
 
+      if (current.category === "obra" && !input.scheduledAt) {
+        throw new Error(
+          "Las órdenes de trabajo adjudicadas en votación requieren una fecha programada.",
+        );
+      }
+
+      const finalEstimatedCost =
+        current.category === "obra" && current.estimatedCost != null
+          ? current.estimatedCost
+          : input.estimatedCost;
+
       const [updated] = await ctx.db
         .update(incident)
         .set({
           status: "AGENDADA",
           providerId: input.providerId,
-          estimatedCost: input.estimatedCost,
+          estimatedCost: finalEstimatedCost,
           estimatedDays: input.estimatedDays,
           scheduledAt: input.scheduledAt
             ? new Date(input.scheduledAt)

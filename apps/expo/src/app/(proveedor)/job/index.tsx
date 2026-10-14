@@ -524,6 +524,23 @@ export default function ProveedorJobScreen() {
       setShowNotificationsDropdown(false);
       setShowProfileDropdown(false);
 
+      // If OT comes from an awarded budget (category === 'obra'), route directly to estimate (scheduling)
+      if (
+        i.category === "obra" &&
+        (i.status === "EN_REVISION" || i.status === "RECIBIDA")
+      ) {
+        router.push({
+          pathname: "/(proveedor)/job/estimate" as any,
+          params: {
+            incidentId: i.id,
+            providerId: providerId ?? DEMO_PROVIDER_ID,
+            tenantId,
+            awarded: "1",
+          },
+        });
+        return;
+      }
+
       const isExpired =
         (i.status === "EN_REVISION" || i.status === "RECIBIDA") &&
         isOTExpired(i);
@@ -592,6 +609,8 @@ export default function ProveedorJobScreen() {
         i.communityName ||
         (i.organizationId ? `Org: ${i.organizationId}` : "Sin comunidad"),
       assignedAt: i.assignedAt ?? i.createdAt,
+      cost: i.estimatedCost ? `${i.estimatedCost} €` : undefined,
+      isAwarded: i.category === "obra",
       raw: i,
     }));
   }, [porResponderDB]);
@@ -1316,7 +1335,16 @@ export default function ProveedorJobScreen() {
                         onPress={() => handleSelectIncident(item.raw ?? item)}
                         activeOpacity={0.7}
                       >
-                        <View style={styles.redLeftAccent} />
+                        {item.isAwarded ? (
+                          <View
+                            style={[
+                              styles.redLeftAccent,
+                              { backgroundColor: "#0284c7" },
+                            ]}
+                          />
+                        ) : (
+                          <View style={styles.redLeftAccent} />
+                        )}
                         <View style={styles.porResponderMainInfo}>
                           <View style={styles.otHeaderRow}>
                             <Text style={styles.otCodeText}>{item.code}</Text>
@@ -1336,7 +1364,29 @@ export default function ProveedorJobScreen() {
                             </Text>
                           </View>
                         </View>
-                        <ItemCountdown targetTimestamp={item.assignedAt} />
+                        {item.isAwarded ? (
+                          <View style={styles.porResponderTimeRight}>
+                            <View style={styles.awardedBadge}>
+                              <Ionicons
+                                name="calendar-outline"
+                                size={13}
+                                color="#0369a1"
+                                style={{ marginRight: 4 }}
+                              />
+                              <Text style={styles.awardedBadgeText}>
+                                Programar{item.cost ? ` · ${item.cost}` : ""}
+                              </Text>
+                            </View>
+                            <Ionicons
+                              name="chevron-forward-outline"
+                              size={18}
+                              color="#94a3b8"
+                              style={{ marginLeft: 6 }}
+                            />
+                          </View>
+                        ) : (
+                          <ItemCountdown targetTimestamp={item.assignedAt} />
+                        )}
                       </TouchableOpacity>
                     </View>
                   ))
@@ -1629,7 +1679,16 @@ export default function ProveedorJobScreen() {
                           onPress={() => handleSelectIncident(item.raw ?? item)}
                           activeOpacity={0.7}
                         >
-                          <View style={styles.redLeftAccent} />
+                          {item.isAwarded ? (
+                            <View
+                              style={[
+                                styles.redLeftAccent,
+                                { backgroundColor: "#0284c7" },
+                              ]}
+                            />
+                          ) : (
+                            <View style={styles.redLeftAccent} />
+                          )}
                           <View style={styles.porResponderMainInfo}>
                             <View style={styles.otHeaderRow}>
                               <Text style={styles.otCodeText}>{item.code}</Text>
@@ -1652,7 +1711,29 @@ export default function ProveedorJobScreen() {
                               </Text>
                             </View>
                           </View>
-                          <ItemCountdown targetTimestamp={item.assignedAt} />
+                          {item.isAwarded ? (
+                            <View style={styles.porResponderTimeRight}>
+                              <View style={styles.awardedBadge}>
+                                <Ionicons
+                                  name="calendar-outline"
+                                  size={13}
+                                  color="#0369a1"
+                                  style={{ marginRight: 4 }}
+                                />
+                                <Text style={styles.awardedBadgeText}>
+                                  Programar{item.cost ? ` · ${item.cost}` : ""}
+                                </Text>
+                              </View>
+                              <Ionicons
+                                name="chevron-forward-outline"
+                                size={18}
+                                color="#94a3b8"
+                                style={{ marginLeft: 6 }}
+                              />
+                            </View>
+                          ) : (
+                            <ItemCountdown targetTimestamp={item.assignedAt} />
+                          )}
                         </TouchableOpacity>
                       </View>
                     ))
@@ -2989,6 +3070,19 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
     color: "#ea580c",
+  },
+  awardedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#e0f2fe",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  awardedBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#0369a1",
   },
 
   /* Footer Link */

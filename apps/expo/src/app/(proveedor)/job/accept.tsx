@@ -128,9 +128,21 @@ export default function AcceptScreen() {
     return () => clearInterval(timer);
   }, [assignedTime]);
 
+  const isAwarded = incident?.category === "obra";
+
+  useEffect(() => {
+    if (incident?.category === "obra" && incidentId) {
+      router.replace({
+        pathname: "/(proveedor)/job/estimate",
+        params: { incidentId, providerId, tenantId, awarded: "1" },
+      });
+    }
+  }, [incident?.category, incidentId, providerId, tenantId, router]);
+
   const isExpired =
-    remainingMs <= 0 ||
-    (incident?.status === "RECIBIDA" && !incident?.assignedAt);
+    !isAwarded &&
+    (remainingMs <= 0 ||
+      (incident?.status === "RECIBIDA" && !incident?.assignedAt));
 
   const formatCountdown = (ms: number) => {
     if (ms <= 0) return "00:00:00";
@@ -151,7 +163,12 @@ export default function AcceptScreen() {
     }
     router.push({
       pathname: "/(proveedor)/job/estimate",
-      params: { incidentId, providerId, tenantId },
+      params: {
+        incidentId,
+        providerId,
+        tenantId,
+        awarded: isAwarded ? "1" : "0",
+      },
     });
   };
 

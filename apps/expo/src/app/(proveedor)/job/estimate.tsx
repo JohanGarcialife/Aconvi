@@ -14,7 +14,10 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -267,10 +270,12 @@ function generateDateChips(count = 14): DateChip[] {
 
 export default function JobEstimateScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
     incidentId?: string;
     providerId?: string;
     tenantId?: string;
+    awarded?: string;
   }>();
 
   const incidentId = params.incidentId;
@@ -285,6 +290,8 @@ export default function JobEstimateScreen() {
     ),
   );
 
+  const isAwarded = params.awarded === "1" || incident?.category === "obra";
+
   const [departure, setDeparture] = useState(40);
   const [labor, setLabor] = useState(80);
   const [materials, setMaterials] = useState(35);
@@ -292,7 +299,13 @@ export default function JobEstimateScreen() {
   const [laborText, setLaborText] = useState("80");
   const [materialsText, setMaterialsText] = useState("35");
   const [days, setDays] = useState(1);
-  const [goNow, setGoNow] = useState(true);
+  const [goNow, setGoNow] = useState(params.awarded !== "1");
+
+  useEffect(() => {
+    if (isAwarded) {
+      setGoNow(false);
+    }
+  }, [isAwarded]);
 
   const handleDepartureSlider = (val: number) => {
     setDeparture(val);
@@ -380,9 +393,14 @@ export default function JobEstimateScreen() {
   };
 
   const dateChips = generateDateChips(14);
+  const awardedCost = incident?.estimatedCost
+    ? Number(incident.estimatedCost)
+    : 0;
   const total =
-    Math.round(((departure || 0) + (labor || 0) + (materials || 0)) * 100) /
-    100;
+    isAwarded && awardedCost > 0
+      ? awardedCost
+      : Math.round(((departure || 0) + (labor || 0) + (materials || 0)) * 100) /
+        100;
 
   const acceptMutation = useMutation(
     api.incident.providerAccept.mutationOptions({
@@ -449,10 +467,11 @@ export default function JobEstimateScreen() {
       ? new Date(incident.createdAt).getTime()
       : Date.now();
   const isIncidentExpired =
-    incident?.status === "RECIBIDA" ||
-    (incident?.status !== "AGENDADA" &&
-      incident?.status !== "EN_CURSO" &&
-      Date.now() - assignedTime > 2 * 60 * 60 * 1000);
+    !isAwarded &&
+    (incident?.status === "RECIBIDA" ||
+      (incident?.status !== "AGENDADA" &&
+        incident?.status !== "EN_CURSO" &&
+        Date.now() - assignedTime > 2 * 60 * 60 * 1000));
 
   // Bottom sheet animation
   const openSheet = () => {
@@ -466,12 +485,29 @@ export default function JobEstimateScreen() {
     }).start();
   };
 
-  const closeSheet = () => {
+  // Auto-open modal for awarded OTs
+  const hasAutoOpened = useRef(false);
+  useEffect(() => {
+    if (isAwarded && !hasAutoOpened.current) {
+      hasAutoOpened.current = true;
+      const t = setTimeout(() => {
+        openSheet();
+      }, 250);
+      return () => clearTimeout(t);
+    }
+  }, [isAwarded]);
+
+  const closeSheet = (cancelledByUser = false) => {
     Animated.timing(slideAnim, {
       toValue: SCREEN_HEIGHT,
       duration: 250,
       useNativeDriver: true,
-    }).start(() => setShowSchedule(false));
+    }).start(() => {
+      setShowSchedule(false);
+      if (cancelledByUser && isAwarded) {
+        router.replace("/(proveedor)/job");
+      }
+    });
   };
 
   // Handle "Salir ahora" send
@@ -779,7 +815,7 @@ export default function JobEstimateScreen() {
           )}
         </View>
 
-        {/* Go now / Schedule toggle (Disabled if expired) */}
+        {/* Go now / Schedule toggle (Disabled if expired or awarded) */}
         <Text
           style={[styles.questionLabel, isIncidentExpired && { color: MUTED }]}
         >
@@ -789,21 +825,38 @@ export default function JobEstimateScreen() {
           <TouchableOpacity
             style={[
               styles.toggleBtn,
-              goNow && styles.toggleBtnActive,
-              isIncidentExpired && { opacity: 0.5, borderColor: "#e2e8f0" },
+              goNow && !isAwarded && styles.toggleBtnActive,
+              (isIncidentExpired || isAwarded) && {
+                opacity: 0.45,
+                backgroundColor: "#f8fafc",
+                borderColor: "#e2e8f0",
+              },
             ]}
-            onPress={() => !isIncidentExpired && setGoNow(true)}
-            disabled={isIncidentExpired}
+            onPress={() => {
+              if (isAwarded) {
+                Alert.alert(
+                  "Opción no disponible",
+                  "Esta orden corresponde a un presupuesto ya aprobado por la comunidad y requiere ser programada.",
+                );
+                return;
+              }
+              if (!isIncidentExpired) setGoNow(true);
+            }}
+            disabled={isIncidentExpired || isAwarded}
           >
             <Ionicons
-              name="car-outline"
+              name={isAwarded ? "lock-closed-outline" : "car-outline"}
               size={18}
-              color={goNow && !isIncidentExpired ? "#fff" : MUTED}
+              color={goNow && !isAwarded && !isIncidentExpired ? "#fff" : MUTED}
             />
             <Text
               style={[
                 styles.toggleText,
-                goNow && !isIncidentExpired && styles.toggleTextActive,
+                goNow &&
+                  !isAwarded &&
+                  !isIncidentExpired &&
+                  styles.toggleTextActive,
+                isAwarded && { color: MUTED },
               ]}
             >
               Salir ahora
@@ -813,7 +866,7 @@ export default function JobEstimateScreen() {
           <TouchableOpacity
             style={[
               styles.toggleBtn,
-              !goNow && styles.toggleBtnActive,
+              (!goNow || isAwarded) && styles.toggleBtnActive,
               isIncidentExpired && { opacity: 0.5, borderColor: "#e2e8f0" },
             ]}
             onPress={() => {
@@ -827,18 +880,36 @@ export default function JobEstimateScreen() {
             <Ionicons
               name="calendar-outline"
               size={18}
-              color={!goNow && !isIncidentExpired ? "#fff" : MUTED}
+              color={
+                (!goNow || isAwarded) && !isIncidentExpired ? "#fff" : MUTED
+              }
             />
             <Text
               style={[
                 styles.toggleText,
-                !goNow && !isIncidentExpired && styles.toggleTextActive,
+                (!goNow || isAwarded) &&
+                  !isIncidentExpired &&
+                  styles.toggleTextActive,
               ]}
             >
               Programar
             </Text>
           </TouchableOpacity>
         </View>
+
+        {isAwarded && (
+          <View style={styles.awardedNoticeBadge}>
+            <Ionicons
+              name="alert-circle-outline"
+              size={15}
+              color="#0284c7"
+              style={{ marginRight: 6 }}
+            />
+            <Text style={styles.awardedNoticeBadgeText}>
+              Opción "Salir ahora" no disponible en presupuestos adjudicados.
+            </Text>
+          </View>
+        )}
 
         {/* Show schedule summary if programmed */}
         {!goNow && !isIncidentExpired && (
@@ -865,152 +936,214 @@ export default function JobEstimateScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Sliders for cost estimation */}
-        <View style={[styles.sliderBox, isIncidentExpired && { opacity: 0.5 }]}>
-          <View style={styles.sliderHeader}>
-            <Ionicons
-              name="car-outline"
-              size={18}
-              color={DARK}
-              style={{ marginRight: 8 }}
-            />
-            <Text style={styles.sliderLabel}>Desplazamiento</Text>
-            <View style={styles.editableInputContainer}>
-              <TextInput
-                style={styles.editableAmountInput}
-                value={departureText}
-                onChangeText={handleDepartureText}
-                keyboardType="decimal-pad"
-                placeholder="0"
-                placeholderTextColor="#94a3b8"
-                editable={!isIncidentExpired}
-                selectTextOnFocus
+        {/* Sliders for cost estimation OR Approved Budget Card for awarded OTs */}
+        {isAwarded ? (
+          <View style={styles.awardedBudgetCard}>
+            <View style={styles.awardedBudgetHeader}>
+              <View style={styles.awardedBudgetIconContainer}>
+                <Ionicons name="checkmark-done" size={20} color="#0284c7" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.awardedBudgetTitle}>
+                  Presupuesto Adjudicado
+                </Text>
+                <Text style={styles.awardedBudgetSubtitle}>
+                  Aprobado en junta por la comunidad
+                </Text>
+              </View>
+              <View style={styles.awardedBadgePill}>
+                <Text style={styles.awardedBadgePillText}>Aprobado</Text>
+              </View>
+            </View>
+
+            <View style={styles.awardedBudgetDivider} />
+
+            <View style={styles.awardedBudgetAmountRow}>
+              <Text style={styles.awardedBudgetAmountLabel}>
+                Importe adjudicado:
+              </Text>
+              <Text style={styles.awardedBudgetAmountVal}>
+                {total.toLocaleString("es-ES", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}{" "}
+                €
+              </Text>
+            </View>
+
+            <View style={styles.awardedBudgetNotice}>
+              <Ionicons
+                name="information-circle-outline"
+                size={16}
+                color="#0369a1"
+                style={{ marginRight: 6 }}
               />
-              <Text style={styles.euroText}>€</Text>
+              <Text style={styles.awardedBudgetNoticeText}>
+                La decisión económica ya está acordada con la comunidad. Por
+                favor confirma la fecha y hora de tu intervención en el botón
+                Programar.
+              </Text>
             </View>
           </View>
-          <NativeSlider
-            value={departure}
-            min={0}
-            max={departureMax}
-            step={5}
-            onChange={handleDepartureSlider}
-            disabled={isIncidentExpired}
-          />
-          <View style={styles.scaleRow}>
-            <Text style={styles.scaleMark}>0 €</Text>
-            <Text style={styles.scaleMark}>
-              {Math.round(departureMax / 3)} €
-            </Text>
-            <Text style={styles.scaleMark}>
-              {Math.round((departureMax * 2) / 3)} €
-            </Text>
-            <Text style={styles.scaleMark}>{departureMax} €</Text>
-          </View>
-        </View>
-
-        <View style={[styles.sliderBox, isIncidentExpired && { opacity: 0.5 }]}>
-          <View style={styles.sliderHeader}>
-            <Ionicons
-              name="build-outline"
-              size={18}
-              color={DARK}
-              style={{ marginRight: 8 }}
-            />
-            <Text style={styles.sliderLabel}>Mano de obra</Text>
-            <View style={styles.editableInputContainer}>
-              <TextInput
-                style={styles.editableAmountInput}
-                value={laborText}
-                onChangeText={handleLaborText}
-                keyboardType="decimal-pad"
-                placeholder="0"
-                placeholderTextColor="#94a3b8"
-                editable={!isIncidentExpired}
-                selectTextOnFocus
+        ) : (
+          <>
+            <View
+              style={[styles.sliderBox, isIncidentExpired && { opacity: 0.5 }]}
+            >
+              <View style={styles.sliderHeader}>
+                <Ionicons
+                  name="car-outline"
+                  size={18}
+                  color={DARK}
+                  style={{ marginRight: 8 }}
+                />
+                <Text style={styles.sliderLabel}>Desplazamiento</Text>
+                <View style={styles.editableInputContainer}>
+                  <TextInput
+                    style={styles.editableAmountInput}
+                    value={departureText}
+                    onChangeText={handleDepartureText}
+                    keyboardType="decimal-pad"
+                    placeholder="0"
+                    placeholderTextColor="#94a3b8"
+                    editable={!isIncidentExpired}
+                    selectTextOnFocus
+                  />
+                  <Text style={styles.euroText}>€</Text>
+                </View>
+              </View>
+              <NativeSlider
+                value={departure}
+                min={0}
+                max={departureMax}
+                step={5}
+                onChange={handleDepartureSlider}
+                disabled={isIncidentExpired}
               />
-              <Text style={styles.euroText}>€</Text>
+              <View style={styles.scaleRow}>
+                <Text style={styles.scaleMark}>0 €</Text>
+                <Text style={styles.scaleMark}>
+                  {Math.round(departureMax / 3)} €
+                </Text>
+                <Text style={styles.scaleMark}>
+                  {Math.round((departureMax * 2) / 3)} €
+                </Text>
+                <Text style={styles.scaleMark}>{departureMax} €</Text>
+              </View>
             </View>
-          </View>
-          <NativeSlider
-            value={labor}
-            min={0}
-            max={laborMax}
-            step={10}
-            onChange={handleLaborSlider}
-            disabled={isIncidentExpired}
-          />
-          <View style={styles.scaleRow}>
-            <Text style={styles.scaleMark}>0 €</Text>
-            <Text style={styles.scaleMark}>{Math.round(laborMax / 3)} €</Text>
-            <Text style={styles.scaleMark}>
-              {Math.round((laborMax * 2) / 3)} €
-            </Text>
-            <Text style={styles.scaleMark}>{laborMax} €</Text>
-          </View>
-        </View>
 
-        <View style={[styles.sliderBox, isIncidentExpired && { opacity: 0.5 }]}>
-          <View style={styles.sliderHeader}>
-            <Ionicons
-              name="briefcase-outline"
-              size={18}
-              color={DARK}
-              style={{ marginRight: 8 }}
-            />
-            <Text style={styles.sliderLabel}>Materiales</Text>
-            <View style={styles.editableInputContainer}>
-              <TextInput
-                style={styles.editableAmountInput}
-                value={materialsText}
-                onChangeText={handleMaterialsText}
-                keyboardType="decimal-pad"
-                placeholder="0"
-                placeholderTextColor="#94a3b8"
-                editable={!isIncidentExpired}
-                selectTextOnFocus
+            <View
+              style={[styles.sliderBox, isIncidentExpired && { opacity: 0.5 }]}
+            >
+              <View style={styles.sliderHeader}>
+                <Ionicons
+                  name="build-outline"
+                  size={18}
+                  color={DARK}
+                  style={{ marginRight: 8 }}
+                />
+                <Text style={styles.sliderLabel}>Mano de obra</Text>
+                <View style={styles.editableInputContainer}>
+                  <TextInput
+                    style={styles.editableAmountInput}
+                    value={laborText}
+                    onChangeText={handleLaborText}
+                    keyboardType="decimal-pad"
+                    placeholder="0"
+                    placeholderTextColor="#94a3b8"
+                    editable={!isIncidentExpired}
+                    selectTextOnFocus
+                  />
+                  <Text style={styles.euroText}>€</Text>
+                </View>
+              </View>
+              <NativeSlider
+                value={labor}
+                min={0}
+                max={laborMax}
+                step={10}
+                onChange={handleLaborSlider}
+                disabled={isIncidentExpired}
               />
-              <Text style={styles.euroText}>€</Text>
+              <View style={styles.scaleRow}>
+                <Text style={styles.scaleMark}>0 €</Text>
+                <Text style={styles.scaleMark}>
+                  {Math.round(laborMax / 3)} €
+                </Text>
+                <Text style={styles.scaleMark}>
+                  {Math.round((laborMax * 2) / 3)} €
+                </Text>
+                <Text style={styles.scaleMark}>{laborMax} €</Text>
+              </View>
             </View>
-          </View>
-          <NativeSlider
-            value={materials}
-            min={0}
-            max={materialsMax}
-            step={5}
-            onChange={handleMaterialsSlider}
-            disabled={isIncidentExpired}
-          />
-          <View style={styles.scaleRow}>
-            <Text style={styles.scaleMark}>0 €</Text>
-            <Text style={styles.scaleMark}>
-              {Math.round(materialsMax / 3)} €
-            </Text>
-            <Text style={styles.scaleMark}>
-              {Math.round((materialsMax * 2) / 3)} €
-            </Text>
-            <Text style={styles.scaleMark}>{materialsMax} €</Text>
-          </View>
-        </View>
 
-        {/* Total sum row */}
-        <View style={styles.totalRow}>
-          <Text style={styles.totalLabel}>Presupuesto total estimativo:</Text>
-          <View
-            style={[
-              styles.totalBadge,
-              isIncidentExpired && { backgroundColor: "#94a3b8" },
-            ]}
-          >
-            <Text style={styles.totalAmount}>
-              {total.toLocaleString("es-ES", {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 2,
-              })}{" "}
-              €
-            </Text>
-          </View>
-        </View>
+            <View
+              style={[styles.sliderBox, isIncidentExpired && { opacity: 0.5 }]}
+            >
+              <View style={styles.sliderHeader}>
+                <Ionicons
+                  name="briefcase-outline"
+                  size={18}
+                  color={DARK}
+                  style={{ marginRight: 8 }}
+                />
+                <Text style={styles.sliderLabel}>Materiales</Text>
+                <View style={styles.editableInputContainer}>
+                  <TextInput
+                    style={styles.editableAmountInput}
+                    value={materialsText}
+                    onChangeText={handleMaterialsText}
+                    keyboardType="decimal-pad"
+                    placeholder="0"
+                    placeholderTextColor="#94a3b8"
+                    editable={!isIncidentExpired}
+                    selectTextOnFocus
+                  />
+                  <Text style={styles.euroText}>€</Text>
+                </View>
+              </View>
+              <NativeSlider
+                value={materials}
+                min={0}
+                max={materialsMax}
+                step={5}
+                onChange={handleMaterialsSlider}
+                disabled={isIncidentExpired}
+              />
+              <View style={styles.scaleRow}>
+                <Text style={styles.scaleMark}>0 €</Text>
+                <Text style={styles.scaleMark}>
+                  {Math.round(materialsMax / 3)} €
+                </Text>
+                <Text style={styles.scaleMark}>
+                  {Math.round((materialsMax * 2) / 3)} €
+                </Text>
+                <Text style={styles.scaleMark}>{materialsMax} €</Text>
+              </View>
+            </View>
+
+            {/* Total sum row */}
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>
+                Presupuesto total estimativo:
+              </Text>
+              <View
+                style={[
+                  styles.totalBadge,
+                  isIncidentExpired && { backgroundColor: "#94a3b8" },
+                ]}
+              >
+                <Text style={styles.totalAmount}>
+                  {total.toLocaleString("es-ES", {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 2,
+                  })}{" "}
+                  €
+                </Text>
+              </View>
+            </View>
+          </>
+        )}
 
         {/* Submit button / Disabled button if expired */}
         <TouchableOpacity
@@ -1021,7 +1154,7 @@ export default function JobEstimateScreen() {
               shadowColor: "transparent",
             },
           ]}
-          onPress={goNow ? handleSendNow : handleConfirmSchedule}
+          onPress={goNow ? handleSendNow : openSheet}
           disabled={isLoading || isIncidentExpired}
           activeOpacity={isIncidentExpired ? 1 : 0.7}
         >
@@ -1031,9 +1164,11 @@ export default function JobEstimateScreen() {
             <Text style={styles.sendButtonText}>
               {isIncidentExpired
                 ? "OT Caducada — No se puede aceptar"
-                : goNow
-                  ? "Aceptar e Intervenir Ahora"
-                  : "Confirmar Cita y Aceptar"}
+                : isAwarded
+                  ? "Programar Fecha de Intervención"
+                  : goNow
+                    ? "Aceptar e Intervenir Ahora"
+                    : "Confirmar Cita y Aceptar"}
             </Text>
           )}
         </TouchableOpacity>
@@ -1044,13 +1179,13 @@ export default function JobEstimateScreen() {
         visible={showSchedule}
         transparent
         animationType="none"
-        onRequestClose={closeSheet}
+        onRequestClose={() => closeSheet(true)}
       >
         <View style={bsStyles.overlay}>
           <TouchableOpacity
             style={bsStyles.backdrop}
             activeOpacity={1}
-            onPress={closeSheet}
+            onPress={() => closeSheet(true)}
           />
 
           <Animated.View
@@ -1058,7 +1193,7 @@ export default function JobEstimateScreen() {
           >
             <View style={bsStyles.header}>
               <Text style={bsStyles.headerTitle}>Programar intervención</Text>
-              <TouchableOpacity onPress={closeSheet}>
+              <TouchableOpacity onPress={() => closeSheet(true)}>
                 <Ionicons name="close" size={24} color={MUTED} />
               </TouchableOpacity>
             </View>
@@ -1207,19 +1342,38 @@ export default function JobEstimateScreen() {
               </View>
             </ScrollView>
 
-            <View style={bsStyles.footer}>
-              <TouchableOpacity style={bsStyles.cancelBtn} onPress={closeSheet}>
+            <View
+              style={[
+                bsStyles.footer,
+                { paddingBottom: Math.max(insets.bottom, 16) + 12 },
+              ]}
+            >
+              <TouchableOpacity
+                style={bsStyles.cancelBtn}
+                onPress={() => closeSheet(true)}
+              >
                 <Text style={bsStyles.cancelBtnText}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={bsStyles.confirmBtn}
                 onPress={handleConfirmSchedule}
                 disabled={isLoading}
+                activeOpacity={0.8}
               >
                 {isLoading ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={bsStyles.confirmBtnText}>Confirmar Cita</Text>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 8,
+                    }}
+                  >
+                    <Ionicons name="calendar" size={18} color="#fff" />
+                    <Text style={bsStyles.confirmBtnText}>Confirmar Cita</Text>
+                  </View>
                 )}
               </TouchableOpacity>
             </View>
@@ -1429,6 +1583,108 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   sendButtonText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+
+  /* Awarded budget styles */
+  awardedNoticeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f0f9ff",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: "#bae6fd",
+  },
+  awardedNoticeBadgeText: {
+    fontSize: 12,
+    color: "#0369a1",
+    fontWeight: "600",
+    flex: 1,
+  },
+  awardedBudgetCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: "#bae6fd",
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: "#0284c7",
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  awardedBudgetHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  awardedBudgetIconContainer: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: "#e0f2fe",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  awardedBudgetTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: DARK,
+  },
+  awardedBudgetSubtitle: {
+    fontSize: 12,
+    color: MUTED,
+    marginTop: 1,
+  },
+  awardedBadgePill: {
+    backgroundColor: "#ecfdf5",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#a7f3d0",
+  },
+  awardedBadgePillText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#059669",
+  },
+  awardedBudgetDivider: {
+    height: 1,
+    backgroundColor: "#f1f5f9",
+    marginVertical: 12,
+  },
+  awardedBudgetAmountRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  awardedBudgetAmountLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: MUTED,
+  },
+  awardedBudgetAmountVal: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#0369a1",
+  },
+  awardedBudgetNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f0f9ff",
+    borderRadius: 10,
+    padding: 10,
+  },
+  awardedBudgetNoticeText: {
+    fontSize: 12,
+    color: "#0369a1",
+    lineHeight: 16,
+    flex: 1,
+  },
 });
 
 // Bottom sheet styles
@@ -1556,7 +1812,7 @@ const bsStyles = StyleSheet.create({
     backgroundColor: "#f0fdfa",
     borderRadius: 14,
     padding: 16,
-    marginBottom: 16,
+    marginBottom: 24,
     borderWidth: 1,
     borderColor: "#ccfbf1",
   },
@@ -1566,32 +1822,40 @@ const bsStyles = StyleSheet.create({
   footer: {
     flexDirection: "row",
     gap: 12,
-    paddingTop: 14,
-    paddingBottom: 16,
+    paddingTop: 18,
     borderTopWidth: 1,
     borderTopColor: BORDER,
     backgroundColor: "#fff",
+    alignItems: "center",
   },
   cancelBtn: {
     flex: 1,
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: 14,
+    backgroundColor: "#f8fafc",
     borderWidth: 1.5,
-    borderColor: PRIMARY,
+    borderColor: "#cbd5e1",
     alignItems: "center",
+    justifyContent: "center",
   },
-  cancelBtnText: { fontSize: 15, fontWeight: "700", color: PRIMARY },
+  cancelBtnText: { fontSize: 15, fontWeight: "700", color: "#64748b" },
   confirmBtn: {
-    flex: 1.5,
-    paddingVertical: 14,
-    borderRadius: 12,
+    flex: 2,
+    paddingVertical: 15,
+    borderRadius: 14,
     backgroundColor: PRIMARY,
     alignItems: "center",
+    justifyContent: "center",
     shadowColor: PRIMARY,
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 4,
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
   },
-  confirmBtnText: { fontSize: 15, fontWeight: "700", color: "#fff" },
+  confirmBtnText: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#fff",
+    letterSpacing: -0.2,
+  },
 });
