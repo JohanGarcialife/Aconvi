@@ -1179,13 +1179,13 @@ export default function JobEstimateScreen() {
         visible={showSchedule}
         transparent
         animationType="none"
-        onRequestClose={() => closeSheet(true)}
+        onRequestClose={() => closeSheet(false)}
       >
         <View style={bsStyles.overlay}>
           <TouchableOpacity
             style={bsStyles.backdrop}
             activeOpacity={1}
-            onPress={() => closeSheet(true)}
+            onPress={() => closeSheet(false)}
           />
 
           <Animated.View
@@ -1193,7 +1193,7 @@ export default function JobEstimateScreen() {
           >
             <View style={bsStyles.header}>
               <Text style={bsStyles.headerTitle}>Programar intervención</Text>
-              <TouchableOpacity onPress={() => closeSheet(true)}>
+              <TouchableOpacity onPress={() => closeSheet(false)}>
                 <Ionicons name="close" size={24} color={MUTED} />
               </TouchableOpacity>
             </View>
