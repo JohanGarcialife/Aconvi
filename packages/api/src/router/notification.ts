@@ -182,8 +182,8 @@ export async function sendPushToAllMembers(
   organizationId: string,
   notification: { title: string; body: string; data?: Record<string, string> },
 ): Promise<{ sent: number; failed: number }> {
-  const { member, pushToken } = await import("@acme/db/schema");
-  const { eq } = await import("drizzle-orm");
+  const { member, pushToken, user } = await import("@acme/db/schema");
+  const { eq, inArray } = await import("drizzle-orm");
 
   const members = await db.query.member.findMany({
     where: eq(member.organizationId, organizationId),
@@ -201,12 +201,38 @@ export async function sendPushToAllMembers(
 
   const memberUserIds = members.map((m: any) => m.userId as string);
   const tokenUserIds = pushTokens.map((p: any) => p.userId as string);
-  const userIds = [...new Set([...memberUserIds, ...tokenUserIds])].filter(
+  const candidateIds = [...new Set([...memberUserIds, ...tokenUserIds])].filter(
     Boolean,
   ) as string[];
 
+  // Filter out provider users so they never receive community/junta/voting broadcasts
+  let excludedProviderIds = new Set<string>();
+  if (candidateIds.length > 0) {
+    try {
+      const usersWithRoles = await db.query.user.findMany({
+        where: inArray(user.id, candidateIds),
+        columns: { id: true, role: true },
+      });
+      excludedProviderIds = new Set(
+        usersWithRoles
+          .filter((u: any) => {
+            const r = (u.role ?? "").toLowerCase().trim();
+            return r.includes("proveedor") || r === "provider";
+          })
+          .map((u: any) => u.id as string),
+      );
+    } catch (err) {
+      console.warn(
+        "[sendPushToAllMembers] Could not filter provider roles:",
+        err,
+      );
+    }
+  }
+
+  const userIds = candidateIds.filter((id) => !excludedProviderIds.has(id));
+
   console.log(
-    `[sendPushToAllMembers] Broadcasting push to ${userIds.length} users:`,
+    `[sendPushToAllMembers] Broadcasting push to ${userIds.length} users (excluded ${excludedProviderIds.size} providers):`,
     userIds,
   );
 

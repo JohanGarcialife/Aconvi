@@ -3,6 +3,7 @@ import { LogBox, useColorScheme } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 import { StatusBar } from "expo-status-bar";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
@@ -87,7 +88,7 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
 
   // Handle notification tap & real-time foreground updates
   useEffect(() => {
-    const handleNotificationData = (
+    const handleNotificationData = async (
       data: Record<string, string> | undefined,
     ) => {
       if (!data) return;
@@ -99,6 +100,47 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
       if (data?.type === "auth_confirm" && data?.token) {
         router.push(`/confirm-access?token=${data.token}`);
         return;
+      }
+
+      const storedRole =
+        (await SecureStore.getItemAsync("expo_user_role").catch(() => null)) ??
+        "";
+      const roleLower = storedRole.toLowerCase().trim();
+      const isProvider =
+        roleLower.includes("proveedor") || roleLower === "provider";
+      const isAf =
+        roleLower === "af" ||
+        roleLower === "administrador" ||
+        roleLower === "admin" ||
+        roleLower === "superadmin";
+
+      // Providers must never be routed to vecino/community screens
+      if (isProvider) {
+        if (data?.type === "job_assigned" || data?.incidentId) {
+          router.push("/(proveedor)/job");
+        }
+        return;
+      }
+
+      // AF users route to AF screens
+      if (isAf) {
+        if (data?.type === "new_vote" || data?.type === "vote_closed") {
+          router.push("/(af)/votaciones" as any);
+          return;
+        }
+        if (
+          data?.type === "new_incident" ||
+          data?.type === "ot_assigned" ||
+          data?.type === "ot_expired" ||
+          data?.incidentId
+        ) {
+          router.push("/(af)/incidencias" as any);
+          return;
+        }
+        if (data?.type === "new_notice" || data?.type === "urgent_notice") {
+          router.push("/(af)/comunicados" as any);
+          return;
+        }
       }
 
       // ── Incidencia concreta ────────────────────────────────────────────────
@@ -165,7 +207,7 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
           string,
           string
         >;
-        handleNotificationData(data);
+        void handleNotificationData(data);
       }
     });
 
@@ -181,7 +223,7 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
           string,
           string
         >;
-        handleNotificationData(data);
+        void handleNotificationData(data);
       },
     );
 

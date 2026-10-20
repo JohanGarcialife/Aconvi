@@ -5,6 +5,7 @@ import { communityRouter } from "./router/community";
 import { documentRouter } from "./router/document";
 import { feeRouter } from "./router/fee";
 import { incidentRouter } from "./router/incident";
+import { meetingRouter } from "./router/meeting";
 import { noticeRouter } from "./router/notice";
 import { notificationRouter } from "./router/notification";
 import { postRouter } from "./router/post";
@@ -24,6 +25,7 @@ export const appRouter = createTRPCRouter({
   provider: providerRouter,
   document: documentRouter,
   voting: votingRouter,
+  meeting: meetingRouter,
   agenda: agendaRouter,
   superadmin: superadminRouter,
   fee: feeRouter,

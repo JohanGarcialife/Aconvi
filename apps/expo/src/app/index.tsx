@@ -90,18 +90,28 @@ export default function RootIndex() {
 
         // 3. Navegar por rol
         const role = sessionData.user.role ?? "Vecino";
+        await SecureStore.setItemAsync("expo_user_role", role);
+        const roleLower = role.toLowerCase().trim();
         const isProvider =
-          role.toLowerCase().includes("proveedor") ||
-          role.toLowerCase() === "provider";
+          roleLower.includes("proveedor") || roleLower === "provider";
+        const isAf =
+          roleLower === "af" ||
+          roleLower === "administrador" ||
+          roleLower === "admin" ||
+          roleLower === "superadmin";
         console.log(
           "[RootIndex] Valid session, role:",
           role,
           "isProvider:",
           isProvider,
+          "isAf:",
+          isAf,
         );
 
         if (isProvider) {
           router.replace("/(proveedor)/job");
+        } else if (isAf) {
+          router.replace("/(af)" as any);
         } else {
           router.replace("/(vecino)");
         }

@@ -23,6 +23,7 @@ import {
   Info,
   Layers,
   Paperclip,
+  Pencil,
   Play,
   Plus,
   RotateCcw,
@@ -1396,8 +1397,12 @@ function CreateSingleVoteView({
     }>
   >([]);
 
-  // Subform for new proposal
+  // Subform for new or edited proposal
   const [isAddingProposal, setIsAddingProposal] = useState(false);
+  const [editingProposalIndex, setEditingProposalIndex] = useState<
+    number | null
+  >(null);
+  const [proposalError, setProposalError] = useState<string | null>(null);
   const [propCompany, setPropCompany] = useState("");
   const [propAmount, setPropAmount] = useState("");
   const [propProviderId, setPropProviderId] = useState<string | null>(null);
@@ -1423,37 +1428,103 @@ function CreateSingleVoteView({
     }),
   );
 
-  const handleSaveProposal = () => {
+  const isProposalFormEmpty = () =>
+    !propCompany.trim() && !propAmount.trim() && !propFile;
+
+  const resetProposalForm = () => {
+    setPropCompany("");
+    setPropAmount("");
+    setPropProviderId(null);
+    setPropFile(null);
+    setEditingProposalIndex(null);
+    setProposalError(null);
+    setShowProviderDropdown(false);
+  };
+
+  const commitProposal = (): boolean => {
     if (!propCompany.trim() || !propAmount.trim()) {
-      alert("Introduce la empresa/opción y el importe.");
-      return;
+      setProposalError(
+        "Debes ingresar la empresa/opción y el importe antes de guardar el presupuesto.",
+      );
+      return false;
+    }
+    if (!/\d/.test(propAmount.trim())) {
+      setProposalError(
+        "El importe ingresado no es válido. Ejemplo: 2.500,00 €",
+      );
+      return false;
     }
     const matched = ((providers as any[]) ?? []).find(
       (p: any) =>
         p.name.toLowerCase().trim() === propCompany.toLowerCase().trim(),
     );
-    setProposals([
-      ...proposals,
-      {
-        companyName: propCompany.trim(),
-        amount: formatEuro(propAmount.trim()),
-        providerId: propProviderId || matched?.id || undefined,
-        fileName: propFile || undefined,
-        fileUrl: propFile
-          ? "https://example.com/" + encodeURIComponent(propFile)
-          : undefined,
-      },
-    ]);
-    setPropCompany("");
-    setPropAmount("");
-    setPropProviderId(null);
-    setPropFile(null);
-    setIsAddingProposal(false);
+    const entry = {
+      companyName: propCompany.trim(),
+      amount: formatEuro(propAmount.trim()),
+      providerId: propProviderId || matched?.id || undefined,
+      fileName: propFile || undefined,
+      fileUrl: propFile
+        ? "https://example.com/" + encodeURIComponent(propFile)
+        : undefined,
+    };
+
+    if (
+      editingProposalIndex !== null &&
+      editingProposalIndex >= 0 &&
+      editingProposalIndex < proposals.length
+    ) {
+      setProposals(
+        proposals.map((p, i) => (i === editingProposalIndex ? entry : p)),
+      );
+    } else {
+      setProposals([...proposals, entry]);
+    }
+
+    resetProposalForm();
+    return true;
+  };
+
+  const handleSaveProposal = () => {
+    if (commitProposal()) {
+      setIsAddingProposal(false);
+    }
+  };
+
+  const handleAddProposalClick = () => {
+    if (!isAddingProposal || isProposalFormEmpty()) {
+      resetProposalForm();
+      setIsAddingProposal(true);
+      return;
+    }
+    if (commitProposal()) {
+      setIsAddingProposal(true);
+    }
+  };
+
+  const handleEditProposal = (index: number) => {
+    const target = proposals[index];
+    if (!target) return;
+    setPropCompany(target.companyName);
+    setPropAmount(target.amount);
+    setPropProviderId(target.providerId ?? null);
+    setPropFile(target.fileName ?? null);
+    setEditingProposalIndex(index);
+    setProposalError(null);
     setShowProviderDropdown(false);
+    setIsAddingProposal(true);
   };
 
   const handleRemoveProposal = (index: number) => {
     setProposals(proposals.filter((_, i) => i !== index));
+    if (editingProposalIndex === index) {
+      resetProposalForm();
+      setIsAddingProposal(false);
+    } else if (
+      editingProposalIndex !== null &&
+      index < editingProposalIndex
+    ) {
+      setEditingProposalIndex(editingProposalIndex - 1);
+    }
   };
 
   const handlePublish = () => {
@@ -1468,12 +1539,22 @@ function CreateSingleVoteView({
     }
 
     const finalProposals = [...proposals];
-    if (isAddingProposal && propCompany.trim() && propAmount.trim()) {
+    if (isAddingProposal && !isProposalFormEmpty()) {
+      if (
+        !propCompany.trim() ||
+        !propAmount.trim() ||
+        !/\d/.test(propAmount.trim())
+      ) {
+        setProposalError(
+          "Completa correctamente la empresa y el importe o cancela el formulario antes de publicar.",
+        );
+        return;
+      }
       const matched = ((providers as any[]) ?? []).find(
         (p: any) =>
           p.name.toLowerCase().trim() === propCompany.toLowerCase().trim(),
       );
-      finalProposals.push({
+      const pendingEntry = {
         companyName: propCompany.trim(),
         amount: formatEuro(propAmount.trim()),
         providerId: propProviderId || matched?.id || undefined,
@@ -1481,7 +1562,16 @@ function CreateSingleVoteView({
         fileUrl: propFile
           ? "https://example.com/" + encodeURIComponent(propFile)
           : undefined,
-      });
+      };
+      if (
+        editingProposalIndex !== null &&
+        editingProposalIndex >= 0 &&
+        editingProposalIndex < finalProposals.length
+      ) {
+        finalProposals[editingProposalIndex] = pendingEntry;
+      } else {
+        finalProposals.push(pendingEntry);
+      }
     }
 
     const d = new Date(closesAt);
@@ -1618,16 +1708,14 @@ function CreateSingleVoteView({
             </div>
           </div>
 
-          {!isAddingProposal && (
-            <button
-              type="button"
-              onClick={() => setIsAddingProposal(true)}
-              className="flex items-center gap-1 rounded-md border border-[#008075] px-3 py-1.5 text-xs font-bold text-[#008075] transition-colors hover:bg-[#EAF5F2]"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Añadir propuesta
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={handleAddProposalClick}
+            className="flex items-center gap-1 rounded-md border border-[#008075] px-3 py-1.5 text-xs font-bold text-[#008075] transition-colors hover:bg-[#EAF5F2]"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Añadir presupuesto
+          </button>
         </div>
 
         <div className="space-y-3 pl-8.5">
@@ -1636,12 +1724,23 @@ function CreateSingleVoteView({
             <div className="space-y-3 rounded-md border border-emerald-200 bg-[#EAF5F2]/40 p-3.5">
               <div className="flex items-center gap-2">
                 <span className="flex h-4 w-4 items-center justify-center rounded bg-[#008075] text-[10px] font-bold text-white">
-                  {proposals.length + 1}
+                  {editingProposalIndex !== null
+                    ? editingProposalIndex + 1
+                    : proposals.length + 1}
                 </span>
                 <span className="text-xs font-bold text-slate-900">
-                  Nueva Propuesta / Opción {proposals.length + 1}
+                  {editingProposalIndex !== null
+                    ? `Editar Propuesta / Presupuesto ${editingProposalIndex + 1}`
+                    : `Nueva Propuesta / Opción ${proposals.length + 1}`}
                 </span>
               </div>
+
+              {proposalError && (
+                <div className="flex items-center gap-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-rose-600" />
+                  <span>{proposalError}</span>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
                 <div className="relative space-y-1">
@@ -1653,6 +1752,7 @@ function CreateSingleVoteView({
                     value={propCompany}
                     onChange={(e) => {
                       setPropCompany(e.target.value);
+                      if (proposalError) setProposalError(null);
                       setShowProviderDropdown(true);
                       const exact = ((providers as any[]) ?? []).find(
                         (p: any) =>
@@ -1684,6 +1784,7 @@ function CreateSingleVoteView({
                                 e.preventDefault();
                                 setPropCompany(p.name);
                                 setPropProviderId(p.id);
+                                if (proposalError) setProposalError(null);
                                 setShowProviderDropdown(false);
                               }}
                               className="flex w-full items-center justify-between px-3 py-1.5 text-left text-xs transition-colors hover:bg-[#EAF5F2]"
@@ -1709,7 +1810,10 @@ function CreateSingleVoteView({
                   <Input
                     placeholder="Ej. 2.500,00 €"
                     value={propAmount}
-                    onChange={(e) => setPropAmount(e.target.value)}
+                    onChange={(e) => {
+                      setPropAmount(e.target.value);
+                      if (proposalError) setProposalError(null);
+                    }}
                     className="h-8.5 rounded-md bg-white text-xs"
                   />
                 </div>
@@ -1750,7 +1854,10 @@ function CreateSingleVoteView({
               <div className="flex items-center justify-end gap-2 pt-1">
                 <button
                   type="button"
-                  onClick={() => setIsAddingProposal(false)}
+                  onClick={() => {
+                    resetProposalForm();
+                    setIsAddingProposal(false);
+                  }}
                   className="rounded-md border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-700 hover:bg-slate-50"
                 >
                   Cancelar
@@ -1760,7 +1867,9 @@ function CreateSingleVoteView({
                   onClick={handleSaveProposal}
                   className="rounded-md bg-[#008075] px-3 py-1 text-xs font-bold text-white hover:bg-[#006e64]"
                 >
-                  Guardar propuesta
+                  {editingProposalIndex !== null
+                    ? "Guardar cambios"
+                    : "Guardar propuesta"}
                 </button>
               </div>
             </div>
@@ -1770,7 +1879,7 @@ function CreateSingleVoteView({
           {proposals.length === 0 && !isAddingProposal ? (
             <div className="rounded-md border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-xs text-slate-400">
               No hay opciones o propuestas añadidas todavía. Pulsa en
-              &quot;Añadir propuesta&quot; para definir las alternativas de
+              &quot;Añadir presupuesto&quot; para definir las alternativas de
               voto.
             </div>
           ) : (
@@ -1778,7 +1887,11 @@ function CreateSingleVoteView({
               {proposals.map((p, idx) => (
                 <div
                   key={idx}
-                  className="flex items-center justify-between rounded-md border border-slate-200 bg-white p-2.5 text-xs shadow-2xs"
+                  className={`flex items-center justify-between rounded-md border p-2.5 text-xs shadow-2xs transition-colors ${
+                    editingProposalIndex === idx
+                      ? "border-[#008075] bg-[#EAF5F2]/30"
+                      : "border-slate-200 bg-white"
+                  }`}
                 >
                   <div className="flex items-center gap-2.5">
                     <span className="flex h-5 w-5 items-center justify-center rounded bg-slate-100 text-[10px] font-bold text-slate-600">
@@ -1788,7 +1901,7 @@ function CreateSingleVoteView({
                       {p.companyName}
                     </span>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2.5">
                     <span className="font-extrabold text-slate-800">
                       {p.amount}
                     </span>
@@ -1800,6 +1913,17 @@ function CreateSingleVoteView({
                     )}
                     <button
                       type="button"
+                      title="Editar presupuesto"
+                      aria-label="Editar presupuesto"
+                      onClick={() => handleEditProposal(idx)}
+                      className="p-1 text-slate-400 transition-colors hover:text-[#008075]"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      title="Eliminar presupuesto"
+                      aria-label="Eliminar presupuesto"
                       onClick={() => handleRemoveProposal(idx)}
                       className="p-1 text-slate-400 transition-colors hover:text-red-500"
                     >
@@ -2075,6 +2199,10 @@ function CreateMeetingView({
   const [showMeetingProviderDropdown, setShowMeetingProviderDropdown] =
     useState(false);
   const [isAddingProposal, setIsAddingProposal] = useState(false);
+  const [editingProposalIndex, setEditingProposalIndex] = useState<
+    number | null
+  >(null);
+  const [proposalError, setProposalError] = useState<string | null>(null);
 
   const { data: providers } = useQuery(
     trpc.provider.listByOrg.queryOptions({ tenantId: TENANT_ID }),
@@ -2092,10 +2220,77 @@ function CreateMeetingView({
     }),
   );
 
+  const isMeetingProposalFormEmpty = () =>
+    !newPropCompany.trim() && !newPropAmount.trim() && !newPropFile;
+
+  const resetMeetingProposalForm = () => {
+    setNewPropCompany("");
+    setNewPropAmount("");
+    setNewPropFile("");
+    setNewPropProviderId(null);
+    setEditingProposalIndex(null);
+    setProposalError(null);
+    setShowMeetingProviderDropdown(false);
+  };
+
+  const commitMeetingProposal = (targetIdx = activeItemIndex): boolean => {
+    if (targetIdx < 0 || !items[targetIdx]) return false;
+    if (!newPropCompany.trim() || !newPropAmount.trim()) {
+      setProposalError(
+        "Debes ingresar la empresa y el importe antes de guardar el presupuesto.",
+      );
+      return false;
+    }
+    if (!/\d/.test(newPropAmount.trim())) {
+      setProposalError(
+        "El importe ingresado no es válido. Ejemplo: 2.500,00 €",
+      );
+      return false;
+    }
+    const matched = ((providers as any[]) ?? []).find(
+      (p: any) =>
+        p.name.toLowerCase().trim() === newPropCompany.toLowerCase().trim(),
+    );
+    const entry = {
+      companyName: newPropCompany.trim(),
+      amount: formatEuro(newPropAmount.trim()),
+      providerId: newPropProviderId || matched?.id || undefined,
+      fileName: newPropFile || undefined,
+      fileUrl: newPropFile
+        ? "https://example.com/" + encodeURIComponent(newPropFile)
+        : undefined,
+    };
+
+    const next = [...items];
+    const currentProps = [...next[targetIdx]!.proposals];
+    if (
+      editingProposalIndex !== null &&
+      editingProposalIndex >= 0 &&
+      editingProposalIndex < currentProps.length
+    ) {
+      currentProps[editingProposalIndex] = entry;
+    } else {
+      currentProps.push(entry);
+    }
+    next[targetIdx] = {
+      ...next[targetIdx]!,
+      proposals: currentProps,
+    };
+    setItems(next);
+    resetMeetingProposalForm();
+    return true;
+  };
+
   const handleAddNewItem = () => {
+    if (isAddingProposal && !isMeetingProposalFormEmpty()) {
+      if (!commitMeetingProposal()) return;
+    } else {
+      resetMeetingProposalForm();
+      setIsAddingProposal(false);
+    }
     const nextIndex = items.length;
-    setItems([
-      ...items,
+    setItems((prev) => [
+      ...prev,
       {
         title: "",
         budget: "",
@@ -2119,37 +2314,63 @@ function CreateMeetingView({
   const handleRemoveItem = (index: number) => {
     setItems(items.filter((_, i) => i !== index));
     if (activeItemIndex === index) {
+      resetMeetingProposalForm();
+      setIsAddingProposal(false);
       setActiveItemIndex(-1);
+    } else if (activeItemIndex > index) {
+      setActiveItemIndex(activeItemIndex - 1);
     }
   };
 
   const handleSaveProposal = () => {
-    if (!newPropCompany.trim() || !newPropAmount.trim()) {
-      alert("Introduce empresa e importe de la propuesta.");
+    if (commitMeetingProposal()) {
+      setIsAddingProposal(false);
+    }
+  };
+
+  const handleAddMeetingProposalClick = () => {
+    if (!isAddingProposal || isMeetingProposalFormEmpty()) {
+      resetMeetingProposalForm();
+      setIsAddingProposal(true);
       return;
     }
+    if (commitMeetingProposal()) {
+      setIsAddingProposal(true);
+    }
+  };
+
+  const handleEditMeetingProposal = (itemIdx: number, pIdx: number) => {
+    const targetProp = items[itemIdx]?.proposals[pIdx];
+    if (!targetProp) return;
+    setActiveItemIndex(itemIdx);
+    setNewPropCompany(targetProp.companyName);
+    setNewPropAmount(targetProp.amount);
+    setNewPropFile(targetProp.fileName ?? "");
+    setNewPropProviderId(targetProp.providerId ?? null);
+    setEditingProposalIndex(pIdx);
+    setProposalError(null);
+    setShowMeetingProviderDropdown(false);
+    setIsAddingProposal(true);
+  };
+
+  const handleRemoveMeetingProposal = (itemIdx: number, pIdx: number) => {
     const next = [...items];
-    if (next[activeItemIndex]) {
-      const matched = ((providers as any[]) ?? []).find(
-        (p: any) =>
-          p.name.toLowerCase().trim() === newPropCompany.toLowerCase().trim(),
-      );
-      next[activeItemIndex]!.proposals.push({
-        companyName: newPropCompany.trim(),
-        amount: formatEuro(newPropAmount.trim()),
-        providerId: newPropProviderId || matched?.id || undefined,
-        fileName: newPropFile || undefined,
-        fileUrl: newPropFile
-          ? "https://example.com/" + encodeURIComponent(newPropFile)
-          : undefined,
-      });
-      setItems(next);
-      setNewPropCompany("");
-      setNewPropAmount("");
-      setNewPropFile("");
-      setNewPropProviderId(null);
-      setShowMeetingProviderDropdown(false);
-      setIsAddingProposal(false);
+    if (!next[itemIdx]) return;
+    next[itemIdx] = {
+      ...next[itemIdx]!,
+      proposals: next[itemIdx]!.proposals.filter((_, i) => i !== pIdx),
+    };
+    setItems(next);
+    if (activeItemIndex === itemIdx) {
+      if (editingProposalIndex === pIdx) {
+        resetMeetingProposalForm();
+        setIsAddingProposal(false);
+      } else if (
+        editingProposalIndex !== null &&
+        pIdx < editingProposalIndex
+      ) {
+        setEditingProposalIndex(editingProposalIndex - 1);
+      }
     }
   };
 
@@ -2162,6 +2383,52 @@ function CreateMeetingView({
     if (!closesAt.trim()) {
       alert("Por favor introduce la fecha límite para votar online.");
       return;
+    }
+
+    const finalItems = items.map((it) => ({
+      ...it,
+      proposals: [...it.proposals],
+    }));
+
+    if (
+      isAddingProposal &&
+      !isMeetingProposalFormEmpty() &&
+      activeItemIndex >= 0 &&
+      finalItems[activeItemIndex]
+    ) {
+      if (
+        !newPropCompany.trim() ||
+        !newPropAmount.trim() ||
+        !/\d/.test(newPropAmount.trim())
+      ) {
+        setProposalError(
+          "Completa correctamente la empresa y el importe o cancela el formulario antes de convocar.",
+        );
+        return;
+      }
+      const matched = ((providers as any[]) ?? []).find(
+        (p: any) =>
+          p.name.toLowerCase().trim() === newPropCompany.toLowerCase().trim(),
+      );
+      const pendingEntry = {
+        companyName: newPropCompany.trim(),
+        amount: formatEuro(newPropAmount.trim()),
+        providerId: newPropProviderId || matched?.id || undefined,
+        fileName: newPropFile || undefined,
+        fileUrl: newPropFile
+          ? "https://example.com/" + encodeURIComponent(newPropFile)
+          : undefined,
+      };
+      const targetProps = finalItems[activeItemIndex]!.proposals;
+      if (
+        editingProposalIndex !== null &&
+        editingProposalIndex >= 0 &&
+        editingProposalIndex < targetProps.length
+      ) {
+        targetProps[editingProposalIndex] = pendingEntry;
+      } else {
+        targetProps.push(pendingEntry);
+      }
     }
 
     const parsedMeetingDate = new Date(
@@ -2204,7 +2471,7 @@ function CreateMeetingView({
       closesAt: safeClosesAt,
       scheduledAt: scheduledIso,
       status: activationType === "schedule" ? "DRAFT" : "OPEN",
-      items: items
+      items: finalItems
         .filter((it) => it.title.trim().length > 0)
         .map((it) => ({
           title: it.title.trim(),
@@ -2438,9 +2705,15 @@ function CreateMeetingView({
                       </span>
                       <button
                         type="button"
-                        onClick={() =>
-                          setActiveItemIndex(isSelected ? -1 : idx)
-                        }
+                        onClick={() => {
+                          if (isAddingProposal && !isMeetingProposalFormEmpty()) {
+                            if (!commitMeetingProposal()) return;
+                          } else {
+                            resetMeetingProposalForm();
+                            setIsAddingProposal(false);
+                          }
+                          setActiveItemIndex(isSelected ? -1 : idx);
+                        }}
                         className="p-1 text-slate-400 hover:text-slate-600"
                       >
                         {isSelected ? (
@@ -2565,16 +2838,31 @@ function CreateMeetingView({
                           </span>
                           <button
                             type="button"
-                            onClick={() => setIsAddingProposal(true)}
+                            onClick={handleAddMeetingProposalClick}
                             className="text-xs font-bold text-[#008075] hover:underline"
                           >
                             + Añadir presupuesto
                           </button>
                         </div>
 
-                        {/* Add proposal mini form */}
+                        {/* Add / Edit proposal mini form */}
                         {isAddingProposal && (
                           <div className="space-y-2.5 rounded-md border border-slate-200 bg-slate-50 p-2.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-bold text-slate-800">
+                                {editingProposalIndex !== null
+                                  ? `Editar presupuesto #${editingProposalIndex + 1}`
+                                  : `Nuevo presupuesto #${it.proposals.length + 1}`}
+                              </span>
+                            </div>
+
+                            {proposalError && (
+                              <div className="flex items-center gap-2 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-medium text-rose-700">
+                                <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-rose-600" />
+                                <span>{proposalError}</span>
+                              </div>
+                            )}
+
                             <div className="grid grid-cols-2 gap-2">
                               {/* Empresa con autocomplete */}
                               <div className="relative space-y-1">
@@ -2583,6 +2871,7 @@ function CreateMeetingView({
                                   value={newPropCompany}
                                   onChange={(e) => {
                                     setNewPropCompany(e.target.value);
+                                    if (proposalError) setProposalError(null);
                                     setShowMeetingProviderDropdown(true);
                                     const exact = (
                                       (providers as any[]) ?? []
@@ -2630,6 +2919,8 @@ function CreateMeetingView({
                                               e.preventDefault();
                                               setNewPropCompany(p.name);
                                               setNewPropProviderId(p.id);
+                                              if (proposalError)
+                                                setProposalError(null);
                                               setShowMeetingProviderDropdown(
                                                 false,
                                               );
@@ -2653,9 +2944,10 @@ function CreateMeetingView({
                               <Input
                                 placeholder="Importe (ej. 2.500 €)"
                                 value={newPropAmount}
-                                onChange={(e) =>
-                                  setNewPropAmount(e.target.value)
-                                }
+                                onChange={(e) => {
+                                  setNewPropAmount(e.target.value);
+                                  if (proposalError) setProposalError(null);
+                                }}
                                 className="h-7.5 rounded-md bg-white text-xs"
                               />
                             </div>
@@ -2699,12 +2991,8 @@ function CreateMeetingView({
                               <button
                                 type="button"
                                 onClick={() => {
+                                  resetMeetingProposalForm();
                                   setIsAddingProposal(false);
-                                  setNewPropCompany("");
-                                  setNewPropAmount("");
-                                  setNewPropFile("");
-                                  setNewPropProviderId(null);
-                                  setShowMeetingProviderDropdown(false);
                                 }}
                                 className="px-2 py-1 text-xs text-slate-500"
                               >
@@ -2715,7 +3003,9 @@ function CreateMeetingView({
                                 onClick={handleSaveProposal}
                                 className="rounded-md bg-[#008075] px-2.5 py-1 text-xs font-bold text-white"
                               >
-                                Guardar
+                                {editingProposalIndex !== null
+                                  ? "Guardar cambios"
+                                  : "Guardar"}
                               </button>
                             </div>
                           </div>
@@ -2724,7 +3014,11 @@ function CreateMeetingView({
                         {it.proposals.map((p, pIdx) => (
                           <div
                             key={pIdx}
-                            className="flex items-center justify-between rounded bg-slate-50 p-2 text-xs"
+                            className={`flex items-center justify-between rounded border p-2 text-xs transition-colors ${
+                              editingProposalIndex === pIdx
+                                ? "border-[#008075] bg-[#EAF5F2]/30"
+                                : "border-transparent bg-slate-50"
+                            }`}
                           >
                             <span className="font-medium text-slate-800">
                               {p.companyName}
@@ -2741,16 +3035,25 @@ function CreateMeetingView({
                               )}
                               <button
                                 type="button"
-                                onClick={() => {
-                                  const next = [...items];
-                                  next[idx]!.proposals = next[
-                                    idx
-                                  ]!.proposals.filter((_, i) => i !== pIdx);
-                                  setItems(next);
-                                }}
-                                className="p-0.5 text-slate-400 hover:text-red-500"
+                                title="Editar presupuesto"
+                                aria-label="Editar presupuesto"
+                                onClick={() =>
+                                  handleEditMeetingProposal(idx, pIdx)
+                                }
+                                className="p-0.5 text-slate-400 transition-colors hover:text-[#008075]"
                               >
-                                <Trash2 className="h-3 w-3" />
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                title="Eliminar presupuesto"
+                                aria-label="Eliminar presupuesto"
+                                onClick={() =>
+                                  handleRemoveMeetingProposal(idx, pIdx)
+                                }
+                                className="p-0.5 text-slate-400 transition-colors hover:text-red-500"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
                               </button>
                             </div>
                           </div>

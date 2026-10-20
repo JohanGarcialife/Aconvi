@@ -626,3 +626,37 @@ export const feeRelations = relations(fee, ({ one }) => ({
     references: [user.id],
   }),
 }));
+
+// ─── Meeting Attendance (Asistencia y Representación en Juntas) ───────────────
+export const meetingAttendance = pgTable("meeting_attendance", {
+  id: uuid().notNull().primaryKey().defaultRandom(),
+  sessionId: uuid("session_id")
+    .notNull()
+    .references(() => voteSession.id, { onDelete: "cascade" }),
+  memberId: text("member_id").notNull(),
+  userId: text("user_id").notNull(),
+  present: boolean("present").notNull().default(false),
+  status: varchar("status", { length: 32 }).notNull().default("ABSENT"), // ABSENT | PRESENT | REPRESENTED
+  coefficient: real("coefficient").notNull().default(0),
+  repName: varchar("rep_name", { length: 256 }),
+  repDocId: varchar("rep_doc_id", { length: 64 }),
+  repPhone: varchar("rep_phone", { length: 64 }),
+  repEmail: varchar("rep_email", { length: 256 }),
+  repDocVerified: boolean("rep_doc_verified").notNull().default(false),
+  checkInMethod: varchar("check_in_method", { length: 32 })
+    .notNull()
+    .default("MANUAL"), // MANUAL | QR
+  updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export const meetingAttendanceRelations = relations(
+  meetingAttendance,
+  ({ one }) => ({
+    session: one(voteSession, {
+      fields: [meetingAttendance.sessionId],
+      references: [voteSession.id],
+    }),
+  }),
+);

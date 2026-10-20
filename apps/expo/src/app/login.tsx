@@ -103,9 +103,15 @@ export default function LoginScreen() {
       if (userId) {
         await SecureStore.setItemAsync("expo_user_id", userId);
       }
+      await SecureStore.setItemAsync("expo_user_role", role);
+      const roleLower = role.toLowerCase().trim();
       const isProvider =
-        role.toLowerCase().includes("proveedor") ||
-        role.toLowerCase() === "provider";
+        roleLower.includes("proveedor") || roleLower === "provider";
+      const isAf =
+        roleLower === "af" ||
+        roleLower === "administrador" ||
+        roleLower === "admin" ||
+        roleLower === "superadmin";
 
       setStep("done");
 
@@ -118,6 +124,8 @@ export default function LoginScreen() {
       // 4. Navegar DIRECTO a la pantalla correcta (sin pasar por index.tsx)
       if (isProvider) {
         router.replace("/(proveedor)/job");
+      } else if (isAf) {
+        router.replace("/(af)" as any);
       } else {
         router.replace("/(vecino)");
       }

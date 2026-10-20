@@ -7,14 +7,45 @@ import * as SecureStore from "expo-secure-store";
 
 import { getBaseUrl } from "./base-url";
 
+const COMMUNITY_ONLY_NOTIFICATION_TYPES = new Set([
+  "new_vote",
+  "vote_closed",
+  "new_notice",
+  "urgent_notice",
+  "new_document",
+  "booking_confirmed",
+  "booking_cancelled",
+  "incident_assigned",
+]);
+
 // Configure how notifications appear when app is in foreground
 Notifications.setNotificationHandler({
-  handleNotification: async () =>
-    ({
+  handleNotification: async (notification) => {
+    try {
+      const storedRole =
+        (await SecureStore.getItemAsync("expo_user_role")) ?? "";
+      const roleLower = storedRole.toLowerCase().trim();
+      const isProvider =
+        roleLower.includes("proveedor") || roleLower === "provider";
+      const notifType = String(
+        notification?.request?.content?.data?.type ?? "",
+      );
+      if (isProvider && COMMUNITY_ONLY_NOTIFICATION_TYPES.has(notifType)) {
+        return {
+          shouldShowAlert: false,
+          shouldPlaySound: false,
+          shouldSetBadge: false,
+        } as any;
+      }
+    } catch {
+      // Fallback to default presentation
+    }
+    return {
       shouldShowAlert: true,
       shouldPlaySound: true,
       shouldSetBadge: true,
-    }) as any,
+    } as any;
+  },
 });
 
 export function usePushNotifications() {
