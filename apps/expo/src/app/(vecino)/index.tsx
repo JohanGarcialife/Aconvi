@@ -19,12 +19,14 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
+import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
 import { api, queryClient } from "~/utils/api";
 import { useReadStatus } from "~/utils/notifications-tracker";
+import { QrMatrixView } from "~/utils/qr-matrix";
 import { useVotedSessions } from "~/utils/voting-tracker";
 
 const TENANT_ID = "org_aconvi_demo";
@@ -408,6 +410,11 @@ export default function VecinoHome() {
   const [USER_ID, setUserId] = useState<string>(
     "00000000-0000-0000-0000-000000000000",
   );
+  const [qrModalVisible, setQrModalVisible] = useState(false);
+  const [selectedQrJunta, setSelectedQrJunta] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
 
   const { isSessionVoted } = useVotedSessions();
 
@@ -421,6 +428,16 @@ export default function VecinoHome() {
       })
       .catch(console.warn);
   }, []);
+
+  const { data: myQrData } = useQuery({
+    ...api.meeting.myAttendanceQr.queryOptions({
+      tenantId: TENANT_ID,
+      sessionId: selectedQrJunta?.id ?? "00000000-0000-0000-0000-000000000000",
+      userId: USER_ID,
+    }),
+    enabled: Boolean(selectedQrJunta?.id && qrModalVisible),
+    refetchInterval: qrModalVisible ? 2500 : false,
+  });
 
   // ── Data Fetching with real-time polling ──
   const {
@@ -1034,6 +1051,29 @@ export default function VecinoHome() {
                           : "Sin fecha límite"}
                     </Text>
 
+                    {isJunta && !isClosed && (
+                      <TouchableOpacity
+                        style={styles.qrCodeCardBtn}
+                        activeOpacity={0.8}
+                        onPress={() => {
+                          setSelectedQrJunta({
+                            id: voting.id,
+                            title: voting.title,
+                          });
+                          setQrModalVisible(true);
+                        }}
+                      >
+                        <Ionicons
+                          name="qr-code-outline"
+                          size={16}
+                          color={PRIMARY}
+                        />
+                        <Text style={styles.qrCodeCardBtnText}>
+                          Ver código QR
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+
                     <TouchableOpacity
                       style={[
                         styles.primaryButton,
@@ -1281,6 +1321,87 @@ export default function VecinoHome() {
         visible={profileVisible}
         onClose={() => setProfileVisible(false)}
       />
+
+      {/* ── Modal Código QR del Vecino ── */}
+      <Modal
+        visible={qrModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setQrModalVisible(false)}
+      >
+        <View style={styles.qrModalBackdrop}>
+          <TouchableOpacity
+            style={styles.qrModalBackdropTouchable}
+            activeOpacity={1}
+            onPress={() => setQrModalVisible(false)}
+          />
+          <View style={styles.qrModalCard}>
+            <View style={styles.qrModalHeader}>
+              <View style={{ flex: 1, paddingRight: 8 }}>
+                <Text style={styles.qrModalTitle}>Código QR de asistencia</Text>
+                <Text style={styles.qrModalSub} numberOfLines={1}>
+                  {selectedQrJunta?.title || "Junta de Propietarios"}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setQrModalVisible(false)}
+                style={{ padding: 4 }}
+              >
+                <Ionicons name="close" size={24} color={DARK} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.qrCodeCenterBox}>
+              <QrMatrixView
+                value={
+                  myQrData?.qrPayload ||
+                  `ACONVI_QR:${selectedQrJunta?.id || "demo"}:${USER_ID}`
+                }
+                size={180}
+                darkColor="#008075"
+              />
+            </View>
+
+            <View style={styles.qrOwnerInfoBox}>
+              <View style={styles.qrOwnerRow}>
+                <Text style={styles.qrOwnerName}>
+                  {myQrData?.owner?.name || "García López, Juan"}
+                </Text>
+                <View
+                  style={[
+                    styles.qrBadge,
+                    myQrData?.isPresent
+                      ? styles.qrBadgePresent
+                      : styles.qrBadgePending,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.qrBadgeText,
+                      myQrData?.isPresent
+                        ? styles.qrBadgeTextPresent
+                        : styles.qrBadgeTextPending,
+                    ]}
+                  >
+                    {myQrData?.isPresent
+                      ? "Presente registrado"
+                      : "Pendiente de registro"}
+                  </Text>
+                </View>
+              </View>
+              <Text style={styles.qrOwnerMeta}>
+                Puerta: {myQrData?.owner?.door || "1º B"} · Coeficiente:{" "}
+                {myQrData?.owner?.coefficient ?? "2,38"} %
+              </Text>
+            </View>
+
+            <Text style={styles.qrNotice}>
+              Muestra este código al Administrador de Fincas en la entrada para
+              registrar tu asistencia de forma automática.
+            </Text>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1526,5 +1647,119 @@ const styles = StyleSheet.create({
   carouselDotActive: {
     width: 20,
     backgroundColor: PRIMARY,
+  },
+
+  qrCodeCardBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: PRIMARY,
+    backgroundColor: "#F0FDF4",
+    marginBottom: 8,
+  },
+  qrCodeCardBtnText: {
+    color: PRIMARY,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+
+  qrModalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  qrModalBackdropTouchable: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  qrModalCard: {
+    width: "100%",
+    maxWidth: 380,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  qrModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 16,
+  },
+  qrModalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#0F172A",
+  },
+  qrModalSub: {
+    fontSize: 13,
+    color: "#64748B",
+    marginTop: 2,
+  },
+  qrCodeCenterBox: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+  },
+  qrOwnerInfoBox: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    marginVertical: 12,
+  },
+  qrOwnerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  qrOwnerName: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#0F172A",
+    flex: 1,
+  },
+  qrOwnerMeta: {
+    fontSize: 12,
+    color: "#64748B",
+  },
+  qrBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  qrBadgePresent: {
+    backgroundColor: "#DCFCE7",
+  },
+  qrBadgePending: {
+    backgroundColor: "#FEF3C7",
+  },
+  qrBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  qrBadgeTextPresent: {
+    color: "#166534",
+  },
+  qrBadgeTextPending: {
+    color: "#92400E",
+  },
+  qrNotice: {
+    fontSize: 12,
+    color: "#64748B",
+    textAlign: "center",
+    lineHeight: 18,
   },
 });

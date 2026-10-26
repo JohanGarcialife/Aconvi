@@ -112,7 +112,9 @@ export default function AfIncidenciasScreen() {
         ) : allIncidents.length === 0 ? (
           <View style={styles.emptyCard}>
             <Ionicons name="warning-outline" size={32} color={SUBTEXT} />
-            <Text style={styles.emptyText}>No hay incidencias registradas.</Text>
+            <Text style={styles.emptyText}>
+              No hay incidencias registradas.
+            </Text>
           </View>
         ) : (
           allIncidents.map((inc: any) => {

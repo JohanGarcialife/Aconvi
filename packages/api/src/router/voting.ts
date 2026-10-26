@@ -1486,6 +1486,17 @@ export const votingRouter = createTRPCRouter({
               title: z.string().min(1),
               budget: z.string().optional(),
               description: z.string().optional(),
+              agreementType: z
+                .enum([
+                  "INFORMATIVO",
+                  "RUEGOS_Y_PREGUNTAS",
+                  "MAYORIA_SIMPLE",
+                  "UN_TERCIO",
+                  "TRES_QUINTOS",
+                  "UNANIMIDAD",
+                ])
+                .optional()
+                .default("MAYORIA_SIMPLE"),
               onlineVotingEnabled: z.boolean().default(true),
               proposals: z
                 .array(
@@ -1595,6 +1606,11 @@ export const votingRouter = createTRPCRouter({
       for (let idx = 0; idx < resolvedItems.length; idx++) {
         const itemInput = resolvedItems[idx]!;
         const itemId = crypto.randomUUID();
+        const agreementType =
+          (itemInput as any).agreementType || "MAYORIA_SIMPLE";
+        const requiresVoting = !["INFORMATIVO", "RUEGOS_Y_PREGUNTAS"].includes(
+          agreementType,
+        );
 
         await ctx.db.insert(voteItem).values({
           id: itemId,
@@ -1603,7 +1619,11 @@ export const votingRouter = createTRPCRouter({
           title: itemInput.title,
           budget: itemInput.budget ? formatEuro(itemInput.budget) : null,
           description: itemInput.description ?? null,
-          onlineVotingEnabled: itemInput.onlineVotingEnabled ?? true,
+          agreementType,
+          requiresVoting,
+          onlineVotingEnabled: requiresVoting
+            ? (itemInput.onlineVotingEnabled ?? true)
+            : false,
           autoGenerateOt: Boolean(
             itemInput.autoGenerateOt ||
               (itemInput.proposals && itemInput.proposals.length > 0),

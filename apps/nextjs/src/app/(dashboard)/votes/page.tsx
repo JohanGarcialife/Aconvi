@@ -1519,10 +1519,7 @@ function CreateSingleVoteView({
     if (editingProposalIndex === index) {
       resetProposalForm();
       setIsAddingProposal(false);
-    } else if (
-      editingProposalIndex !== null &&
-      index < editingProposalIndex
-    ) {
+    } else if (editingProposalIndex !== null && index < editingProposalIndex) {
       setEditingProposalIndex(editingProposalIndex - 1);
     }
   };
@@ -2176,6 +2173,13 @@ function CreateMeetingView({
     Array<{
       title: string;
       budget: string;
+      agreementType:
+        | "INFORMATIVO"
+        | "RUEGOS_Y_PREGUNTAS"
+        | "MAYORIA_SIMPLE"
+        | "UN_TERCIO"
+        | "TRES_QUINTOS"
+        | "UNANIMIDAD";
       onlineVotingEnabled: boolean;
       autoGenerateOt: boolean;
       otProviderId?: string;
@@ -2294,6 +2298,7 @@ function CreateMeetingView({
       {
         title: "",
         budget: "",
+        agreementType: "MAYORIA_SIMPLE",
         onlineVotingEnabled: true,
         autoGenerateOt: false,
         otProviderId: "",
@@ -2365,10 +2370,7 @@ function CreateMeetingView({
       if (editingProposalIndex === pIdx) {
         resetMeetingProposalForm();
         setIsAddingProposal(false);
-      } else if (
-        editingProposalIndex !== null &&
-        pIdx < editingProposalIndex
-      ) {
+      } else if (editingProposalIndex !== null && pIdx < editingProposalIndex) {
         setEditingProposalIndex(editingProposalIndex - 1);
       }
     }
@@ -2476,6 +2478,7 @@ function CreateMeetingView({
         .map((it) => ({
           title: it.title.trim(),
           budget: it.budget?.trim() ? formatEuro(it.budget.trim()) : undefined,
+          agreementType: it.agreementType || "MAYORIA_SIMPLE",
           onlineVotingEnabled: it.onlineVotingEnabled,
           autoGenerateOt: it.autoGenerateOt ?? false,
           otProviderId: it.otProviderId || undefined,
@@ -2701,12 +2704,20 @@ function CreateMeetingView({
                     <div className="flex shrink-0 items-center gap-2">
                       <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#008075]">
                         <span className="h-1.5 w-1.5 rounded-full bg-[#008075]" />
-                        {it.onlineVotingEnabled ? "Voto previo" : "Informativo"}
+                        {it.agreementType === "INFORMATIVO" ||
+                        it.agreementType === "RUEGOS_Y_PREGUNTAS"
+                          ? "Sin votación"
+                          : it.onlineVotingEnabled
+                            ? "Voto previo"
+                            : "Voto en junta"}
                       </span>
                       <button
                         type="button"
                         onClick={() => {
-                          if (isAddingProposal && !isMeetingProposalFormEmpty()) {
+                          if (
+                            isAddingProposal &&
+                            !isMeetingProposalFormEmpty()
+                          ) {
                             if (!commitMeetingProposal()) return;
                           } else {
                             resetMeetingProposalForm();
@@ -2734,41 +2745,77 @@ function CreateMeetingView({
 
                   {isSelected && (
                     <div className="space-y-3 border-t border-slate-100 pt-2.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-700">
-                          ¿Se vota este punto antes de la junta? *
-                        </span>
-                        <div className="flex items-center gap-3 text-xs">
-                          <label className="flex cursor-pointer items-center gap-1">
+                      {/* Tipo de acuerdo * (Selector obligatorio según requerimiento Punto 3) */}
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-semibold text-slate-700">
+                          Tipo de acuerdo *
+                        </Label>
+                        <select
+                          value={it.agreementType || "MAYORIA_SIMPLE"}
+                          onChange={(e) => {
+                            const val = e.target.value as any;
+                            const next = [...items];
+                            next[idx]!.agreementType = val;
+                            if (
+                              val === "INFORMATIVO" ||
+                              val === "RUEGOS_Y_PREGUNTAS"
+                            ) {
+                              next[idx]!.onlineVotingEnabled = false;
+                            }
+                            setItems(next);
+                          }}
+                          className="h-8.5 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs text-slate-800 focus:ring-1 focus:ring-[#008075] focus:outline-none"
+                        >
+                          <option value="INFORMATIVO">
+                            Informativo (sin votación)
+                          </option>
+                          <option value="RUEGOS_Y_PREGUNTAS">
+                            Ruegos y preguntas (sin votación)
+                          </option>
+                          <option value="MAYORIA_SIMPLE">
+                            Mayoría simple (&gt;50 % de los votos emitidos)
+                          </option>
+                          <option value="UN_TERCIO">1/3 del total</option>
+                          <option value="TRES_QUINTOS">3/5 del total</option>
+                          <option value="UNANIMIDAD">Unanimidad</option>
+                        </select>
+                      </div>
+
+                      {/* Momento de la votación (Gestión independiente cuando requiere votación) */}
+                      {it.agreementType !== "INFORMATIVO" &&
+                      it.agreementType !== "RUEGOS_Y_PREGUNTAS" ? (
+                        <div className="flex items-center justify-between rounded-md border border-slate-100 bg-slate-50/70 p-2.5">
+                          <div>
+                            <span className="block text-xs font-semibold text-slate-700">
+                              Momento de la votación
+                            </span>
+                            <span className="text-[11px] text-slate-500">
+                              {it.onlineVotingEnabled
+                                ? "Votación habilitada antes y durante la junta desde la App"
+                                : "Votación presencial exclusivamente en la sala de la junta"}
+                            </span>
+                          </div>
+                          <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-slate-700">
                             <input
-                              type="radio"
-                              name={`vote-point-${idx}`}
+                              type="checkbox"
                               checked={it.onlineVotingEnabled}
-                              onChange={() => {
+                              onChange={(e) => {
                                 const next = [...items];
-                                next[idx]!.onlineVotingEnabled = true;
+                                next[idx]!.onlineVotingEnabled =
+                                  e.target.checked;
                                 setItems(next);
                               }}
-                              className="accent-[#008075]"
+                              className="h-4 w-4 rounded border-slate-300 text-[#008075] focus:ring-[#008075]"
                             />
-                            <span>Sí</span>
-                          </label>
-                          <label className="flex cursor-pointer items-center gap-1">
-                            <input
-                              type="radio"
-                              name={`vote-point-${idx}`}
-                              checked={!it.onlineVotingEnabled}
-                              onChange={() => {
-                                const next = [...items];
-                                next[idx]!.onlineVotingEnabled = false;
-                                setItems(next);
-                              }}
-                              className="accent-[#008075]"
-                            />
-                            <span>No</span>
+                            <span>Votar antes de la junta</span>
                           </label>
                         </div>
-                      </div>
+                      ) : (
+                        <div className="rounded-md border border-slate-100 bg-slate-50 p-2 text-[11px] text-slate-500">
+                          Este punto no requiere votación ni propuestas de
+                          presupuesto.
+                        </div>
+                      )}
 
                       {/* Importe opcional del punto */}
                       <div className="space-y-1">

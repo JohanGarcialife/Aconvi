@@ -56,7 +56,10 @@ export default function AfComunicadosScreen() {
         );
       },
       onError: (err) => {
-        Alert.alert("Error", err.message || "No se pudo publicar el comunicado.");
+        Alert.alert(
+          "Error",
+          err.message || "No se pudo publicar el comunicado.",
+        );
       },
     }),
   );
@@ -209,7 +212,10 @@ export default function AfComunicadosScreen() {
               placeholder="Escribe el mensaje para los propietarios..."
               placeholderTextColor="#8AA8C7"
               multiline
-              style={[styles.modalInput, { minHeight: 90, textAlignVertical: "top" }]}
+              style={[
+                styles.modalInput,
+                { minHeight: 90, textAlignVertical: "top" },
+              ]}
             />
 
             <TouchableOpacity
@@ -226,9 +232,7 @@ export default function AfComunicadosScreen() {
                   <Ionicons name="checkmark" size={16} color="#FFFFFF" />
                 )}
               </View>
-              <Text style={styles.urgentLabel}>
-                Marcar como aviso urgente
-              </Text>
+              <Text style={styles.urgentLabel}>Marcar como aviso urgente</Text>
             </TouchableOpacity>
 
             <View style={styles.modalActions}>

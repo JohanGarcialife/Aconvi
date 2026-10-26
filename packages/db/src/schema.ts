@@ -382,6 +382,18 @@ export const voteSession = pgTable("vote_session", {
     mode: "date",
     withTimezone: true,
   }),
+  agreementType: varchar("agreement_type", { length: 32 })
+    .default("MAYORIA_SIMPLE")
+    .notNull(),
+  meetingStartedAt: timestamp("meeting_started_at", {
+    mode: "date",
+    withTimezone: true,
+  }),
+  meetingEndedAt: timestamp("meeting_ended_at", {
+    mode: "date",
+    withTimezone: true,
+  }),
+  meetingCall: varchar("meeting_call", { length: 16 }).default("SECOND"),
   // Auto-generación de OT tras votación aprobada
   autoGenerateOt: boolean("auto_generate_ot").default(false),
   otProviderId: uuid("ot_provider_id"),
@@ -418,7 +430,25 @@ export const voteItem = pgTable("vote_item", {
   title: varchar({ length: 256 }).notNull(),
   budget: varchar({ length: 64 }), // e.g. "1.200 €"
   description: text(),
-  onlineVotingEnabled: boolean("online_voting_enabled").default(true).notNull(), // Toggle AF: ¿Votar este punto antes de la junta?
+  agreementType: varchar("agreement_type", { length: 32 })
+    .default("MAYORIA_SIMPLE")
+    .notNull(), // INFORMATIVO | RUEGOS_Y_PREGUNTAS | MAYORIA_SIMPLE | UN_TERCIO | TRES_QUINTOS | UNANIMIDAD
+  requiresVoting: boolean("requires_voting").default(true).notNull(),
+  onlineVotingEnabled: boolean("online_voting_enabled").default(true).notNull(), // Momento de voto: votar antes de la junta
+  itemStatus: varchar("item_status", { length: 32 })
+    .default("PENDING")
+    .notNull(), // PENDING | APPROVED | REJECTED | PENDING_ABSENTEES
+  adminComments: text("admin_comments"),
+  currentRound: integer("current_round").default(1).notNull(),
+  winningProposalId: uuid("winning_proposal_id"),
+  absenteeNotifiedAt: timestamp("absentee_notified_at", {
+    mode: "date",
+    withTimezone: true,
+  }),
+  absenteeDeadlineAt: timestamp("absentee_deadline_at", {
+    mode: "date",
+    withTimezone: true,
+  }),
   autoGenerateOt: boolean("auto_generate_ot").default(false),
   otProviderId: uuid("ot_provider_id"),
   otGeneratedIncidentId: uuid("ot_generated_incident_id"),
@@ -434,7 +464,82 @@ export const voteItemRelations = relations(voteItem, ({ one, many }) => ({
   }),
   casts: many(voteCast),
   budgetProposals: many(voteBudgetProposal),
+  scrutinyRounds: many(voteScrutinyRound),
+  absenteeDiscrepancies: many(voteAbsenteeDiscrepancy),
 }));
+
+// ─── Vote Scrutiny Round ───────────────────────────────────────────────────────
+// Tracks show-of-hands counts, in-person exceptions and round history
+export const voteScrutinyRound = pgTable("vote_scrutiny_round", {
+  id: uuid().notNull().primaryKey().defaultRandom(),
+  sessionId: uuid("session_id")
+    .notNull()
+    .references(() => voteSession.id, { onDelete: "cascade" }),
+  itemId: uuid("item_id")
+    .notNull()
+    .references(() => voteItem.id, { onDelete: "cascade" }),
+  roundNumber: integer("round_number").default(1).notNull(),
+  defaultLogic: varchar("default_logic", { length: 32 })
+    .default("ASSUME_FAVOR")
+    .notNull(), // ASSUME_FAVOR | ASSUME_AGAINST
+  selectedProposalId: uuid("selected_proposal_id"),
+  showOfHandsJson: text("show_of_hands_json"),
+  inPersonExceptionsJson: text("in_person_exceptions_json"),
+  resultSnapshotJson: text("result_snapshot_json"),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export const voteScrutinyRoundRelations = relations(
+  voteScrutinyRound,
+  ({ one }) => ({
+    session: one(voteSession, {
+      fields: [voteScrutinyRound.sessionId],
+      references: [voteSession.id],
+    }),
+    item: one(voteItem, {
+      fields: [voteScrutinyRound.itemId],
+      references: [voteItem.id],
+    }),
+  }),
+);
+
+// ─── Vote Absentee Discrepancy (Art. 17.8 LPH) ─────────────────────────────────
+export const voteAbsenteeDiscrepancy = pgTable("vote_absentee_discrepancy", {
+  id: uuid().notNull().primaryKey().defaultRandom(),
+  sessionId: uuid("session_id")
+    .notNull()
+    .references(() => voteSession.id, { onDelete: "cascade" }),
+  itemId: uuid("item_id")
+    .notNull()
+    .references(() => voteItem.id, { onDelete: "cascade" }),
+  memberId: text("member_id").notNull(),
+  userId: text("user_id").notNull(),
+  coefficient: real("coefficient").default(0).notNull(),
+  notifiedAt: timestamp("notified_at", { mode: "date", withTimezone: true }),
+  deadlineAt: timestamp("deadline_at", { mode: "date", withTimezone: true }),
+  status: varchar("status", { length: 32 }).default("NOTIFIED").notNull(), // NOTIFIED | DISCREPANCY_REJECT | PRESUMED_APPROVE | EXPLICIT_APPROVE
+  respondedAt: timestamp("responded_at", { mode: "date", withTimezone: true }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export const voteAbsenteeDiscrepancyRelations = relations(
+  voteAbsenteeDiscrepancy,
+  ({ one }) => ({
+    session: one(voteSession, {
+      fields: [voteAbsenteeDiscrepancy.sessionId],
+      references: [voteSession.id],
+    }),
+    item: one(voteItem, {
+      fields: [voteAbsenteeDiscrepancy.itemId],
+      references: [voteItem.id],
+    }),
+  }),
+);
 
 // ─── Vote Budget Proposal (Presupuestos / Alternativas de empresas) ─────────────
 export const voteBudgetProposal = pgTable("vote_budget_proposal", {

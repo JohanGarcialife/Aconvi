@@ -123,7 +123,8 @@ export default function AfVotacionesScreen() {
                 tab === "OPEN" && styles.segmentTextActive,
               ]}
             >
-              Activas ({allSessions.filter((s) => s.status !== "CLOSED").length})
+              Activas ({allSessions.filter((s) => s.status !== "CLOSED").length}
+              )
             </Text>
           </TouchableOpacity>
           <TouchableOpacity

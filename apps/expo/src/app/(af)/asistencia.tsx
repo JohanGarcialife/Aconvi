@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Modal,
   RefreshControl,
@@ -72,7 +73,7 @@ function buildQrMatrix(seed: string): boolean[][] {
       }
       hash ^= (r * 31 + c * 17) & 0xff;
       hash = Math.imul(hash, 16777619);
-      grid[r]![c] = (Math.abs(hash) % 10) < 5;
+      grid[r]![c] = Math.abs(hash) % 10 < 5;
     }
   }
   return grid;
@@ -100,6 +101,10 @@ export default function AfAsistenciaScreen() {
   const [repDocVerified, setRepDocVerified] = useState(false);
   const [repError, setRepError] = useState<string | null>(null);
   const [qrVisible, setQrVisible] = useState(false);
+  const [scannerVisible, setScannerVisible] = useState(false);
+  const [scanSuccessMessage, setScanSuccessMessage] = useState<string | null>(
+    null,
+  );
   const [refreshing, setRefreshing] = useState(false);
 
   const { data: attendance, isLoading } = useQuery(
@@ -109,10 +114,52 @@ export default function AfAsistenciaScreen() {
     }),
   );
 
+  const quorumReached =
+    (attendance?.missingForQuorumPct ?? 100) <= 0 ||
+    (attendance?.participationPct ?? 0) >= 50;
+
+  const startMeetingMutation = useMutation(
+    api.meeting.startMeeting.mutationOptions({
+      onSuccess: (data) => {
+        void queryClient.invalidateQueries();
+        router.push({
+          pathname: "/(af)/orden-del-dia" as any,
+          params: { sessionId: data.sessionId },
+        });
+      },
+      onError: (err: any) => {
+        Alert.alert("Error", err?.message || "No se pudo iniciar la junta.");
+      },
+    }),
+  );
+
+  const scanAttendanceQrMutation = useMutation(
+    api.meeting.scanAttendanceQr.mutationOptions({
+      onSuccess: async (data) => {
+        await queryClient.invalidateQueries(
+          api.meeting.attendance.pathFilter(),
+        );
+        setScanSuccessMessage(
+          `¡Asistencia registrada! ${data.owner.name} (${data.owner.door} · ${data.owner.coefficient} %)`,
+        );
+        setTimeout(() => setScanSuccessMessage(null), 4000);
+        setScannerVisible(false);
+      },
+      onError: (err: any) => {
+        Alert.alert(
+          "Error al escanear",
+          err?.message || "Código QR no válido.",
+        );
+      },
+    }),
+  );
+
   const setPresenceMutation = useMutation(
     api.meeting.setPresence.mutationOptions({
       onSuccess: async () => {
-        await queryClient.invalidateQueries(api.meeting.attendance.pathFilter());
+        await queryClient.invalidateQueries(
+          api.meeting.attendance.pathFilter(),
+        );
       },
     }),
   );
@@ -120,7 +167,9 @@ export default function AfAsistenciaScreen() {
   const saveRepMutation = useMutation(
     api.meeting.saveRepresentative.mutationOptions({
       onSuccess: async () => {
-        await queryClient.invalidateQueries(api.meeting.attendance.pathFilter());
+        await queryClient.invalidateQueries(
+          api.meeting.attendance.pathFilter(),
+        );
         setExpandedMemberId(null);
         setRepError(null);
       },
@@ -388,17 +437,49 @@ export default function AfAsistenciaScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Ver código QR Button */}
-        <View style={styles.qrBtnRow}>
+        {/* Actions Row: Escanear QR + Iniciar junta (si hay quórum) */}
+        <View style={styles.afActionsRow}>
           <TouchableOpacity
-            style={styles.qrOutlineBtn}
-            activeOpacity={0.8}
-            onPress={() => setQrVisible(true)}
+            style={styles.scanQrBtn}
+            activeOpacity={0.85}
+            onPress={() => setScannerVisible(true)}
           >
-            <Ionicons name="qr-code-outline" size={18} color={GREEN} />
-            <Text style={styles.qrOutlineBtnText}>Ver código QR</Text>
+            <Ionicons name="qr-code-outline" size={18} color="#FFFFFF" />
+            <Text style={styles.scanQrBtnText}>Escanear QR</Text>
           </TouchableOpacity>
+
+          {quorumReached && (
+            <TouchableOpacity
+              style={styles.startMeetingBtn}
+              activeOpacity={0.85}
+              onPress={() => {
+                if (attendance?.session?.id) {
+                  startMeetingMutation.mutate({
+                    tenantId: TENANT_ID,
+                    sessionId: attendance.session.id,
+                  });
+                }
+              }}
+              disabled={startMeetingMutation.isPending}
+            >
+              {startMeetingMutation.isPending ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <>
+                  <Ionicons name="play" size={17} color="#FFFFFF" />
+                  <Text style={styles.startMeetingBtnText}>Iniciar junta</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
         </View>
+
+        {scanSuccessMessage && (
+          <View style={styles.scanSuccessBanner}>
+            <Ionicons name="checkmark-circle" size={18} color="#15803D" />
+            <Text style={styles.scanSuccessText}>{scanSuccessMessage}</Text>
+          </View>
+        )}
 
         {/* Search Input */}
         <View style={styles.searchBar}>
@@ -672,6 +753,99 @@ export default function AfAsistenciaScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Scanner Modal (Rol AF) */}
+      <Modal
+        visible={scannerVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setScannerVisible(false)}
+      >
+        <View style={styles.scannerModalOverlay}>
+          <View style={styles.scannerModalCard}>
+            <View style={styles.scannerModalHeader}>
+              <View>
+                <Text style={styles.scannerModalTitle}>Escanear código QR</Text>
+                <Text style={styles.scannerModalSub}>
+                  Apunta a la pantalla del móvil del propietario
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setScannerVisible(false)}
+                style={styles.scannerCloseBtn}
+              >
+                <Ionicons name="close" size={24} color={NAVY} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Viewfinder Graphic */}
+            <View style={styles.viewfinderBox}>
+              <View style={styles.viewfinderFrame}>
+                <View style={styles.viewfinderCornerTL} />
+                <View style={styles.viewfinderCornerTR} />
+                <View style={styles.viewfinderCornerBL} />
+                <View style={styles.viewfinderCornerBR} />
+                <View style={styles.viewfinderScanLine} />
+              </View>
+              <Text style={styles.viewfinderHint}>
+                Cámara lista para lectura de QR
+              </Text>
+            </View>
+
+            {/* Quick scan for registered absent owners */}
+            <View style={styles.quickScanSection}>
+              <Text style={styles.quickScanSectionTitle}>
+                Simular escaneo de vecino presente:
+              </Text>
+              <ScrollView
+                style={{ maxHeight: 180 }}
+                showsVerticalScrollIndicator={false}
+              >
+                {owners
+                  .filter((o) => !o.present)
+                  .slice(0, 5)
+                  .map((o) => (
+                    <TouchableOpacity
+                      key={o.memberId}
+                      style={styles.quickScanItem}
+                      onPress={() => {
+                        if (attendance?.session?.id) {
+                          scanAttendanceQrMutation.mutate({
+                            tenantId: TENANT_ID,
+                            sessionId: attendance.session.id,
+                            qrPayload: `ACONVI_QR:${attendance.session.id}:${o.memberId}:${o.userId}`,
+                          });
+                        }
+                      }}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.quickScanOwnerName}>{o.name}</Text>
+                        <Text style={styles.quickScanOwnerMeta}>
+                          Puerta {o.door} · {o.coefficient} %
+                        </Text>
+                      </View>
+                      <View style={styles.quickScanActionBadge}>
+                        <Ionicons
+                          name="qr-code-outline"
+                          size={15}
+                          color="#FFFFFF"
+                        />
+                        <Text style={styles.quickScanActionText}>Escanear</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+              </ScrollView>
+            </View>
+
+            <TouchableOpacity
+              style={styles.scannerCancelBtn}
+              onPress={() => setScannerVisible(false)}
+            >
+              <Text style={styles.scannerCancelBtnText}>Cerrar lector</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -898,25 +1072,226 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontWeight: "700",
   },
-  qrBtnRow: {
+  afActionsRow: {
     flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
     marginBottom: 12,
   },
-  qrOutlineBtn: {
+  scanQrBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: GREEN,
-    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: GREEN,
+    shadowColor: GREEN,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  qrOutlineBtnText: {
+  scanQrBtnText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  startMeetingBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: "#0D9488",
+    shadowColor: "#0D9488",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  startMeetingBtnText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  scanSuccessBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#DCFCE7",
+    borderColor: "#86EFAC",
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  scanSuccessText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#166534",
+    flex: 1,
+  },
+  scannerModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.75)",
+    justifyContent: "flex-end",
+  },
+  scannerModalCard: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    maxHeight: "85%",
+  },
+  scannerModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 18,
+  },
+  scannerModalTitle: {
+    fontSize: 19,
+    fontWeight: "700",
+    color: NAVY,
+  },
+  scannerModalSub: {
+    fontSize: 13,
+    color: BLUE_MUTED,
+    marginTop: 2,
+  },
+  scannerCloseBtn: {
+    padding: 4,
+  },
+  viewfinderBox: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#0F172A",
+    borderRadius: 16,
+    paddingVertical: 24,
+    marginBottom: 18,
+  },
+  viewfinderFrame: {
+    width: 140,
+    height: 140,
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  viewfinderCornerTL: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: 24,
+    height: 24,
+    borderTopWidth: 3,
+    borderLeftWidth: 3,
+    borderColor: "#10B981",
+  },
+  viewfinderCornerTR: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    width: 24,
+    height: 24,
+    borderTopWidth: 3,
+    borderRightWidth: 3,
+    borderColor: "#10B981",
+  },
+  viewfinderCornerBL: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    width: 24,
+    height: 24,
+    borderBottomWidth: 3,
+    borderLeftWidth: 3,
+    borderColor: "#10B981",
+  },
+  viewfinderCornerBR: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 24,
+    height: 24,
+    borderBottomWidth: 3,
+    borderRightWidth: 3,
+    borderColor: "#10B981",
+  },
+  viewfinderScanLine: {
+    width: 120,
+    height: 2,
+    backgroundColor: "#34D399",
+    shadowColor: "#34D399",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
+  },
+  viewfinderHint: {
+    fontSize: 12,
+    color: "#94A3B8",
+    marginTop: 12,
+  },
+  quickScanSection: {
+    marginBottom: 16,
+  },
+  quickScanSectionTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: NAVY,
+    marginBottom: 8,
+  },
+  quickScanItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    marginBottom: 8,
+  },
+  quickScanOwnerName: {
+    fontSize: 13.5,
+    fontWeight: "600",
+    color: NAVY,
+  },
+  quickScanOwnerMeta: {
+    fontSize: 11.5,
+    color: BLUE_MUTED,
+    marginTop: 2,
+  },
+  quickScanActionBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: GREEN,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  quickScanActionText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  scannerCancelBtn: {
+    paddingVertical: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    backgroundColor: "#F1F5F9",
+  },
+  scannerCancelBtnText: {
     fontSize: 14,
     fontWeight: "600",
-    color: GREEN,
+    color: "#64748B",
   },
   searchBar: {
     flexDirection: "row",

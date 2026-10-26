@@ -133,6 +133,18 @@ export default function AfLayout() {
         name="comunidades"
         options={{ href: null, headerShown: false }}
       />
+      <Tabs.Screen
+        name="orden-del-dia"
+        options={{ href: null, headerShown: false }}
+      />
+      <Tabs.Screen
+        name="escrutinio"
+        options={{ href: null, headerShown: false }}
+      />
+      <Tabs.Screen
+        name="mano-alzada"
+        options={{ href: null, headerShown: false }}
+      />
     </Tabs>
   );
 }

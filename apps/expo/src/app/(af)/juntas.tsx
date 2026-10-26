@@ -73,7 +73,7 @@ function buildQrMatrix(seed: string): boolean[][] {
       }
       hash ^= (r * 31 + c * 17) & 0xff;
       hash = Math.imul(hash, 16777619);
-      grid[r]![c] = (Math.abs(hash) % 10) < 5;
+      grid[r]![c] = Math.abs(hash) % 10 < 5;
     }
   }
   return grid;
@@ -83,10 +83,63 @@ export default function AfJuntasScreen() {
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
   const [qrVisible, setQrVisible] = useState(false);
+  const [scannerVisible, setScannerVisible] = useState(false);
+  const [scanSuccessMessage, setScanSuccessMessage] = useState<string | null>(
+    null,
+  );
   const [agendaVisible, setAgendaVisible] = useState(false);
 
   const { data: portfolio, isLoading } = useQuery(
     api.meeting.portfolio.queryOptions({ tenantId: TENANT_ID }),
+  );
+
+  const activeJunta = portfolio?.featuredJunta;
+
+  const { data: attendanceData } = useQuery({
+    ...api.meeting.attendance.queryOptions({
+      tenantId: TENANT_ID,
+      sessionId: activeJunta?.id ?? "00000000-0000-0000-0000-000000000000",
+    }),
+    enabled: Boolean(activeJunta?.id),
+    refetchInterval: 3000,
+  });
+
+  const quorumReached =
+    (attendanceData?.missingForQuorumPct ?? 100) <= 0 ||
+    (attendanceData?.participationPct ?? 0) >= 50;
+
+  const startMeetingMutation = useMutation(
+    api.meeting.startMeeting.mutationOptions({
+      onSuccess: (data) => {
+        void queryClient.invalidateQueries();
+        router.push({
+          pathname: "/(af)/orden-del-dia" as any,
+          params: { sessionId: data.sessionId },
+        });
+      },
+      onError: (err: any) => {
+        Alert.alert("Error", err?.message || "No se pudo iniciar la junta.");
+      },
+    }),
+  );
+
+  const scanAttendanceQrMutation = useMutation(
+    api.meeting.scanAttendanceQr.mutationOptions({
+      onSuccess: async (data) => {
+        await queryClient.invalidateQueries();
+        setScanSuccessMessage(
+          `¡Asistencia registrada! ${data.owner.name} (${data.owner.door} · ${data.owner.coefficient} %)`,
+        );
+        setTimeout(() => setScanSuccessMessage(null), 4000);
+        setScannerVisible(false);
+      },
+      onError: (err: any) => {
+        Alert.alert(
+          "Error al escanear",
+          err?.message || "Código QR no válido.",
+        );
+      },
+    }),
   );
 
   const closeSessionMutation = useMutation(
@@ -114,7 +167,6 @@ export default function AfJuntasScreen() {
     }
   }, []);
 
-  const activeJunta = portfolio?.featuredJunta;
   const qrMatrix = useMemo(
     () => buildQrMatrix(activeJunta?.id ?? "junta-jardines-del-turia"),
     [activeJunta?.id],
@@ -243,28 +295,56 @@ export default function AfJuntasScreen() {
               <TouchableOpacity
                 style={styles.secondaryActionBtn}
                 activeOpacity={0.85}
-                onPress={() => setQrVisible(true)}
+                onPress={() => setScannerVisible(true)}
               >
                 <Ionicons name="qr-code-outline" size={17} color={NAVY} />
-                <Text style={styles.secondaryActionText}>Ver código QR</Text>
+                <Text style={styles.secondaryActionText}>Escanear QR</Text>
               </TouchableOpacity>
+
+              {quorumReached && (
+                <TouchableOpacity
+                  style={styles.startMeetingInlineBtn}
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    if (activeJunta?.id) {
+                      startMeetingMutation.mutate({
+                        tenantId: TENANT_ID,
+                        sessionId: activeJunta.id,
+                      });
+                    }
+                  }}
+                  disabled={startMeetingMutation.isPending}
+                >
+                  {startMeetingMutation.isPending ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <>
+                      <Ionicons name="play" size={16} color="#FFFFFF" />
+                      <Text style={styles.startMeetingInlineText}>
+                        Iniciar junta
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
             </View>
+
+            {scanSuccessMessage && (
+              <View style={styles.scanSuccessBanner}>
+                <Ionicons name="checkmark-circle" size={16} color="#15803D" />
+                <Text style={styles.scanSuccessText}>{scanSuccessMessage}</Text>
+              </View>
+            )}
           </View>
         </View>
 
         {/* Pendientes Section Header */}
         <View style={styles.pendingSectionHeader}>
           <View style={styles.pendingHeaderLeft}>
-            <Ionicons
-              name="checkmark-circle-outline"
-              size={26}
-              color={GREEN}
-            />
+            <Ionicons name="checkmark-circle-outline" size={26} color={GREEN} />
             <View>
               <Text style={styles.pendingSectionTitle}>Pendientes</Text>
-              <Text style={styles.pendingSectionSub}>
-                3 requieren atención
-              </Text>
+              <Text style={styles.pendingSectionSub}>3 requieren atención</Text>
             </View>
           </View>
           <TouchableOpacity
@@ -280,7 +360,9 @@ export default function AfJuntasScreen() {
         <View style={styles.card}>
           {/* Item 1 */}
           <View style={styles.pendingRow}>
-            <View style={[styles.pendingIconCircle, { backgroundColor: RED_BG }]}>
+            <View
+              style={[styles.pendingIconCircle, { backgroundColor: RED_BG }]}
+            >
               <Ionicons name="warning-outline" size={20} color={RED} />
             </View>
             <View style={styles.pendingTextCol}>
@@ -347,7 +429,9 @@ export default function AfJuntasScreen() {
                 Portal 1 · Validar trabajo
               </Text>
               <View style={styles.statusDotRow}>
-                <View style={[styles.statusDot, { backgroundColor: SUBTEXT }]} />
+                <View
+                  style={[styles.statusDot, { backgroundColor: SUBTEXT }]}
+                />
                 <Text style={[styles.statusTimeText, { color: SUBTEXT }]}>
                   Hace 2h
                 </Text>
@@ -431,14 +515,14 @@ export default function AfJuntasScreen() {
                 setQrVisible(false);
                 router.push({
                   pathname: "/(af)/asistencia" as any,
-                  params: activeJunta?.id
-                    ? { sessionId: activeJunta.id }
-                    : {},
+                  params: activeJunta?.id ? { sessionId: activeJunta.id } : {},
                 });
               }}
             >
               <Ionicons name="people-outline" size={18} color="#FFFFFF" />
-              <Text style={styles.qrPrimaryBtnText}>Ir a lista de asistencia</Text>
+              <Text style={styles.qrPrimaryBtnText}>
+                Ir a lista de asistencia
+              </Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -532,6 +616,98 @@ export default function AfJuntasScreen() {
                 </TouchableOpacity>
               )}
             </View>
+          </View>
+        </View>
+      </Modal>
+      {/* Scanner Modal (Rol AF) */}
+      <Modal
+        visible={scannerVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setScannerVisible(false)}
+      >
+        <View style={styles.scannerModalOverlay}>
+          <View style={styles.scannerModalCard}>
+            <View style={styles.scannerModalHeader}>
+              <View>
+                <Text style={styles.scannerModalTitle}>Escanear código QR</Text>
+                <Text style={styles.scannerModalSub}>
+                  Apunta a la pantalla del móvil del propietario
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setScannerVisible(false)}
+                style={styles.scannerCloseBtn}
+              >
+                <Ionicons name="close" size={24} color={NAVY} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Viewfinder Graphic */}
+            <View style={styles.viewfinderBox}>
+              <View style={styles.viewfinderFrame}>
+                <View style={styles.viewfinderCornerTL} />
+                <View style={styles.viewfinderCornerTR} />
+                <View style={styles.viewfinderCornerBL} />
+                <View style={styles.viewfinderCornerBR} />
+                <View style={styles.viewfinderScanLine} />
+              </View>
+              <Text style={styles.viewfinderHint}>
+                Cámara lista para lectura de QR
+              </Text>
+            </View>
+
+            {/* Quick scan for registered absent owners */}
+            <View style={styles.quickScanSection}>
+              <Text style={styles.quickScanSectionTitle}>
+                Simular escaneo de vecino presente:
+              </Text>
+              <ScrollView
+                style={{ maxHeight: 180 }}
+                showsVerticalScrollIndicator={false}
+              >
+                {(attendanceData?.owners ?? [])
+                  .filter((o: any) => !o.present)
+                  .slice(0, 5)
+                  .map((o: any) => (
+                    <TouchableOpacity
+                      key={o.memberId}
+                      style={styles.quickScanItem}
+                      onPress={() => {
+                        if (activeJunta?.id) {
+                          scanAttendanceQrMutation.mutate({
+                            tenantId: TENANT_ID,
+                            sessionId: activeJunta.id,
+                            qrPayload: `ACONVI_QR:${activeJunta.id}:${o.memberId}:${o.userId}`,
+                          });
+                        }
+                      }}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.quickScanOwnerName}>{o.name}</Text>
+                        <Text style={styles.quickScanOwnerMeta}>
+                          Puerta {o.door} · {o.coefficient} %
+                        </Text>
+                      </View>
+                      <View style={styles.quickScanActionBadge}>
+                        <Ionicons
+                          name="qr-code-outline"
+                          size={15}
+                          color="#FFFFFF"
+                        />
+                        <Text style={styles.quickScanActionText}>Escanear</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+              </ScrollView>
+            </View>
+
+            <TouchableOpacity
+              style={styles.scannerCancelBtn}
+              onPress={() => setScannerVisible(false)}
+            >
+              <Text style={styles.scannerCancelBtnText}>Cerrar lector</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -757,6 +933,201 @@ const styles = StyleSheet.create({
     color: NAVY,
     fontSize: 14,
     fontWeight: "600",
+  },
+  startMeetingInlineBtn: {
+    backgroundColor: "#0D9488",
+    borderRadius: 24,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    shadowColor: "#0D9488",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  startMeetingInlineText: {
+    color: "#FFFFFF",
+    fontSize: 13.5,
+    fontWeight: "700",
+  },
+  scanSuccessBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#DCFCE7",
+    borderColor: "#86EFAC",
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 10,
+  },
+  scanSuccessText: {
+    fontSize: 12.5,
+    fontWeight: "600",
+    color: "#166534",
+    flex: 1,
+  },
+  scannerModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.75)",
+    justifyContent: "flex-end",
+  },
+  scannerModalCard: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    maxHeight: "85%",
+  },
+  scannerModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 18,
+  },
+  scannerModalTitle: {
+    fontSize: 19,
+    fontWeight: "700",
+    color: NAVY,
+  },
+  scannerModalSub: {
+    fontSize: 13,
+    color: SUBTEXT,
+    marginTop: 2,
+  },
+  scannerCloseBtn: {
+    padding: 4,
+  },
+  viewfinderBox: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#0F172A",
+    borderRadius: 16,
+    paddingVertical: 24,
+    marginBottom: 18,
+  },
+  viewfinderFrame: {
+    width: 140,
+    height: 140,
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  viewfinderCornerTL: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: 24,
+    height: 24,
+    borderTopWidth: 3,
+    borderLeftWidth: 3,
+    borderColor: "#10B981",
+  },
+  viewfinderCornerTR: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    width: 24,
+    height: 24,
+    borderTopWidth: 3,
+    borderRightWidth: 3,
+    borderColor: "#10B981",
+  },
+  viewfinderCornerBL: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    width: 24,
+    height: 24,
+    borderBottomWidth: 3,
+    borderLeftWidth: 3,
+    borderColor: "#10B981",
+  },
+  viewfinderCornerBR: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 24,
+    height: 24,
+    borderBottomWidth: 3,
+    borderRightWidth: 3,
+    borderColor: "#10B981",
+  },
+  viewfinderScanLine: {
+    width: 120,
+    height: 2,
+    backgroundColor: "#34D399",
+    shadowColor: "#34D399",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
+  },
+  viewfinderHint: {
+    fontSize: 12,
+    color: "#94A3B8",
+    marginTop: 12,
+  },
+  quickScanSection: {
+    marginBottom: 16,
+  },
+  quickScanSectionTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: NAVY,
+    marginBottom: 8,
+  },
+  quickScanItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    marginBottom: 8,
+  },
+  quickScanOwnerName: {
+    fontSize: 13.5,
+    fontWeight: "600",
+    color: NAVY,
+  },
+  quickScanOwnerMeta: {
+    fontSize: 11.5,
+    color: SUBTEXT,
+    marginTop: 2,
+  },
+  quickScanActionBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: GREEN,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  quickScanActionText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  scannerCancelBtn: {
+    paddingVertical: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    backgroundColor: "#F1F5F9",
+  },
+  scannerCancelBtnText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#64748B",
   },
   pendingSectionHeader: {
     flexDirection: "row",
